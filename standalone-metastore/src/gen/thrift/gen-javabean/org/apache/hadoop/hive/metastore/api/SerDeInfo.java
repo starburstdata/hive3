@@ -197,10 +197,10 @@ import org.slf4j.LoggerFactory;
       this.description = other.description;
     }
     if (other.isSetSerializerClass()) {
-      this.serializerClass = other.serializerClass;
+      this.serializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(other.serializerClass);
     }
     if (other.isSetDeserializerClass()) {
-      this.deserializerClass = other.deserializerClass;
+      this.deserializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(other.deserializerClass);
     }
     if (other.isSetSerdeType()) {
       this.serdeType = other.serdeType;
@@ -330,7 +330,7 @@ import org.slf4j.LoggerFactory;
   }
 
   public void setSerializerClass(String serializerClass) {
-    this.serializerClass = serializerClass;
+    this.serializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(serializerClass);
   }
 
   public void unsetSerializerClass() {
@@ -353,7 +353,7 @@ import org.slf4j.LoggerFactory;
   }
 
   public void setDeserializerClass(String deserializerClass) {
-    this.deserializerClass = deserializerClass;
+    this.deserializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(deserializerClass);
   }
 
   public void unsetDeserializerClass() {
@@ -842,7 +842,7 @@ import org.slf4j.LoggerFactory;
         switch (schemeField.id) {
           case 1: // NAME
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.name = iprot.readString();
+              struct.name = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
               struct.setNameIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
@@ -850,7 +850,7 @@ import org.slf4j.LoggerFactory;
             break;
           case 2: // SERIALIZATION_LIB
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.serializationLib = iprot.readString();
+              struct.serializationLib = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
               struct.setSerializationLibIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
@@ -859,15 +859,15 @@ import org.slf4j.LoggerFactory;
           case 3: // PARAMETERS
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
-                org.apache.thrift.protocol.TMap _map112 = iprot.readMapBegin();
-                struct.parameters = new HashMap<String,String>(2*_map112.size);
-                String _key113;
-                String _val114;
-                for (int _i115 = 0; _i115 < _map112.size; ++_i115)
+                org.apache.thrift.protocol.TMap _map120 = iprot.readMapBegin();
+                struct.parameters = new HashMap<String,String>(2*_map120.size);
+                String _key121;
+                String _val122;
+                for (int _i123 = 0; _i123 < _map120.size; ++_i123)
                 {
-                  _key113 = iprot.readString();
-                  _val114 = iprot.readString();
-                  struct.parameters.put(_key113, _val114);
+                  _key121 = iprot.readString();
+                  _val122 = iprot.readString();
+                  struct.parameters.put(_key121, _val122);
                 }
                 iprot.readMapEnd();
               }
@@ -886,7 +886,7 @@ import org.slf4j.LoggerFactory;
             break;
           case 5: // SERIALIZER_CLASS
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.serializerClass = iprot.readString();
+              struct.serializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
               struct.setSerializerClassIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
@@ -894,7 +894,7 @@ import org.slf4j.LoggerFactory;
             break;
           case 6: // DESERIALIZER_CLASS
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.deserializerClass = iprot.readString();
+              struct.deserializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
               struct.setDeserializerClassIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
@@ -935,10 +935,10 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(PARAMETERS_FIELD_DESC);
         {
           oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.parameters.size()));
-          for (Map.Entry<String, String> _iter116 : struct.parameters.entrySet())
+          for (Map.Entry<String, String> _iter124 : struct.parameters.entrySet())
           {
-            oprot.writeString(_iter116.getKey());
-            oprot.writeString(_iter116.getValue());
+            oprot.writeString(_iter124.getKey());
+            oprot.writeString(_iter124.getValue());
           }
           oprot.writeMapEnd();
         }
@@ -1021,10 +1021,10 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetParameters()) {
         {
           oprot.writeI32(struct.parameters.size());
-          for (Map.Entry<String, String> _iter117 : struct.parameters.entrySet())
+          for (Map.Entry<String, String> _iter125 : struct.parameters.entrySet())
           {
-            oprot.writeString(_iter117.getKey());
-            oprot.writeString(_iter117.getValue());
+            oprot.writeString(_iter125.getKey());
+            oprot.writeString(_iter125.getValue());
           }
         }
       }
@@ -1047,24 +1047,24 @@ import org.slf4j.LoggerFactory;
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(7);
       if (incoming.get(0)) {
-        struct.name = iprot.readString();
+        struct.name = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
         struct.setNameIsSet(true);
       }
       if (incoming.get(1)) {
-        struct.serializationLib = iprot.readString();
+        struct.serializationLib = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
         struct.setSerializationLibIsSet(true);
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TMap _map118 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.parameters = new HashMap<String,String>(2*_map118.size);
-          String _key119;
-          String _val120;
-          for (int _i121 = 0; _i121 < _map118.size; ++_i121)
+          org.apache.thrift.protocol.TMap _map126 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.parameters = new HashMap<String,String>(2*_map126.size);
+          String _key127;
+          String _val128;
+          for (int _i129 = 0; _i129 < _map126.size; ++_i129)
           {
-            _key119 = iprot.readString();
-            _val120 = iprot.readString();
-            struct.parameters.put(_key119, _val120);
+            _key127 = iprot.readString();
+            _val128 = iprot.readString();
+            struct.parameters.put(_key127, _val128);
           }
         }
         struct.parameters = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(struct.parameters); struct.setParametersIsSet(true);
@@ -1074,11 +1074,11 @@ import org.slf4j.LoggerFactory;
         struct.setDescriptionIsSet(true);
       }
       if (incoming.get(4)) {
-        struct.serializerClass = iprot.readString();
+        struct.serializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
         struct.setSerializerClassIsSet(true);
       }
       if (incoming.get(5)) {
-        struct.deserializerClass = iprot.readString();
+        struct.deserializerClass = org.apache.hadoop.hive.metastore.utils.StringUtils.intern(iprot.readString());
         struct.setDeserializerClassIsSet(true);
       }
       if (incoming.get(6)) {

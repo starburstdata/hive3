@@ -55,6 +55,11 @@ import org.apache.hadoop.hive.metastore.events.OpenTxnEvent;
 import org.apache.hadoop.hive.metastore.events.CommitTxnEvent;
 import org.apache.hadoop.hive.metastore.events.AbortTxnEvent;
 import org.apache.hadoop.hive.metastore.events.AllocWriteIdEvent;
+import org.apache.hadoop.hive.metastore.events.AcidWriteEvent;
+import org.apache.hadoop.hive.metastore.events.UpdateTableColumnStatEvent;
+import org.apache.hadoop.hive.metastore.events.DeleteTableColumnStatEvent;
+import org.apache.hadoop.hive.metastore.events.UpdatePartitionColumnStatEvent;
+import org.apache.hadoop.hive.metastore.events.DeletePartitionColumnStatEvent;
 import org.apache.hadoop.hive.metastore.tools.SQLGenerator;
 import java.sql.Connection;
 
@@ -280,6 +285,60 @@ public abstract class MetaStoreEventListener implements Configurable {
    */
   public void onAllocWriteId(AllocWriteIdEvent allocWriteIdEvent, Connection dbConn, SQLGenerator sqlGenerator)
           throws MetaException {
+  }
+
+  /**
+   * This will be called to perform acid write operation.
+   * @param acidWriteEvent event to be processed
+   * @param dbConn jdbc connection to remote meta store db.
+   * @param sqlGenerator helper class to generate db specific sql string.
+   * @throws MetaException
+   */
+  public void onAcidWrite(AcidWriteEvent acidWriteEvent, Connection dbConn, SQLGenerator sqlGenerator)
+          throws MetaException {
+  }
+
+  /**
+   * This will be called to update table column stats
+   * @param updateTableColumnStatEvent event to be processed
+   * @throws MetaException
+   */
+  public void onUpdateTableColumnStat(UpdateTableColumnStatEvent updateTableColumnStatEvent)
+          throws MetaException {
+  }
+
+  /**
+   * This will be called to delete table column stats
+   * @param deleteTableColumnStatEvent event to be processed
+   * @throws MetaException
+   */
+  public void onDeleteTableColumnStat(DeleteTableColumnStatEvent deleteTableColumnStatEvent)
+          throws MetaException {
+  }
+
+  /**
+   * This will be called to update partition column stats
+   * @param updatePartColStatEvent event to be processed
+   * @throws MetaException
+   */
+  public void onUpdatePartitionColumnStat(UpdatePartitionColumnStatEvent updatePartColStatEvent)
+          throws MetaException {
+  }
+
+  /**
+   * This will be called to delete partition column stats
+   * @param deletePartColStatEvent event to be processed
+   * @throws MetaException
+   */
+  public void onDeletePartitionColumnStat(DeletePartitionColumnStatEvent deletePartColStatEvent)
+          throws MetaException {
+  }
+
+  /**
+   * This is to check if the listener adds the event info to notification log table.
+   */
+  public boolean doesAddEventsToNotificationLogTable() {
+    return false;
   }
 
   @Override

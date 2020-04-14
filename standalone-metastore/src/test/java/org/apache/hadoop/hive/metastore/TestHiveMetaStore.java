@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import java.io.FileNotFoundException;
 import java.lang.reflect.Field;
 import java.io.IOException;
 import java.sql.Connection;
@@ -40,13 +41,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Sets;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.hive.metastore.api.CreationMetadata;
 import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.utils.FileUtils;
+import org.apache.hadoop.hive.metastore.utils.MetastoreVersionInfo;
 import org.apache.hadoop.hive.metastore.utils.SecurityUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.datanucleus.api.jdo.JDOPersistenceManager;
 import org.datanucleus.api.jdo.JDOPersistenceManagerFactory;
 import org.junit.Assert;
@@ -100,10 +104,11 @@ import static org.junit.Assert.fail;
 public abstract class TestHiveMetaStore {
   private static final Logger LOG = LoggerFactory.getLogger(TestHiveMetaStore.class);
   protected static HiveMetaStoreClient client;
-  protected static Configuration conf;
+  protected static Configuration conf = null;
   protected static Warehouse warehouse;
   protected static boolean isThriftClient = false;
 
+  private static final String ENGINE = "hive";
   private static final String TEST_DB1_NAME = "testdb1";
   private static final String TEST_DB2_NAME = "testdb2";
 
@@ -113,7 +118,7 @@ public abstract class TestHiveMetaStore {
 
   @Before
   public void setUp() throws Exception {
-    conf = MetastoreConf.newMetastoreConf();
+    initConf();
     warehouse = new Warehouse(conf);
 
     // set some values to use for getting conf. vars
@@ -123,11 +128,18 @@ public abstract class TestHiveMetaStore {
     conf.set("hive.key3", "");
     conf.set("hive.key4", "0");
     conf.set("datanucleus.autoCreateTables", "false");
+    conf.set("hive.in.test", "true");
 
     MetaStoreTestUtils.setConfForStandloneMode(conf);
     MetastoreConf.setLongVar(conf, ConfVars.BATCH_RETRIEVE_MAX, 2);
     MetastoreConf.setLongVar(conf, ConfVars.LIMIT_PARTITION_REQUEST, DEFAULT_LIMIT_PARTITION_REQUEST);
     MetastoreConf.setVar(conf, ConfVars.STORAGE_SCHEMA_READER_IMPL, "no.such.class");
+  }
+
+  protected void initConf() {
+    if (null == conf) {
+      conf = MetastoreConf.newMetastoreConf();
+    }
   }
 
   @Test
@@ -245,15 +257,13 @@ public abstract class TestHiveMetaStore {
       assertNotNull("Unable to create partition " + part4, retp4);
 
       Partition part_get = client.getPartition(dbName, tblName, part.getValues());
-      if(isThriftClient) {
-        // since we are using thrift, 'part' will not have the create time and
-        // last DDL time set since it does not get updated in the add_partition()
-        // call - likewise part2 and part3 - set it correctly so that equals check
-        // doesn't fail
-        adjust(client, part, dbName, tblName);
-        adjust(client, part2, dbName, tblName);
-        adjust(client, part3, dbName, tblName);
-      }
+      // since we are using thrift, 'part' will not have the create time and
+      // last DDL time set since it does not get updated in the add_partition()
+      // call - likewise part2 and part3 - set it correctly so that equals check
+      // doesn't fail
+      adjust(client, part, dbName, tblName, isThriftClient);
+      adjust(client, part2, dbName, tblName, isThriftClient);
+      adjust(client, part3, dbName, tblName, isThriftClient);
       assertTrue("Partitions are not same", part.equals(part_get));
 
       // check null cols schemas for a partition
@@ -384,12 +394,10 @@ public abstract class TestHiveMetaStore {
       Partition mpart3 = makePartitionObject(dbName, tblName, mvals3, tbl, "/mpart3");
       client.add_partitions(Arrays.asList(mpart1,mpart2,mpart3));
 
-      if(isThriftClient) {
-        // do DDL time munging if thrift mode
-        adjust(client, mpart1, dbName, tblName);
-        adjust(client, mpart2, dbName, tblName);
-        adjust(client, mpart3, dbName, tblName);
-      }
+      // do DDL time munging if thrift mode
+      adjust(client, mpart1, dbName, tblName, isThriftClient);
+      adjust(client, mpart2, dbName, tblName, isThriftClient);
+      adjust(client, mpart3, dbName, tblName, isThriftClient);
       verifyPartitionsPublished(client, dbName, tblName,
           Arrays.asList(mvals1.get(0)),
           Arrays.asList(mpart1,mpart2,mpart3));
@@ -419,10 +427,8 @@ public abstract class TestHiveMetaStore {
       // add_partitions(5) : ok
       client.add_partitions(Arrays.asList(mpart5));
 
-      if(isThriftClient) {
-        // do DDL time munging if thrift mode
-        adjust(client, mpart5, dbName, tblName);
-      }
+      // do DDL time munging if thrift mode
+      adjust(client, mpart5, dbName, tblName, isThriftClient);
 
       verifyPartitionsPublished(client, dbName, tblName,
           Arrays.asList(mvals1.get(0)),
@@ -1071,6 +1077,50 @@ public abstract class TestHiveMetaStore {
   }
 
   @Test
+  public void testExternalDirectory() throws Exception{
+    String externalDirString = MetastoreConf.getVar(conf, ConfVars.WAREHOUSE_EXTERNAL);
+    Path externalDir = new Path(externalDirString);
+    silentDropDatabase(TEST_DB1_NAME);
+
+    String dbLocation =
+        MetastoreConf.getVar(conf, ConfVars.WAREHOUSE) + "/test/_testDB_create_";
+
+    String dbExternalLocation = externalDirString + "/testdb1.db";
+
+
+    FileSystem fs = FileSystem.get(new Path(dbLocation).toUri(), conf);
+    fs.mkdirs(
+        new Path(MetastoreConf.getVar(conf, ConfVars.WAREHOUSE)),
+        new FsPermission((short) 700));
+
+    fs.mkdirs(externalDir, new FsPermission((short) 0777));
+
+    Database db = new DatabaseBuilder()
+        .setName(TEST_DB1_NAME)
+        .setLocation(dbLocation)
+        .build(conf);
+    client.createDatabase(db);
+    FileStatus fileStatus = fs.getFileStatus(new Path(dbExternalLocation));
+
+    assertTrue("External folder should have been created", fileStatus.isDirectory());
+    assertEquals("External folder should have the right permissions", new FsPermission((short) 0755),
+        fileStatus.getPermission());
+    assertEquals("External folder should be owned by the right username",
+        UserGroupInformation.getCurrentUser().getShortUserName(), fileStatus.getOwner());
+    client.dropDatabase(db.getName());
+
+    try {
+      fs.getFileStatus(new Path(dbExternalLocation));
+      fail("External directory should have been deleted");
+    } catch (FileNotFoundException e) {
+    } finally {
+      fs.delete(new Path(MetastoreConf.getVar(conf, ConfVars.WAREHOUSE) + "/test"), true);
+      fs.delete(new Path(MetastoreConf.getVar(conf,
+          ConfVars.WAREHOUSE_EXTERNAL) + "/test"), true);
+    }
+  }
+
+  @Test
   public void testDatabaseLocation() throws Throwable {
     try {
       // clear up any existing databases
@@ -1453,28 +1503,28 @@ public abstract class TestHiveMetaStore {
     assertEquals(4,partNames.size());
 
     // Test for both colNames and partNames being empty:
-    AggrStats aggrStatsEmpty = client.getAggrColStatsFor(dbName,tblName,emptyColNames,emptyPartNames);
+    AggrStats aggrStatsEmpty = client.getAggrColStatsFor(dbName,tblName,emptyColNames,emptyPartNames, ENGINE);
     assertNotNull(aggrStatsEmpty); // short-circuited on client-side, verifying that it's an empty object, not null
     assertEquals(0,aggrStatsEmpty.getPartsFound());
     assertNotNull(aggrStatsEmpty.getColStats());
     assert(aggrStatsEmpty.getColStats().isEmpty());
 
     // Test for only colNames being empty
-    AggrStats aggrStatsOnlyParts = client.getAggrColStatsFor(dbName,tblName,emptyColNames,partNames);
+    AggrStats aggrStatsOnlyParts = client.getAggrColStatsFor(dbName,tblName,emptyColNames,partNames, ENGINE);
     assertNotNull(aggrStatsOnlyParts); // short-circuited on client-side, verifying that it's an empty object, not null
     assertEquals(0,aggrStatsOnlyParts.getPartsFound());
     assertNotNull(aggrStatsOnlyParts.getColStats());
     assert(aggrStatsOnlyParts.getColStats().isEmpty());
 
     // Test for only partNames being empty
-    AggrStats aggrStatsOnlyCols = client.getAggrColStatsFor(dbName,tblName,colNames,emptyPartNames);
+    AggrStats aggrStatsOnlyCols = client.getAggrColStatsFor(dbName,tblName,colNames,emptyPartNames, ENGINE);
     assertNotNull(aggrStatsOnlyCols); // short-circuited on client-side, verifying that it's an empty object, not null
     assertEquals(0,aggrStatsOnlyCols.getPartsFound());
     assertNotNull(aggrStatsOnlyCols.getColStats());
     assert(aggrStatsOnlyCols.getColStats().isEmpty());
 
     // Test for valid values for both.
-    AggrStats aggrStatsFull = client.getAggrColStatsFor(dbName,tblName,colNames,partNames);
+    AggrStats aggrStatsFull = client.getAggrColStatsFor(dbName,tblName,colNames,partNames, ENGINE);
     assertNotNull(aggrStatsFull);
     assertEquals(0,aggrStatsFull.getPartsFound()); // would still be empty, because no stats are actually populated.
     assertNotNull(aggrStatsFull.getColStats());
@@ -1551,13 +1601,14 @@ public abstract class TestHiveMetaStore {
       ColumnStatistics colStats = new ColumnStatistics();
       colStats.setStatsDesc(statsDesc);
       colStats.setStatsObj(statsObjs);
+      colStats.setEngine(ENGINE);
 
       // write stats objs persistently
       client.updateTableColumnStatistics(colStats);
 
       // retrieve the stats obj that was just written
       ColumnStatisticsObj colStats2 = client.getTableColumnStatistics(
-          dbName, tblName, Lists.newArrayList(colName[0])).get(0);
+          dbName, tblName, Lists.newArrayList(colName[0]), ENGINE).get(0);
 
      // compare stats obj to ensure what we get is what we wrote
       assertNotNull(colStats2);
@@ -1569,11 +1620,11 @@ public abstract class TestHiveMetaStore {
 
       // test delete column stats; if no col name is passed all column stats associated with the
       // table is deleted
-      boolean status = client.deleteTableColumnStatistics(dbName, tblName, null);
+      boolean status = client.deleteTableColumnStatistics(dbName, tblName, null, ENGINE);
       assertTrue(status);
       // try to query stats for a column for which stats doesn't exist
       assertTrue(client.getTableColumnStatistics(
-          dbName, tblName, Lists.newArrayList(colName[1])).isEmpty());
+          dbName, tblName, Lists.newArrayList(colName[1]), ENGINE).isEmpty());
 
       colStats.setStatsDesc(statsDesc);
       colStats.setStatsObj(statsObjs);
@@ -1583,7 +1634,7 @@ public abstract class TestHiveMetaStore {
 
       // query column stats for column whose stats were updated in the previous call
       colStats2 = client.getTableColumnStatistics(
-          dbName, tblName, Lists.newArrayList(colName[0])).get(0);
+          dbName, tblName, Lists.newArrayList(colName[0]), ENGINE).get(0);
 
       // partition level column statistics test
       // create a table with multiple partitions
@@ -1612,11 +1663,12 @@ public abstract class TestHiveMetaStore {
       colStats = new ColumnStatistics();
       colStats.setStatsDesc(statsDesc);
       colStats.setStatsObj(statsObjs);
+      colStats.setEngine(ENGINE);
 
      client.updatePartitionColumnStatistics(colStats);
 
      colStats2 = client.getPartitionColumnStatistics(dbName, tblName,
-         Lists.newArrayList(partName), Lists.newArrayList(colName[1])).get(partName).get(0);
+         Lists.newArrayList(partName), Lists.newArrayList(colName[1]), ENGINE).get(partName).get(0);
 
      // compare stats obj to ensure what we get is what we wrote
      assertNotNull(colStats2);
@@ -1628,14 +1680,14 @@ public abstract class TestHiveMetaStore {
      assertEquals(colStats2.getStatsData().getStringStats().getNumDVs(), numDVs);
 
      // test stats deletion at partition level
-     client.deletePartitionColumnStatistics(dbName, tblName, partName, colName[1]);
+     client.deletePartitionColumnStatistics(dbName, tblName, partName, colName[1], ENGINE);
 
      colStats2 = client.getPartitionColumnStatistics(dbName, tblName,
-         Lists.newArrayList(partName), Lists.newArrayList(colName[0])).get(partName).get(0);
+         Lists.newArrayList(partName), Lists.newArrayList(colName[0]), ENGINE).get(partName).get(0);
 
      // test get stats on a column for which stats doesn't exist
      assertTrue(client.getPartitionColumnStatistics(dbName, tblName,
-           Lists.newArrayList(partName), Lists.newArrayList(colName[1])).isEmpty());
+           Lists.newArrayList(partName), Lists.newArrayList(colName[1]), ENGINE).isEmpty());
     } catch (Exception e) {
       System.err.println(StringUtils.stringifyException(e));
       System.err.println("testColumnStatistics() failed.");
@@ -1977,11 +2029,16 @@ public abstract class TestHiveMetaStore {
   }
 
   private static void adjust(HiveMetaStoreClient client, Partition part,
-      String dbName, String tblName) throws TException {
+      String dbName, String tblName, boolean isThriftClient) throws TException {
     Partition part_get = client.getPartition(dbName, tblName, part.getValues());
-    part.setCreateTime(part_get.getCreateTime());
-    part.putToParameters(org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.DDL_TIME, Long.toString(part_get.getCreateTime()));
+    if (isThriftClient) {
+      part.setCreateTime(part_get.getCreateTime());
+      part.putToParameters(org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.DDL_TIME, Long.toString(part_get.getCreateTime()));
+    }
+    part.setWriteId(part_get.getWriteId());
   }
+
+
 
   private static void silentDropDatabase(String dbName) throws TException {
     try {
@@ -2928,18 +2985,18 @@ public abstract class TestHiveMetaStore {
   @Test
   public void testRetriableClientWithConnLifetime() throws Exception {
 
-    Configuration conf = MetastoreConf.newMetastoreConf();
-    MetastoreConf.setTimeVar(conf, ConfVars.CLIENT_SOCKET_LIFETIME, 4, TimeUnit.SECONDS);
-    MetaStoreTestUtils.setConfForStandloneMode(conf);
+    Configuration newConf = MetastoreConf.newMetastoreConf(new Configuration(this.conf));
+    MetastoreConf.setTimeVar(newConf, ConfVars.CLIENT_SOCKET_LIFETIME, 4, TimeUnit.SECONDS);
+    MetaStoreTestUtils.setConfForStandloneMode(newConf);
     long timeout = 5 * 1000; // Lets use a timeout more than the socket lifetime to simulate a reconnect
 
     // Test a normal retriable client
-    IMetaStoreClient client = RetryingMetaStoreClient.getProxy(conf, getHookLoader(), HiveMetaStoreClient.class.getName());
+    IMetaStoreClient client = RetryingMetaStoreClient.getProxy(newConf, getHookLoader(), HiveMetaStoreClient.class.getName());
     client.getAllDatabases();
     client.close();
 
     // Connect after the lifetime, there should not be any failures
-    client = RetryingMetaStoreClient.getProxy(conf, getHookLoader(), HiveMetaStoreClient.class.getName());
+    client = RetryingMetaStoreClient.getProxy(newConf, getHookLoader(), HiveMetaStoreClient.class.getName());
     Thread.sleep(timeout);
     client.getAllDatabases();
     client.close();
@@ -3100,5 +3157,10 @@ public abstract class TestHiveMetaStore {
     }
     int size = allUuids.size();
     assertEquals(numAPICallsPerThread * parallelCalls, size);
+  }
+
+  @Test
+  public void testVersion() throws TException {
+    assertEquals(MetastoreVersionInfo.getVersion(), client.getServerVersion());
   }
 }

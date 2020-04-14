@@ -65,6 +65,10 @@
        <field name="ownerType">
         <column name="OWNER_TYPE" length="10" jdbc-type="VARCHAR" allows-null="true"/>
       </field>
+      <field name="createTime">
+        <!-- allows null is true to keep backwards compatibility with old releases -->
+        <column name="CREATE_TIME" jdbc-type="integer" allows-null="true"/>
+      </field>
     </class>
 
     <class name="MCatalog" identity-type="datastore" table="CTLGS" detachable="true">
@@ -80,6 +84,10 @@
       </field>
       <field name="locationUri">
         <column name="LOCATION_URI" length="4000" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
+      <field name="createTime">
+        <!-- allows null is true to keep backwards compatibility with old releases -->
+        <column name="CREATE_TIME" jdbc-type="integer" allows-null="true"/>
       </field>
     </class>
 
@@ -210,6 +218,9 @@
       <field name="tableType">
         <column name="TBL_TYPE" length="128" jdbc-type="VARCHAR"/>
       </field>
+      <field name="writeId">
+        <column name="WRITE_ID"/>
+      </field>
     </class>
 
     <class name="MCreationMetadata" identity-type="datastore" table="MV_CREATION_METADATA" detachable="true">
@@ -327,6 +338,7 @@
       </datastore-identity>
       <field name="cols" table="COLUMNS_V2" >
         <collection element-type="MFieldSchema"/>
+        <foreign-key name="COLUMNS_V2_FK" delete-action="cascade"/>
         <join>
           <primary-key name="COLUMNS_PK">
             <column name="COLUMN_NAME"/>
@@ -486,8 +498,11 @@
            <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
         </key>
         <value>
-           <column name="PARAM_VALUE" length="4000" jdbc-type="VARCHAR"/>
+           <column name="PARAM_VALUE" length="32672" jdbc-type="VARCHAR"/>
         </value>
+      </field>
+      <field name="writeId">
+        <column name="WRITE_ID"/>
       </field>
     </class>
     
@@ -989,6 +1004,9 @@
       <field name="lastAnalyzed">
         <column name="LAST_ANALYZED" jdbc-type="BIGINT" allows-null="false"/>
       </field>
+      <field name="engine">
+        <column name="ENGINE" length="128" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
     </class>
 
     <class name="MPartitionColumnStatistics" table="PART_COL_STATS" identity-type="datastore" detachable="true">
@@ -1059,7 +1077,11 @@
       <field name="lastAnalyzed">
         <column name="LAST_ANALYZED" jdbc-type="BIGINT" allows-null="false"/>
       </field>
+      <field name="engine">
+        <column name="ENGINE" length="128" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
     </class>
+
     <class name="MVersionTable" table="VERSION" identity-type="datastore" detachable="true">
       <datastore-identity>
         <column name="VER_ID"/>
@@ -1179,6 +1201,41 @@
       </datastore-identity>
       <field name="nextEventId">
         <column name="NEXT_EVENT_ID" jdbc-type="BIGINT" allows-null="false"/>
+      </field>
+    </class>
+
+    <class name="MTxnWriteNotificationLog" table="TXN_WRITE_NOTIFICATION_LOG" identity-type="datastore" detachable="true">
+      <datastore-identity strategy="increment"/>
+      <datastore-identity key-cache-size="1"/>
+      <datastore-identity>
+        <column name="WNL_ID"/>
+      </datastore-identity>
+      <field name="txnId">
+        <column name="WNL_TXNID" jdbc-type="BIGINT" allows-null="false"/>
+      </field>
+      <field name="writeId">
+        <column name="WNL_WRITEID" jdbc-type="BIGINT" allows-null="false"/>
+      </field>
+      <field name="database">
+        <column name="WNL_DATABASE" length="128" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
+      <field name="table">
+        <column name="WNL_TABLE" length="128" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
+      <field name="partition">
+        <column name="WNL_PARTITION" length="1024" jdbc-type="VARCHAR" allows-null="false"/>
+      </field>
+      <field name="tableObject">
+        <column name="WNL_TABLE_OBJ" jdbc-type="LONGVARCHAR"/>
+      </field>
+      <field name="partObject">
+        <column name="WNL_PARTITION_OBJ" jdbc-type="LONGVARCHAR"/>
+      </field>
+      <field name="files">
+        <column name="WNL_FILES" jdbc-type="LONGVARCHAR"/>
+      </field>
+      <field name="eventTime">
+        <column name="WNL_EVENT_TIME" jdbc-type="INTEGER" allows-null="false"/>
       </field>
     </class>
 

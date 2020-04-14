@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.metastore;
 
 import java.util.List;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -29,9 +30,10 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 
 import static org.junit.Assert.assertEquals;
-
 
 /**
  * A wrapper around {@link ObjectStore} that allows us to inject custom behaviour
@@ -82,6 +84,13 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
 
   private static com.google.common.base.Function<CallerArguments, Boolean> callerVerifier = null;
 
+  private static com.google.common.base.Function<NotificationEvent, Boolean> addNotificationEventModifier = null;
+
+  private static com.google.common.base.Function<CallerArguments, Boolean> alterTableModifier = null;
+
+  private static com.google.common.base.Function<CurrentNotificationEventId, CurrentNotificationEventId>
+          getCurrNotiEventIdModifier = null;
+
   // Methods to set/reset getTable modifier
   public static void setGetTableBehaviour(com.google.common.base.Function<Table, Table> modifier){
     getTableModifier = (modifier == null) ? com.google.common.base.Functions.identity() : modifier;
@@ -119,6 +128,14 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
     setGetNextNotificationBehaviour(null);
   }
 
+  public static void setAddNotificationModifier(com.google.common.base.Function<NotificationEvent, Boolean> modifier) {
+    addNotificationEventModifier = modifier;
+  }
+
+  public static void resetAddNotificationModifier() {
+    setAddNotificationModifier(null);
+  }
+
   // Methods to set/reset caller checker
   public static void setCallerVerifier(com.google.common.base.Function<CallerArguments, Boolean> verifier){
     callerVerifier = verifier;
@@ -128,10 +145,22 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
     setCallerVerifier(null);
   }
 
+  public static void setAlterTableModifier(com.google.common.base.Function<CallerArguments, Boolean> modifier) {
+    alterTableModifier = modifier;
+  }
+  public static void resetAlterTableModifier() {
+    setAlterTableModifier(null);
+  }
+
   // ObjectStore methods to be overridden with injected behavior
   @Override
   public Table getTable(String catName, String dbName, String tableName) throws MetaException {
     return getTableModifier.apply(super.getTable(catName, dbName, tableName));
+  }
+
+  @Override
+  public Table getTable(String catName, String dbName, String tableName, String writeIdList) throws MetaException {
+    return getTableModifier.apply(super.getTable(catName, dbName, tableName, writeIdList));
   }
 
   @Override
@@ -151,6 +180,33 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
     return getNextNotificationModifier.apply(super.getNextNotification(rqst));
   }
 
+  @Override
+  public Table alterTable(String catName, String dbname, String name, Table newTable, String queryValidWriteIds)
+          throws InvalidObjectException, MetaException {
+    if (alterTableModifier != null) {
+      CallerArguments args = new CallerArguments(dbname);
+      args.tblName = name;
+      Boolean success = alterTableModifier.apply(args);
+      if ((success != null) && !success) {
+        throw new MetaException("InjectableBehaviourObjectStore: Invalid alterTable operation on Catalog : " + catName +
+                " DB: " + dbname + " table: " + name);
+      }
+    }
+    return super.alterTable(catName, dbname, name, newTable, queryValidWriteIds);
+  }
+
+  @Override
+  public void addNotificationEvent(NotificationEvent entry) throws MetaException {
+    if (addNotificationEventModifier != null) {
+      Boolean success = addNotificationEventModifier.apply(entry);
+      if ((success != null) && !success) {
+        throw new MetaException("InjectableBehaviourObjectStore: Invalid addNotificationEvent operation on DB: "
+                + entry.getDbName() + " table: " + entry.getTableName() + " event : " + entry.getEventType());
+      }
+    }
+    super.addNotificationEvent(entry);
+  }
+  
   @Override
   public void createTable(Table tbl) throws InvalidObjectException, MetaException {
     if (callerVerifier != null) {
@@ -207,5 +263,36 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
       }
     }
     return super.addForeignKeys(fks);
+  }
+
+  @Override
+  public boolean alterDatabase(String catalogName, String dbname, Database db)
+          throws NoSuchObjectException, MetaException {
+    if (callerVerifier != null) {
+      CallerArguments args = new CallerArguments(dbname);
+      callerVerifier.apply(args);
+    }
+    return super.alterDatabase(catalogName, dbname, db);
+  }
+
+  // Methods to set/reset getCurrentNotificationEventId modifier
+  public static void setGetCurrentNotificationEventIdBehaviour(
+          com.google.common.base.Function<CurrentNotificationEventId, CurrentNotificationEventId> modifier){
+    getCurrNotiEventIdModifier = modifier;
+  }
+  public static void resetGetCurrentNotificationEventIdBehaviour(){
+    setGetCurrentNotificationEventIdBehaviour(null);
+  }
+
+  @Override
+  public CurrentNotificationEventId getCurrentNotificationEventId() {
+    CurrentNotificationEventId id = super.getCurrentNotificationEventId();
+    if (getCurrNotiEventIdModifier != null) {
+      id = getCurrNotiEventIdModifier.apply(id);
+      if (id == null) {
+        throw new RuntimeException("InjectableBehaviourObjectStore: Invalid getCurrentNotificationEventId");
+      }
+    }
+    return id;
   }
 }

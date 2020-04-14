@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.metastore.api.CreationMetadata;
 import org.apache.hadoop.hive.metastore.api.ISchemaName;
 import org.apache.hadoop.hive.metastore.api.SchemaVersionDescriptor;
@@ -84,9 +85,9 @@ import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.metastore.api.WMMapping;
 import org.apache.hadoop.hive.metastore.api.WMPool;
+import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.ColStatsObjWithSourceInfo;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.FullTableName;
 import org.apache.thrift.TException;
 
 /**
@@ -247,6 +248,12 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
+  public Table getTable(String catName, String dbName, String tableName, String writeIdList)
+      throws MetaException {
+    return objectStore.getTable(catName, dbName, tableName, writeIdList);
+  }
+
+  @Override
   public boolean addPartition(Partition part)
       throws InvalidObjectException, MetaException {
     return objectStore.addPartition(part);
@@ -256,6 +263,13 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   public Partition getPartition(String catName, String dbName, String tableName, List<String> partVals)
       throws MetaException, NoSuchObjectException {
     return objectStore.getPartition(catName, dbName, tableName, partVals);
+  }
+
+  @Override
+  public Partition getPartition(String catName, String dbName, String tableName,
+                                List<String> partVals, String writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return objectStore.getPartition(catName, dbName, tableName, partVals, writeIdList);
   }
 
   @Override
@@ -272,9 +286,10 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public void alterTable(String catName, String dbName, String name, Table newTable)
+  public Table alterTable(String catName, String dbName, String name, Table newTable,
+      String queryValidWriteIds)
       throws InvalidObjectException, MetaException {
-    objectStore.alterTable(catName, dbName, name, newTable);
+    return objectStore.alterTable(catName, dbName, name, newTable, queryValidWriteIds);
   }
 
   @Override
@@ -289,8 +304,13 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public List<String> getTables(String catName, String dbName, String pattern, TableType tableType) throws MetaException {
-    return objectStore.getTables(catName, dbName, pattern, tableType);
+  public List<String> getTables(String catName, String dbName, String pattern, TableType tableType, int limit) throws MetaException {
+    return objectStore.getTables(catName, dbName, pattern, tableType, limit);
+  }
+
+  @Override
+  public List<Table> getAllMaterializedViewObjectsForRewriting(String catName) throws MetaException {
+    return objectStore.getAllMaterializedViewObjectsForRewriting(catName);
   }
 
   @Override
@@ -336,16 +356,17 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public void alterPartition(String catName, String dbName, String tblName, List<String> partVals,
-      Partition newPart) throws InvalidObjectException, MetaException {
-    objectStore.alterPartition(catName, dbName, tblName, partVals, newPart);
+  public Partition alterPartition(String catName, String dbName, String tblName, List<String> partVals,
+      Partition newPart, String queryValidWriteIds) throws InvalidObjectException, MetaException {
+    return objectStore.alterPartition(catName, dbName, tblName, partVals, newPart, queryValidWriteIds);
   }
 
   @Override
-  public void alterPartitions(String catName, String dbName, String tblName,
-      List<List<String>> partValsList, List<Partition> newParts)
-      throws InvalidObjectException, MetaException {
-    objectStore.alterPartitions(catName, dbName, tblName, partValsList, newParts);
+  public List<Partition> alterPartitions(String catName, String dbName, String tblName,
+      List<List<String>> partValsList, List<Partition> newParts,
+      long writeId, String queryValidWriteIds) throws InvalidObjectException, MetaException {
+    return objectStore.alterPartitions(
+        catName, dbName, tblName, partValsList, newParts, writeId, queryValidWriteIds);
   }
 
   @Override
@@ -641,40 +662,54 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public ColumnStatistics getTableColumnStatistics(String catName, String dbName, String tableName,
+  public List<ColumnStatistics> getTableColumnStatistics(String catName, String dbName, String tableName,
       List<String> colNames) throws MetaException, NoSuchObjectException {
     return objectStore.getTableColumnStatistics(catName, dbName, tableName, colNames);
   }
 
   @Override
+  public ColumnStatistics getTableColumnStatistics(String catName, String dbName, String tableName,
+      List<String> colNames, String engine) throws MetaException, NoSuchObjectException {
+    return objectStore.getTableColumnStatistics(catName, dbName, tableName, colNames, engine);
+  }
+
+  @Override
+  public ColumnStatistics getTableColumnStatistics(String catName, String dbName,
+      String tableName, List<String> colNames, String engine, String writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return objectStore.getTableColumnStatistics(
+        catName, dbName, tableName, colNames, engine, writeIdList);
+  }
+
+  @Override
   public boolean deleteTableColumnStatistics(String catName, String dbName, String tableName,
-                                             String colName)
+      String colName, String engine)
       throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
-    return objectStore.deleteTableColumnStatistics(catName, dbName, tableName, colName);
+    return objectStore.deleteTableColumnStatistics(catName, dbName, tableName, colName, engine);
   }
 
   @Override
   public boolean deletePartitionColumnStatistics(String catName, String dbName, String tableName,
-      String partName, List<String> partVals, String colName)
+      String partName, List<String> partVals, String colName, String engine)
       throws NoSuchObjectException, MetaException, InvalidObjectException,
       InvalidInputException {
     return objectStore.deletePartitionColumnStatistics(catName, dbName, tableName, partName,
-        partVals, colName);
+        partVals, colName, engine);
   }
 
   @Override
-  public boolean updateTableColumnStatistics(ColumnStatistics statsObj)
+  public Map<String, String> updateTableColumnStatistics(ColumnStatistics statsObj, String validWriteIds, long writeId)
       throws NoSuchObjectException, MetaException, InvalidObjectException,
       InvalidInputException {
-    return objectStore.updateTableColumnStatistics(statsObj);
+    return objectStore.updateTableColumnStatistics(statsObj, validWriteIds, writeId);
   }
 
   @Override
-  public boolean updatePartitionColumnStatistics(ColumnStatistics statsObj,
-      List<String> partVals)
+  public Map<String, String> updatePartitionColumnStatistics(ColumnStatistics statsObj,
+      List<String> partVals, String validWriteIds, long writeId)
       throws NoSuchObjectException, MetaException, InvalidObjectException,
       InvalidInputException {
-    return objectStore.updatePartitionColumnStatistics(statsObj, partVals);
+    return objectStore.updatePartitionColumnStatistics(statsObj, partVals, validWriteIds, writeId);
   }
 
   @Override
@@ -732,16 +767,33 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public List<ColumnStatistics> getPartitionColumnStatistics(String catName, String dbName,
+  public List<List<ColumnStatistics>> getPartitionColumnStatistics(String catName, String dbName,
       String tblName, List<String> colNames, List<String> partNames)
       throws MetaException, NoSuchObjectException {
     return objectStore.getPartitionColumnStatistics(catName, dbName, tblName  , colNames, partNames);
   }
 
   @Override
+  public List<ColumnStatistics> getPartitionColumnStatistics(String catName, String dbName,
+      String tblName, List<String> colNames, List<String> partNames, String engine)
+      throws MetaException, NoSuchObjectException {
+    return objectStore.getPartitionColumnStatistics(catName, dbName, tblName, colNames, partNames, engine);
+  }
+
+  @Override
+  public List<ColumnStatistics> getPartitionColumnStatistics(
+      String catName, String dbName, String tblName, List<String> partNames,
+      List<String> colNames, String engine, String writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return objectStore.getPartitionColumnStatistics(
+             catName, dbName, tblName  , colNames, partNames, engine, writeIdList);
+  }
+
+  @Override
   public boolean doesPartitionExist(String catName, String dbName, String tableName,
-      List<String> partVals) throws MetaException, NoSuchObjectException {
-    return objectStore.doesPartitionExist(catName, dbName, tableName, partVals);
+      List<FieldSchema> partKeys, List<String> partVals)
+      throws MetaException, NoSuchObjectException {
+    return objectStore.doesPartitionExist(catName, dbName, tableName, partKeys, partVals);
   }
 
   @Override
@@ -800,8 +852,16 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
 
   @Override
   public AggrStats get_aggr_stats_for(String catName, String dbName,
-      String tblName, List<String> partNames, List<String> colNames)
+      String tblName, List<String> partNames, List<String> colNames, String engine)
       throws MetaException {
+    return null;
+  }
+
+  @Override
+  public AggrStats get_aggr_stats_for(String catName, String dbName,
+      String tblName, List<String> partNames, List<String> colNames,
+      String engine, String writeIdList)
+      throws MetaException, NoSuchObjectException {
     return null;
   }
 
@@ -811,7 +871,7 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public void addNotificationEvent(NotificationEvent event) {
+  public void addNotificationEvent(NotificationEvent event) throws MetaException {
     objectStore.addNotificationEvent(event);
   }
 
@@ -1188,13 +1248,23 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public List<FullTableName> getTableNamesWithStats() throws MetaException,
+  public void cleanWriteNotificationEvents(int olderThan) {
+    objectStore.cleanWriteNotificationEvents(olderThan);
+  }
+
+  @Override
+  public List<WriteEventInfo> getAllWriteEventInfo(long txnId, String dbName, String tableName) throws MetaException {
+    return objectStore.getAllWriteEventInfo(txnId, dbName, tableName);
+  }
+
+  @Override
+  public List<TableName> getTableNamesWithStats() throws MetaException,
       NoSuchObjectException {
     return null;
   }
 
   @Override
-  public List<FullTableName> getAllTableNamesForStats() throws MetaException,
+  public List<TableName> getAllTableNamesForStats() throws MetaException,
       NoSuchObjectException {
     return null;
   }

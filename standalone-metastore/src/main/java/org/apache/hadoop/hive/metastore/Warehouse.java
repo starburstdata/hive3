@@ -31,6 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.metastore.api.Catalog;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
@@ -200,6 +201,23 @@ public class Warehouse {
     }
   }
 
+  /**
+   *  Returns the external path if it exists in the expected location. Null otherwise
+   * @param db
+   * @return the path if it exists, null otherwise
+   * file system.
+   */
+  public Path determineDatabaseExternalPath(Database db){
+    if (hasExternalWarehouseRoot()) {
+      try {
+        return getDefaultExternalDatabasePath(db.getName());
+      } catch (MetaException e) {
+        LOG.warn("Unable to determine external path for database " + db.getName());
+      }
+    }
+    return null;
+  }
+
   private String dbDirFromDbName(Database db) throws MetaException {
     return db.getName().toLowerCase() + DATABASE_WAREHOUSE_SUFFIX;
   }
@@ -239,7 +257,7 @@ public class Warehouse {
     return new Path(getWhRootExternal(), dbName.toLowerCase() + DATABASE_WAREHOUSE_SUFFIX);
   }
 
-  private boolean hasExternalWarehouseRoot() {
+  public boolean hasExternalWarehouseRoot() {
     return !StringUtils.isBlank(whRootExternalString);
   }
 
@@ -283,12 +301,14 @@ public class Warehouse {
     return getDefaultTablePath(db, table.getTableName(), MetaStoreUtils.isExternalTable(table));
   }
 
+  @Deprecated // Use TableName
   public static String getQualifiedName(Table table) {
-    return getQualifiedName(table.getDbName(), table.getTableName());
+    return TableName.getDbTable(table.getDbName(), table.getTableName());
   }
 
+  @Deprecated // Use TableName
   public static String getQualifiedName(String dbName, String tableName) {
-    return dbName + CAT_DB_TABLE_SEPARATOR + tableName;
+    return TableName.getDbTable(dbName, tableName);
   }
 
   public static String getQualifiedName(Partition partition) {
@@ -301,22 +321,7 @@ public class Warehouse {
    * @return fully qualified name.
    */
   public static String getCatalogQualifiedTableName(Table table) {
-    return getCatalogQualifiedTableName(table.getCatName(), table.getDbName(), table.getTableName());
-  }
-
-  /**
-   * Get table name in cat.db.table format.
-   * @param catName catalog name
-   * @param dbName database name
-   * @param tableName table name
-   * @return fully qualified name.
-   */
-  public static String getCatalogQualifiedTableName(String catName, String dbName, String tableName) {
-    return catName + CAT_DB_TABLE_SEPARATOR + dbName + CAT_DB_TABLE_SEPARATOR + tableName;
-  }
-
-  public static String getCatalogQualifiedDbName(String catName, String dbName) {
-    return catName + CAT_DB_TABLE_SEPARATOR + dbName;
+    return TableName.getQualified(table.getCatName(), table.getDbName(), table.getTableName());
   }
 
   public boolean mkdirs(Path f) throws MetaException {
@@ -352,6 +357,16 @@ public class Warehouse {
     } catch (IOException e) {
       throw new MetaException(org.apache.hadoop.util.StringUtils.stringifyException(e));
     }
+  }
+
+  public boolean deleteDirIfEmpty(Path f) throws MetaException, IOException {
+    FileSystem fs = getFs(f);
+    if (FileUtils.isDirEmpty(fs, f)) {
+      return deleteDir(f, false, false, false);
+    } else {
+      LOG.info("Will not delete external directory " + f + " since it's not empty");
+    }
+    return true;
   }
 
   public boolean deleteDir(Path f, boolean recursive, Database db) throws MetaException {
@@ -418,7 +433,7 @@ public class Warehouse {
     }
   }
 
-  private static String escapePathName(String path) {
+  public static String escapePathName(String path) {
     return FileUtils.escapePathName(path);
   }
 

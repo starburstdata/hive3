@@ -60,11 +60,11 @@ public class TestHiveAlterHandler {
         getDefaultCatalog(conf), oldTable.getDbName(), oldTable.getTableName(), Arrays.asList("col1", "col2", "col3"));
     HiveAlterHandler handler = new HiveAlterHandler();
     handler.setConf(conf);
-    handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable);
+    handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable, null, null, conf, null);
   }
 
   @Test
-  public void testAlterTableDelColUpdateStats() throws MetaException, InvalidObjectException, NoSuchObjectException {
+  public void testAlterTableDelColUpdateStats() throws Exception {
     FieldSchema col1 = new FieldSchema("col1", "string", "col1 comment");
     FieldSchema col2 = new FieldSchema("col2", "string", "col2 comment");
     FieldSchema col3 = new FieldSchema("col3", "string", "col3 comment");
@@ -85,7 +85,13 @@ public class TestHiveAlterHandler {
     RawStore msdb = Mockito.mock(RawStore.class);
     HiveAlterHandler handler = new HiveAlterHandler();
     handler.setConf(conf);
-    handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable);
+    try {
+      handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable, null, null, conf, null);
+    } catch (Throwable t) {
+      System.err.println(t);
+      t.printStackTrace(System.err);
+      throw t;
+    }
     Mockito.verify(msdb, Mockito.times(1)).getTableColumnStatistics(
         getDefaultCatalog(conf), oldTable.getDbName(), oldTable.getTableName(), Arrays.asList("col1", "col2", "col3", "col4")
     );
@@ -115,7 +121,7 @@ public class TestHiveAlterHandler {
         getDefaultCatalog(conf), oldTable.getDbName(), oldTable.getTableName(), Arrays.asList("col1", "col2", "col3", "col4"));
     HiveAlterHandler handler = new HiveAlterHandler();
     handler.setConf(conf);
-    handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable);
+    handler.alterTableUpdateTableColumnStats(msdb, oldTable, newTable, null, null, conf, null);
   }
 
 }

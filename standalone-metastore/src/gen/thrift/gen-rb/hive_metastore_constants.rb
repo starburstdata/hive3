@@ -9,6 +9,14 @@ require 'hive_metastore_types'
 
 DDL_TIME = %q"transient_lastDdlTime"
 
+ACCESSTYPE_NONE = 1
+
+ACCESSTYPE_READONLY = 2
+
+ACCESSTYPE_WRITEONLY = 4
+
+ACCESSTYPE_READWRITE = 8
+
 HIVE_FILTER_FIELD_OWNER = %q"hive_filter_field_owner__"
 
 HIVE_FILTER_FIELD_PARAMS = %q"hive_filter_field_params__"
@@ -56,4 +64,8 @@ TABLE_NO_AUTO_COMPACT = %q"no_auto_compaction"
 TABLE_TRANSACTIONAL_PROPERTIES = %q"transactional_properties"
 
 TABLE_BUCKETING_VERSION = %q"bucketing_version"
+
+DRUID_CONFIG_PREFIX = %q"druid."
+
+JDBC_CONFIG_PREFIX = %q"hive.sql."
 

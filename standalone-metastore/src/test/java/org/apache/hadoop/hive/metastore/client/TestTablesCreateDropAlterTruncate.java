@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.minihms.AbstractMetaStoreService;
 import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
@@ -101,6 +102,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     Map<String, String> extraConf = new HashMap<>();
     extraConf.put("fs.trash.checkpoint.interval", "30");  // FS_TRASH_CHECKPOINT_INTERVAL_KEY
     extraConf.put("fs.trash.interval", "30");             // FS_TRASH_INTERVAL_KEY (hadoop-2)
+    extraConf.put(ConfVars.HIVE_IN_TEST.getVarname(), "true");
     startMetaStores(msConf, extraConf);
   }
 
@@ -225,6 +227,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     // Reset the parameters, so we can compare
     table.setParameters(createdTable.getParameters());
     table.setCreationMetadata(createdTable.getCreationMetadata());
+    table.setWriteId(createdTable.getWriteId());
     Assert.assertEquals("create/get table data", table, createdTable);
 
     // Check that the directory is created
@@ -685,6 +688,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     // Some of the data is set on the server side, so reset those
     newTable.setCreateTime(alteredTable.getCreateTime());
     newTable.setCreationMetadata(alteredTable.getCreationMetadata());
+    newTable.setWriteId(alteredTable.getWriteId());
     Assert.assertEquals("The table data should be the same", newTable, alteredTable);
   }
 
@@ -898,13 +902,18 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullTableNameInNew() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
     newTable.setTableName(null);
 
-    client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
+    try {
+      client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+      // Expected.
+    }
   }
 
   @Test(expected = InvalidOperationException.class)
@@ -933,20 +942,28 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullDatabase() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
-
-    client.alter_table(null, originalTable.getTableName(), newTable);
+    try {
+      client.alter_table(null, originalTable.getTableName(), newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+    }
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullTableName() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
 
-    client.alter_table(originalTable.getDbName(), null, newTable);
+    try {
+      client.alter_table(originalTable.getDbName(), null, newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+      // Expected.
+    }
   }
 
   @Test
@@ -959,7 +976,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
       Assert.fail("Expected a NullPointerException or TTransportException to be thrown");
     } catch (NullPointerException exception) {
       // Expected exception - Embedded MetaStore
-    } catch (TTransportException exception) {
+    } catch (TProtocolException exception) {
       // Expected exception - Remote MetaStore
     }
   }
