@@ -1,8 +1,10 @@
 PREHOOK: query: CREATE TABLE bucket_small_n0 (key string, value string) CLUSTERED BY (key) SORTED BY (key) INTO 4 BUCKETS STORED AS TEXTFILE
+TBLPROPERTIES('bucketing_version'='1')
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@bucket_small_n0
 POSTHOOK: query: CREATE TABLE bucket_small_n0 (key string, value string) CLUSTERED BY (key) SORTED BY (key) INTO 4 BUCKETS STORED AS TEXTFILE
+TBLPROPERTIES('bucketing_version'='1')
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@bucket_small_n0
@@ -39,10 +41,12 @@ POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@bucket_small_n0
 PREHOOK: query: CREATE TABLE bucket_big_n0 (key string, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS STORED AS TEXTFILE
+TBLPROPERTIES('bucketing_version'='1')
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@bucket_big_n0
 POSTHOOK: query: CREATE TABLE bucket_big_n0 (key string, value string) CLUSTERED BY (key) SORTED BY (key) INTO 2 BUCKETS STORED AS TEXTFILE
+TBLPROPERTIES('bucketing_version'='1')
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@bucket_big_n0
@@ -72,6 +76,13 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@bucket_big_n0
 POSTHOOK: Input: default@bucket_small_n0
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT COUNT(*) AS `$f0`
+FROM (SELECT `key`
+FROM `default`.`bucket_small_n0`
+WHERE `key` IS NOT NULL) AS `t0`
+INNER JOIN (SELECT `key`
+FROM `default`.`bucket_big_n0`
+WHERE `key` IS NOT NULL) AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -87,6 +98,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: b
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 1 Data size: 27500 Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
@@ -108,6 +120,7 @@ STAGE PLANS:
                         BucketMapJoin: true
                         Group By Operator
                           aggregations: count()
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -130,7 +143,7 @@ STAGE PLANS:
                     SORTBUCKETCOLSPREFIX TRUE
                     bucket_count 2
                     bucket_field_name key
-                    bucketing_version 2
+                    bucketing_version 1
                     column.name.delimiter ,
                     columns key,value
                     columns.comments 
@@ -153,7 +166,7 @@ STAGE PLANS:
                       SORTBUCKETCOLSPREFIX TRUE
                       bucket_count 2
                       bucket_field_name key
-                      bucketing_version 2
+                      bucketing_version 1
                       column.name.delimiter ,
                       columns key,value
                       columns.comments 
@@ -232,6 +245,13 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@bucket_big_n0
 POSTHOOK: Input: default@bucket_small_n0
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT COUNT(*) AS `$f0`
+FROM (SELECT `key`
+FROM `default`.`bucket_big_n0`
+WHERE `key` IS NOT NULL) AS `t0`
+INNER JOIN (SELECT `key`
+FROM `default`.`bucket_small_n0`
+WHERE `key` IS NOT NULL) AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -247,6 +267,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 1 Data size: 27500 Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
@@ -268,6 +289,7 @@ STAGE PLANS:
                         BucketMapJoin: true
                         Group By Operator
                           aggregations: count()
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -290,7 +312,7 @@ STAGE PLANS:
                     SORTBUCKETCOLSPREFIX TRUE
                     bucket_count 2
                     bucket_field_name key
-                    bucketing_version 2
+                    bucketing_version 1
                     column.name.delimiter ,
                     columns key,value
                     columns.comments 
@@ -313,7 +335,7 @@ STAGE PLANS:
                       SORTBUCKETCOLSPREFIX TRUE
                       bucket_count 2
                       bucket_field_name key
-                      bucketing_version 2
+                      bucketing_version 1
                       column.name.delimiter ,
                       columns key,value
                       columns.comments 
@@ -392,6 +414,13 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@bucket_big_n0
 POSTHOOK: Input: default@bucket_small_n0
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT COUNT(*) AS `$f0`
+FROM (SELECT `key`
+FROM `default`.`bucket_big_n0`
+WHERE `key` IS NOT NULL) AS `t0`
+INNER JOIN (SELECT `key`
+FROM `default`.`bucket_small_n0`
+WHERE `key` IS NOT NULL) AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -407,6 +436,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 1 Data size: 27500 Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
@@ -428,6 +458,7 @@ STAGE PLANS:
                         BucketMapJoin: true
                         Group By Operator
                           aggregations: count()
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -450,7 +481,7 @@ STAGE PLANS:
                     SORTBUCKETCOLSPREFIX TRUE
                     bucket_count 2
                     bucket_field_name key
-                    bucketing_version 2
+                    bucketing_version 1
                     column.name.delimiter ,
                     columns key,value
                     columns.comments 
@@ -473,7 +504,7 @@ STAGE PLANS:
                       SORTBUCKETCOLSPREFIX TRUE
                       bucket_count 2
                       bucket_field_name key
-                      bucketing_version 2
+                      bucketing_version 1
                       column.name.delimiter ,
                       columns key,value
                       columns.comments 

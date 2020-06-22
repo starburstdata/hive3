@@ -127,6 +127,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((cint1 - 2) > 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -143,11 +144,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [4, 13]
-                    selectExpressions: LongColSubtractLongScalarChecked(col 4:int, val 2) -> 13:int
+                    projectedOutputColumnNums: [4, 14]
+                    selectExpressions: LongColSubtractLongScalarChecked(col 4:int, val 2) -> 14:int
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -235,6 +237,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((cint2 + 2) < 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -251,11 +254,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [5, 13]
-                    selectExpressions: LongColAddLongScalarChecked(col 5:int, val 2) -> 13:int
+                    projectedOutputColumnNums: [5, 14]
+                    selectExpressions: LongColAddLongScalarChecked(col 5:int, val 2) -> 14:int
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -341,6 +345,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((cint2 * 2) < 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -357,11 +362,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [5, 13]
-                    selectExpressions: LongColMultiplyLongScalarChecked(col 5:int, val 2) -> 13:int
+                    projectedOutputColumnNums: [5, 14]
+                    selectExpressions: LongColMultiplyLongScalarChecked(col 5:int, val 2) -> 14:int
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -447,6 +453,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((ctinyint1 - 2Y) > 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -463,11 +470,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [0, 13]
-                    selectExpressions: LongColSubtractLongScalarChecked(col 0:tinyint, val 2) -> 13:tinyint
+                    projectedOutputColumnNums: [0, 14]
+                    selectExpressions: LongColSubtractLongScalarChecked(col 0:tinyint, val 2) -> 14:tinyint
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: tinyint)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -555,6 +563,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((ctinyint2 + 2Y) < 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -571,11 +580,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [1, 13]
-                    selectExpressions: LongColAddLongScalarChecked(col 1:tinyint, val 2) -> 13:int
+                    projectedOutputColumnNums: [1, 14]
+                    selectExpressions: LongColAddLongScalarChecked(col 1:tinyint, val 2) -> 14:int
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: tinyint)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -661,6 +671,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((csmallint2 * 2S) < 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -677,11 +688,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [3, 13]
-                    selectExpressions: LongColMultiplyLongScalarChecked(col 3:smallint, val 2) -> 13:int
+                    projectedOutputColumnNums: [3, 14]
+                    selectExpressions: LongColMultiplyLongScalarChecked(col 3:smallint, val 2) -> 14:int
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: smallint)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -756,6 +768,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((csmallint2 * 2S) < 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: ((csmallint2 * 2S) < 0) (type: boolean)
@@ -766,6 +779,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: smallint)
+                  null sort order: z
                   sort order: +
                   Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: int)
@@ -839,6 +853,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: parquettable
+            filterExpr: ((t1 - t2) < 50) (type: boolean)
             Statistics: Num rows: 3 Data size: 12 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: ((t1 - t2) < 50) (type: boolean)
@@ -849,6 +864,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: tinyint)
+                  null sort order: z
                   sort order: -
                   Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: tinyint), _col1 (type: tinyint)
@@ -911,6 +927,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: parquettable
+            filterExpr: ((i1 - i2) < 50) (type: boolean)
             Statistics: Num rows: 3 Data size: 12 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -927,11 +944,12 @@ STAGE PLANS:
                 Select Vectorization:
                     className: VectorSelectOperator
                     native: true
-                    projectedOutputColumnNums: [2, 3, 5]
-                    selectExpressions: LongColSubtractLongColumnChecked(col 2:int, col 3:int) -> 5:int
+                    projectedOutputColumnNums: [2, 3, 6]
+                    selectExpressions: LongColSubtractLongColumnChecked(col 2:int, col 3:int) -> 6:int
                 Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: int)
+                  null sort order: z
                   sort order: -
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
@@ -1116,6 +1134,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test_overflow
+            filterExpr: ((csmallint1 pmod 16385S) > 0) (type: boolean)
             Statistics: Num rows: 3 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -1136,6 +1155,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: tinyint)
+                  null sort order: z
                   sort order: +
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator

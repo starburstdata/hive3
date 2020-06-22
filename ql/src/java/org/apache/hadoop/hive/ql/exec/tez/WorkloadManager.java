@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.ql.exec.tez;
 
+import com.google.common.util.concurrent.*;
 import org.apache.hadoop.hive.metastore.api.WMPoolSchedulingPolicy;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 
@@ -24,12 +25,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.math.DoubleMath;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -63,7 +60,7 @@ import org.apache.hadoop.hive.metastore.api.WMPool;
 import org.apache.hadoop.hive.metastore.api.WMPoolTrigger;
 import org.apache.hadoop.hive.metastore.api.WMTrigger;
 import org.apache.hadoop.hive.ql.exec.tez.AmPluginNode.AmPluginInfo;
-import org.apache.hadoop.hive.ql.exec.tez.TezSessionState.HiveResources;
+import org.apache.hadoop.hive.ql.exec.tez.TezSession.HiveResources;
 import org.apache.hadoop.hive.ql.exec.tez.UserPoolMapping.MappingInput;
 import org.apache.hadoop.hive.ql.exec.tez.WmEvent.EventType;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -76,6 +73,7 @@ import org.apache.hadoop.hive.ql.wm.TriggerActionHandler;
 import org.apache.hadoop.hive.ql.wm.WmContext;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hive.common.util.Ref;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.codehaus.jackson.annotate.JsonAutoDetect;
@@ -96,7 +94,7 @@ import org.slf4j.LoggerFactory;
  * none of that state can be accessed directly - most changes that touch pool state, or interact
  * with background operations like init, need to go thru eventstate; see e.g. returnAfterUse.
  */
-public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValidator
+public class WorkloadManager extends AbstractTriggerValidator
   implements TezSessionPoolSession.Manager, SessionExpirationTracker.RestartImpl,
              WorkloadManagerMxBean {
   private static final Logger LOG = LoggerFactory.getLogger(WorkloadManager.class);
@@ -110,10 +108,13 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   private final SessionExpirationTracker expirationTracker;
   private final RestrictedConfigChecker restrictedConfig;
   private final QueryAllocationManager allocationManager;
+  private final boolean recoverAms;
   private final String yarnQueue;
   private final int amRegistryTimeoutMs;
   private final boolean allowAnyPool;
   private final MetricsSystem metricsSystem;
+  private final ExternalSessionsRegistry externalSessions;
+
   // Note: it's not clear that we need to track this - unlike PoolManager we don't have non-pool
   //       sessions, so the pool itself could internally track the ses  sions it gave out, since
   //       calling close on an unopened session is probably harmless.
@@ -183,24 +184,27 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   }
 
   /** Called once, when HS2 initializes. */
-  public static WorkloadManager create(String yarnQueue, HiveConf conf, WMFullResourcePlan plan)
-    throws ExecutionException, InterruptedException {
+  public static WorkloadManager create(String yarnQueue, HiveConf conf,
+      WMFullResourcePlan plan, boolean recoverAms)
+    throws Exception {
     assert INSTANCE == null;
     // We could derive the expected number of AMs to pass in.
     // Note: we pass a null token here; the tokens to talk to plugin endpoints will only be
     //       known once the AMs register, and they are different for every AM (unlike LLAP token).
     LlapPluginEndpointClientImpl amComm = new LlapPluginEndpointClientImpl(conf, null, -1);
     QueryAllocationManager qam = new GuaranteedTasksAllocator(conf, amComm);
-    return (INSTANCE = new WorkloadManager(amComm, yarnQueue, conf, qam, plan));
+    return (INSTANCE = new WorkloadManager(amComm, yarnQueue, conf, qam, plan, recoverAms));
   }
 
   @VisibleForTesting
   WorkloadManager(LlapPluginEndpointClientImpl amComm, String yarnQueue, HiveConf conf,
-      QueryAllocationManager qam, WMFullResourcePlan plan) throws ExecutionException, InterruptedException {
+      QueryAllocationManager qam, WMFullResourcePlan plan, boolean recoverAms)
+    throws Exception {
     this.yarnQueue = yarnQueue;
     this.conf = conf;
     this.totalQueryParallelism = determineQueryParallelism(plan);
     this.allocationManager = qam;
+    this.recoverAms = recoverAms;
     this.allocationManager.setClusterChangedCallback(() -> notifyOfClusterStateChange());
 
     this.amComm = amComm;
@@ -211,8 +215,9 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
     this.amRegistryTimeoutMs = (int)HiveConf.getTimeVar(
       conf, ConfVars.HIVE_SERVER2_TEZ_WM_AM_REGISTRY_TIMEOUT, TimeUnit.MILLISECONDS);
-    tezAmPool = new TezSessionPool<>(conf, totalQueryParallelism, true,
-      oldSession -> createSession(oldSession == null ? null : oldSession.getConf()));
+    tezAmPool = new TezSessionPool<>(conf, totalQueryParallelism,
+      HiveConf.getVar(conf, ConfVars.LLAP_TASK_SCHEDULER_AM_REGISTRY_NAME),
+      (oldSession, id) -> createSession(oldSession == null ? null : oldSession.getConf(), id));
     restrictedConfig = new RestrictedConfigChecker(conf);
     // Only creates the expiration tracker if expiration is configured.
     expirationTracker = SessionExpirationTracker.create(conf, this);
@@ -229,6 +234,12 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
       metricsSystem = DefaultMetricsSystem.instance();
     } else {
       metricsSystem = null;
+    }
+
+    if (HiveConf.getBoolVar(conf, ConfVars.HIVE_SERVER2_TEZ_USE_EXTERNAL_SESSIONS)) {
+      externalSessions = ExternalSessionsRegistry.getClient(conf);
+    } else {
+      externalSessions = null;
     }
 
     wmThread = new Thread(() -> runWmThread(), "Workload management master");
@@ -256,7 +267,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
   public void start() throws Exception {
     initTriggers();
-    tezAmPool.start();
+    tezAmPool.start(recoverAms);
     if (expirationTracker != null) {
       expirationTracker.start();
     }
@@ -277,13 +288,24 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
     }
   }
 
-  public void stop() throws Exception {
-    List<TezSessionPoolSession> sessionsToClose = null;
-    synchronized (openSessions) {
-      sessionsToClose = new ArrayList<TezSessionPoolSession>(openSessions.keySet());
-    }
-    for (TezSessionState sessionState : sessionsToClose) {
-      sessionState.close(false);
+  public void stop(boolean isStop) throws Exception {
+    if (!recoverAms || isStop) {
+      List<TezSessionPoolSession> sessionsToClose = null;
+      synchronized (openSessions) {
+        sessionsToClose = new ArrayList<>(openSessions.keySet());
+      }
+      for (TezSessionPoolSession sessionState : sessionsToClose) {
+        sessionState.close(false);
+      }
+    } else {
+      int count = 0;
+      synchronized (openSessions) {
+        count = openSessions.size();
+        openSessions.clear();
+      }
+      if (count > 0) {
+        LOG.info("AM recovery enabled; leaving " + count + " Tez sessions running");
+      }
     }
     if (expirationTracker != null) {
       expirationTracker.stop();
@@ -309,7 +331,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
       String poolName = entry.getKey();
       PoolState poolState = entry.getValue();
       final List<Trigger> triggers = Collections.unmodifiableList(poolState.getTriggers());
-      final List<TezSessionState> sessionStates = Collections.unmodifiableList(poolState.getSessions());
+      final List<TezSession> sessionStates = Collections.unmodifiableList(poolState.getSessions());
       SessionTriggerProvider sessionTriggerProvider = perPoolProviders.get(poolName);
       if (sessionTriggerProvider != null) {
         perPoolProviders.get(poolName).setTriggers(triggers);
@@ -429,24 +451,27 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
         //       because we know which exact query we intend to kill. This is valid because we
         //       are not expecting query ID to change - we never reuse the session for which a
         //       query is being killed until both the kill, and the user, return it.
-        String queryId = toKill.getQueryId();
-        KillQuery kq = toKill.getKillQuery();
         try {
-          if (kq != null && queryId != null) {
-            WmEvent wmEvent = new WmEvent(WmEvent.EventType.KILL);
-            LOG.info("Invoking KillQuery for " + queryId + ": " + reason);
-            try {
-              kq.killQuery(queryId, reason);
-              addKillQueryResult(toKill, true);
-              killCtx.killSessionFuture.set(true);
-              wmEvent.endEvent(toKill);
-              LOG.debug("Killed " + queryId);
-              return;
-            } catch (HiveException ex) {
-              LOG.error("Failed to kill " + queryId + "; will try to restart AM instead" , ex);
-            }
+          boolean wasKilled = false;
+          String queryId = toKill.getQueryId();
+          WmEvent wmEvent = new WmEvent(WmEvent.EventType.KILL);
+          try {
+            UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+            SessionState ss = new SessionState(new HiveConf(), ugi.getShortUserName());
+            ss.setIsHiveServerQuery(true);
+            SessionState.start(ss);
+            wasKilled = toKill.killQuery(reason);
+            addKillQueryResult(toKill, true);
+            killCtx.killSessionFuture.set(true);
+            wmEvent.endEvent(toKill);
+
+          } catch (HiveException|IOException ex) {
+            LOG.error("Failed to kill " + queryId + "; will try to restart AM instead" , ex);
+          }
+          if (wasKilled) {
+            LOG.debug("Killed " + queryId);
           } else {
-            LOG.info("Will queue restart for {}; queryId {}, killQuery {}", toKill, queryId, kq);
+            LOG.info("Will queue restart for {}; queryId {}", toKill, queryId);
           }
         } finally {
           toKill.setQueryId(null);
@@ -578,7 +603,8 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
         if (!wasReturned) {
           syncWork.toDestroyNoRestart.add(sessionToReturn);
         } else {
-          if (sessionToReturn.getWmContext() != null && sessionToReturn.getWmContext().isQueryCompleted()) {
+          WmContext ctx = sessionToReturn.getWmContext();
+          if (ctx != null && ctx.isQueryCompleted()) {
             sessionToReturn.resolveReturnFuture();
           }
           wmEvent.endEvent(sessionToReturn);
@@ -663,7 +689,8 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
         if (!tezAmPool.returnSessionAsync(ctx.session)) {
           syncWork.toDestroyNoRestart.add(ctx.session);
         } else {
-          if (ctx.session.getWmContext() != null && ctx.session.getWmContext().isQueryCompleted()) {
+          WmContext wmCtx = ctx.session.getWmContext();
+          if (wmCtx != null && wmCtx.isQueryCompleted()) {
             ctx.session.resolveReturnFuture();
           }
           wmEvent.endEvent(ctx.session);
@@ -1092,7 +1119,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   }
 
   private void failOnFutureFailure(ListenableFuture<?> future) {
-    Futures.addCallback(future, FATAL_ERROR_CALLBACK);
+    Futures.addCallback(future, FATAL_ERROR_CALLBACK, MoreExecutors.directExecutor());
   }
 
   private void queueGetRequestOnMasterThread(
@@ -1237,7 +1264,8 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
     if (!tezAmPool.returnSessionAsync(session)) {
       syncWork.toDestroyNoRestart.add(session);
     } else {
-      if (session.getWmContext() != null && session.getWmContext().isQueryCompleted()) {
+      WmContext wmCtx = session.getWmContext();
+      if (wmCtx != null && wmCtx.isQueryCompleted()) {
         session.resolveReturnFuture();
       }
       wmEvent.endEvent(session);
@@ -1403,11 +1431,11 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
   @VisibleForTesting
   public WmTezSession getSession(
-      TezSessionState session, MappingInput input, HiveConf conf) throws Exception {
+      TezSession session, MappingInput input, HiveConf conf) throws Exception {
     return getSession(session, input, conf, null);
   }
 
-  public WmTezSession getSession(TezSessionState session, MappingInput input, HiveConf conf,
+  public WmTezSession getSession(TezSession session, MappingInput input, HiveConf conf,
       final WmContext wmContext) throws Exception {
     WmEvent wmEvent = new WmEvent(WmEvent.EventType.GET);
     // Note: not actually used for pool sessions; verify some things like doAs are not set.
@@ -1439,7 +1467,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   }
 
   @Override
-  public void destroy(TezSessionState session) throws Exception {
+  public void destroy(TezSession session) throws Exception {
     WmTezSession wmTezSession = ensureOwnedSession(session);
     resetGlobalTezSession(wmTezSession);
     currentLock.lock();
@@ -1572,7 +1600,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
 
   @Override
-  public TezSessionState reopen(TezSessionState session) throws Exception {
+  public TezSession reopen(TezSession session) throws Exception {
     WmTezSession wmTezSession = ensureOwnedSession(session);
     HiveConf sessionConf = wmTezSession.getConf();
     if (sessionConf == null) {
@@ -1610,7 +1638,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
     hasChangesCondition.signalAll();
   }
 
-  private WmTezSession checkSessionForReuse(TezSessionState session) throws Exception {
+  private WmTezSession checkSessionForReuse(TezSession session) throws Exception {
     if (session == null) return null;
     WmTezSession result = null;
     if (session instanceof WmTezSession) {
@@ -1647,8 +1675,9 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
     }
   }
 
-  private WmTezSession createSession(HiveConf conf) {
-    WmTezSession session = createSessionObject(TezSessionState.makeSessionId(), conf);
+  private WmTezSession createSession(HiveConf conf, String sessionId) {
+    WmTezSession session = createSessionObject(
+        sessionId != null ? sessionId : TezSessionState.makeSessionId(), conf);
     session.setQueueName(yarnQueue);
     session.setDefault();
     LOG.info("Created new interactive session object " + session.getSessionId());
@@ -1659,10 +1688,16 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   protected WmTezSession createSessionObject(String sessionId, HiveConf conf) {
     conf = (conf == null) ? new HiveConf(this.conf) : conf;
     conf.set(LlapTaskSchedulerService.LLAP_PLUGIN_ENDPOINT_ENABLED, "true");
-    return new WmTezSession(sessionId, this, expirationTracker, conf);
+    TezSessionState base = null;
+    if (externalSessions != null) {
+      base = new TezExternalSessionState(sessionId, conf, externalSessions);
+    } else {
+      base = new TezSessionState(sessionId, conf);
+    }
+    return new WmTezSession(this, expirationTracker, base);
   }
 
-  private WmTezSession ensureOwnedSession(TezSessionState oldSession) {
+  private WmTezSession ensureOwnedSession(TezSession oldSession) {
     if (!(oldSession instanceof WmTezSession) || !((WmTezSession)oldSession).isOwnedBy(this)) {
       throw new AssertionError("Not a WM session " + oldSession);
     }
@@ -1684,7 +1719,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
     synchronized (openSessions) {
       openSessions.remove(session);
     }
-    tezAmPool.notifyClosed(session);
+    tezAmPool.notifyClosed(ensureOwnedSession(session));
   }
 
   @VisibleForTesting
@@ -1925,7 +1960,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
     public void start() throws Exception {
       ListenableFuture<WmTezSession> getFuture = tezAmPool.getSessionAsync();
-      Futures.addCallback(getFuture, this);
+      Futures.addCallback(getFuture, this, MoreExecutors.directExecutor());
     }
 
     @Override
@@ -1979,7 +2014,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
       case GETTING: {
         ListenableFuture<WmTezSession> waitFuture = session.waitForAmRegistryAsync(
             amRegistryTimeoutMs, timeoutPool);
-        Futures.addCallback(waitFuture, this);
+        Futures.addCallback(waitFuture, this, MoreExecutors.directExecutor());
         break;
       }
       case WAITING_FOR_REGISTRY: {

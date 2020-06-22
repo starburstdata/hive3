@@ -78,6 +78,7 @@ STAGE PLANS:
                     Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: z
                       sort order: +
                       Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
@@ -97,6 +98,7 @@ STAGE PLANS:
                       Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: z
                         sort order: +
                         Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
@@ -167,6 +169,7 @@ STAGE PLANS:
                   Statistics: Num rows: 6 Data size: 236 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string)
+                    null sort order: zzz
                     sort order: +++
                     Statistics: Num rows: 6 Data size: 236 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col3 (type: string), _col4 (type: string)
@@ -197,12 +200,12 @@ POSTHOOK: query: select json_tuple(a.jstring, 'f1', 'f2', 'f3', 'f4', 'f5') as (
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@json_t
 #### A masked pattern was here ####
-NULL	NULL	NULL	NULL	NULL
-NULL	NULL	NULL	NULL	NULL
 	NULL	NULL	NULL	NULL
 value1	value2	3	NULL	5.23
 value12	2	value3	4.01	NULL
 value13	2	value33	value44	5.01
+NULL	NULL	NULL	NULL	NULL
+NULL	NULL	NULL	NULL	NULL
 PREHOOK: query: explain 
 select a.key, b.f2, b.f5 from json_t a lateral view json_tuple(a.jstring, 'f1', 'f2', 'f3', 'f4', 'f5') b as f1, f2, f3, f4, f5 order by a.key
 PREHOOK: type: QUERY
@@ -239,6 +242,7 @@ STAGE PLANS:
                     Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: z
                       sort order: +
                       Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: string), _col2 (type: string)
@@ -258,6 +262,7 @@ STAGE PLANS:
                       Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: z
                         sort order: +
                         Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col1 (type: string), _col2 (type: string)
@@ -330,11 +335,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: count()
                       keys: _col6 (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
@@ -359,11 +366,13 @@ STAGE PLANS:
                         Group By Operator
                           aggregations: count()
                           keys: _col6 (type: string)
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
                             key expressions: _col0 (type: string)
+                            null sort order: a
                             sort order: +
                             Map-reduce partition columns: _col0 (type: string)
                             Statistics: Num rows: 12 Data size: 472 Basic stats: COMPLETE Column stats: NONE
@@ -388,6 +397,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string)
+              null sort order: z
               sort order: +
               Statistics: Num rows: 6 Data size: 236 Basic stats: COMPLETE Column stats: NONE
               value expressions: _col1 (type: bigint)
@@ -419,9 +429,9 @@ POSTHOOK: query: select f2, count(*) from json_t a lateral view json_tuple(a.jst
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@json_t
 #### A masked pattern was here ####
-NULL	1
 2	2
 value2	1
+NULL	1
 PREHOOK: query: CREATE TABLE dest1_n65(c1 STRING) STORED AS RCFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default

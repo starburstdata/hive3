@@ -51,6 +51,10 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
     private Reporter reporter;
     private long minimumWriteId;
     private long maximumWriteId;
+    private String attemptId;
+    /**
+     * actual bucketId (as opposed to bucket property via BucketCodec)
+     */
     private int bucketId;
     /**
      * Based on {@link org.apache.hadoop.hive.ql.metadata.Hive#mvFile(HiveConf, FileSystem, Path, FileSystem, Path, boolean, boolean)}
@@ -61,8 +65,15 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
     private boolean oldStyle = false;
     private int recIdCol = -1;  // Column the record identifier is in, -1 indicates no record id
     //unique within a transaction
+    /**
+     * todo: Link to AcidUtils?
+     */
     private int statementId = 0;
     private Path finalDestination;
+    /**
+     * todo: link to AcidUtils?
+     */
+    private long visibilityTxnId = 0;
     /**
      * Create the options object.
      * @param conf Use the given configuration
@@ -228,6 +239,11 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
       return this;
     }
 
+    public Options attemptId(String attemptId) {
+      this.attemptId = attemptId;
+      return this;
+    }
+
     /**
      * @since 1.3.0
      * This can be set to -1 to make the system generate old style (delta_xxxx_yyyy) file names.
@@ -250,6 +266,10 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
      */
     public Options finalDestination(Path p) {
       this.finalDestination = p;
+      return this;
+    }
+    public Options visibilityTxnId(long visibilityTxnId) {
+      this.visibilityTxnId = visibilityTxnId;
       return this;
     }
 
@@ -297,6 +317,10 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
       return bucketId;
     }
 
+    public String getAttemptId() {
+      return attemptId;
+    }
+
     public int getRecordIdColumn() {
       return recIdCol;
     }
@@ -316,6 +340,9 @@ public interface AcidOutputFormat<K extends WritableComparable, V> extends HiveO
     }
     public Path getFinalDestination() {
       return finalDestination;
+    }
+    public long getVisibilityTxnId() {
+      return visibilityTxnId;
     }
   }
 

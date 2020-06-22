@@ -19,10 +19,16 @@ package org.apache.hadoop.hive.ql.parse.repl.dump;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.repl.ReplScope;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -37,10 +43,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -53,18 +61,20 @@ public class Utils {
     IDLE, ACTIVE
   }
 
-  public static void writeOutput(List<String> values, Path outputFile, HiveConf hiveConf)
+  public static void writeOutput(List<List<String>> listValues, Path outputFile, HiveConf hiveConf)
       throws SemanticException {
     DataOutputStream outStream = null;
     try {
       FileSystem fs = outputFile.getFileSystem(hiveConf);
       outStream = fs.create(outputFile);
-      outStream.writeBytes((values.get(0) == null ? Utilities.nullStringOutput : values.get(0)));
-      for (int i = 1; i < values.size(); i++) {
-        outStream.write(Utilities.tabCode);
-        outStream.writeBytes((values.get(i) == null ? Utilities.nullStringOutput : values.get(i)));
+      for (List<String> values : listValues) {
+        outStream.writeBytes((values.get(0) == null ? Utilities.nullStringOutput : values.get(0)));
+        for (int i = 1; i < values.size(); i++) {
+          outStream.write(Utilities.tabCode);
+          outStream.writeBytes((values.get(i) == null ? Utilities.nullStringOutput : values.get(i)));
+        }
+        outStream.write(Utilities.newLineCode);
       }
-      outStream.write(Utilities.newLineCode);
     } catch (IOException e) {
       throw new SemanticException(e);
     } finally {
@@ -72,7 +82,7 @@ public class Utils {
     }
   }
 
-  public static Iterable<? extends String> matchesDb(Hive db, String dbPattern) throws HiveException {
+  public static Iterable<String> matchesDb(Hive db, String dbPattern) throws HiveException {
     if (dbPattern == null) {
       return db.getAllDatabases();
     } else {
@@ -80,21 +90,27 @@ public class Utils {
     }
   }
 
-  public static Iterable<? extends String> matchesTbl(Hive db, String dbName, String tblPattern)
+  public static Iterable<String> matchesTbl(Hive db, String dbName, String tblPattern)
       throws HiveException {
     if (tblPattern == null) {
-      return getAllTables(db, dbName);
+      return getAllTables(db, dbName, null);
     } else {
       return db.getTablesByPattern(dbName, tblPattern);
     }
   }
 
-  public static Collection<String> getAllTables(Hive db, String dbName) throws HiveException {
+  public static Iterable<String> matchesTbl(Hive db, String dbName, ReplScope replScope)
+          throws HiveException {
+    return getAllTables(db, dbName, replScope);
+  }
+
+  public static Collection<String> getAllTables(Hive db, String dbName, ReplScope replScope) throws HiveException {
     return Collections2.filter(db.getAllTables(dbName),
             tableName -> {
-              assert tableName != null;
+              assert(tableName != null);
               return !tableName.toLowerCase().startsWith(
-                      SemanticAnalyzer.VALUES_TMP_TABLE_NAME_PREFIX.toLowerCase());
+                      SemanticAnalyzer.VALUES_TMP_TABLE_NAME_PREFIX.toLowerCase())
+                      && ((replScope == null) || replScope.tableIncludedInReplScope(tableName));
             });
   }
 
@@ -162,8 +178,8 @@ public class Utils {
    * validates if a table can be exported, similar to EximUtil.shouldExport with few replication
    * specific checks.
    */
-  public static Boolean shouldReplicate(ReplicationSpec replicationSpec, Table tableHandle,
-      HiveConf hiveConf) {
+  public static boolean shouldReplicate(ReplicationSpec replicationSpec, Table tableHandle, boolean isEventDump,
+                                        Set<String> bootstrapTableList, ReplScope oldReplScope, HiveConf hiveConf) {
     if (replicationSpec == null) {
       replicationSpec = new ReplicationSpec();
     }
@@ -178,17 +194,58 @@ public class Utils {
     }
 
     if (replicationSpec.isInReplicationScope()) {
-      boolean isAcidTable = AcidUtils.isTransactionalTable(tableHandle);
-      if (isAcidTable) {
-        return hiveConf.getBoolVar(HiveConf.ConfVars.REPL_DUMP_INCLUDE_ACID_TABLES);
+      if (tableHandle.isTemporary()) {
+        return false;
       }
-      return !tableHandle.isTemporary();
+
+      if (MetaStoreUtils.isExternalTable(tableHandle.getTTable())) {
+        boolean shouldReplicateExternalTables = hiveConf.getBoolVar(HiveConf.ConfVars.REPL_INCLUDE_EXTERNAL_TABLES)
+                || replicationSpec.isMetadataOnly();
+        if (isEventDump) {
+          // Skip dumping of events related to external tables if bootstrap is enabled on it.
+          // Also, skip if current table is included only in new policy but not in old policy.
+          shouldReplicateExternalTables = shouldReplicateExternalTables
+                  && !hiveConf.getBoolVar(HiveConf.ConfVars.REPL_BOOTSTRAP_EXTERNAL_TABLES)
+                  && ReplUtils.tableIncludedInReplScope(oldReplScope, tableHandle.getTableName());
+        }
+        return shouldReplicateExternalTables;
+      }
+
+      if (AcidUtils.isTransactionalTable(tableHandle.getTTable())) {
+        if (!ReplUtils.includeAcidTableInDump(hiveConf)) {
+          return false;
+        }
+
+        // Skip dumping events related to ACID tables if bootstrap is enabled for ACID tables.
+        if (isEventDump && hiveConf.getBoolVar(HiveConf.ConfVars.REPL_BOOTSTRAP_ACID_TABLES)) {
+          return false;
+        }
+      }
+
+      // Tables which are selected for bootstrap should be skipped. Those tables would be bootstrapped
+      // along with the current incremental replication dump and thus no need to dump events for them.
+      // Note: If any event (other than alter table with table level replication) dump reaches here, it means, table is
+      // included in new replication policy.
+      if (isEventDump) {
+        // If replication policy is replaced with new included/excluded tables list, then events
+        // corresponding to tables which are not included in old policy but included in new policy
+        // should be skipped.
+        if (!ReplUtils.tableIncludedInReplScope(oldReplScope, tableHandle.getTableName())) {
+          return false;
+        }
+
+        // Tables in the list of tables to be bootstrapped should be skipped.
+        return (bootstrapTableList == null || !bootstrapTableList.contains(tableHandle.getTableName().toLowerCase()));
+      }
     }
     return true;
   }
 
   public static boolean shouldReplicate(NotificationEvent tableForEvent,
-      ReplicationSpec replicationSpec, Hive db, HiveConf hiveConf) {
+                                        ReplicationSpec replicationSpec, Hive db,
+                                        boolean isEventDump, Set<String> bootstrapTableList,
+                                        ReplScope oldReplScope,
+                                        HiveConf hiveConf) {
     Table table;
     try {
       table = db.getTable(tableForEvent.getDbName(), tableForEvent.getTableName());
@@ -198,15 +255,30 @@ public class Utils {
               .getTableName(), e);
       return false;
     }
-    return shouldReplicate(replicationSpec, table, hiveConf);
+    return shouldReplicate(replicationSpec, table, isEventDump, bootstrapTableList, oldReplScope, hiveConf);
   }
 
   static List<Path> getDataPathList(Path fromPath, ReplicationSpec replicationSpec, HiveConf conf)
           throws IOException {
     if (replicationSpec.isTransactionalTableDump()) {
-      return AcidUtils.getValidDataPaths(fromPath, conf, replicationSpec.getValidWriteIdList());
+      try {
+        conf.set(ValidTxnList.VALID_TXNS_KEY, replicationSpec.getValidTxnList());
+        return AcidUtils.getValidDataPaths(fromPath, conf, replicationSpec.getValidWriteIdList());
+      } catch (FileNotFoundException e) {
+        throw new IOException(ErrorMsg.FILE_NOT_FOUND.format(e.getMessage()), e);
+      }
     } else {
       return Collections.singletonList(fromPath);
     }
+  }
+
+  public static boolean shouldDumpMetaDataOnly(HiveConf conf) {
+    return conf.getBoolVar(HiveConf.ConfVars.REPL_DUMP_METADATA_ONLY);
+  }
+
+  public static boolean shouldDumpMetaDataOnlyForExternalTables(Table table, HiveConf conf) {
+    return (conf.getBoolVar(HiveConf.ConfVars.REPL_INCLUDE_EXTERNAL_TABLES) &&
+                    table.getTableType().equals(TableType.EXTERNAL_TABLE) &&
+                    conf.getBoolVar(HiveConf.ConfVars.REPL_DUMP_METADATA_ONLY_FOR_EXTERNAL_TABLE));
   }
 }

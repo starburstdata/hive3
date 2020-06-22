@@ -44,6 +44,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: lv_table1
+            filterExpr: (c3 = 100) (type: boolean)
             Statistics: Num rows: 500 Data size: 26000 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (c3 = 100) (type: boolean)
@@ -63,6 +64,7 @@ STAGE PLANS:
                       Statistics: Num rows: 500 Data size: 26000 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col11 (type: int)
+                        null sort order: zz
                         sort order: ++
                         Statistics: Num rows: 500 Data size: 26000 Basic stats: COMPLETE Column stats: NONE
                         TopN Hash Memory Usage: 0.1
@@ -83,6 +85,7 @@ STAGE PLANS:
                         Statistics: Num rows: 500 Data size: 26000 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col11 (type: int)
+                          null sort order: zz
                           sort order: ++
                           Statistics: Num rows: 500 Data size: 26000 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -108,6 +111,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col11 (type: int)
+              null sort order: zz
               sort order: ++
               Statistics: Num rows: 1 Data size: 52 Basic stats: COMPLETE Column stats: NONE
               TopN Hash Memory Usage: 0.1

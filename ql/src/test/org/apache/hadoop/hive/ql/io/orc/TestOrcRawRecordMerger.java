@@ -20,6 +20,8 @@ package org.apache.hadoop.hive.ql.io.orc;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.hive.common.ValidReadTxnList;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.io.BucketCodec;
 import org.apache.orc.CompressionKind;
@@ -68,11 +70,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 public class TestOrcRawRecordMerger {
@@ -434,6 +436,8 @@ public class TestOrcRawRecordMerger {
     Mockito.when(recordReader.next(row2)).thenReturn(row3);
     Mockito.when(recordReader.next(row3)).thenReturn(row5);
 
+    Mockito.when(reader.hasMetadataValue(OrcRecordUpdater.ACID_KEY_INDEX_NAME))
+        .thenReturn(true);
     Mockito.when(reader.getMetadataValue(OrcRecordUpdater.ACID_KEY_INDEX_NAME))
         .thenReturn(ByteBuffer.wrap("10,20,30;40,50,60;40,50,61"
             .getBytes("UTF-8")));
@@ -529,7 +533,7 @@ public class TestOrcRawRecordMerger {
     Configuration conf = new Configuration();
     FileSystem fs = FileSystem.getLocal(conf);
     OrcOutputFormat of = new OrcOutputFormat();
-    Path root = new Path(tmpDir, "testEmpty").makeQualified(fs);
+    Path root = new Path(tmpDir, "testLogicalEmpty").makeQualified(fs);
     fs.delete(root, true);
     ObjectInspector inspector;
     synchronized (TestOrcFile.class) {
@@ -539,10 +543,10 @@ public class TestOrcRawRecordMerger {
     /*create delta_1_1_0/bucket0 with 1 row and close the file*/
     AcidOutputFormat.Options options = new AcidOutputFormat.Options(conf)
         .inspector(inspector).bucket(BUCKET).writingBase(false).minimumWriteId(1)
-        .maximumWriteId(1).finalDestination(root);
-    Path delta1_1_0 = new Path(root, AcidUtils.deltaSubdir(
+        .maximumWriteId(2).finalDestination(root);
+    Path delta1_2_0 = new Path(root, AcidUtils.deltaSubdir(
         options.getMinimumWriteId(), options.getMaximumWriteId(), options.getStatementId()));
-    Path bucket0 = AcidUtils.createBucketFile(delta1_1_0, BUCKET);
+    Path bucket0 = AcidUtils.createBucketFile(delta1_2_0, BUCKET);
     Path bucket0SideFile = OrcAcidUtils.getSideFile(bucket0);
 
     RecordUpdater ru = of.getRecordUpdater(root, options);
@@ -583,18 +587,10 @@ public class TestOrcRawRecordMerger {
         .inspector(inspector).bucket(BUCKET).writingBase(true)
         .maximumWriteId(100).finalDestination(root);
     of.getRecordUpdater(root, options).close(false);
-    {
-      /*OrcRecordUpdater is inconsistent about when it creates empty files and when it does not.
-      This creates an empty bucket. HIVE-17138*/
-      OrcFile.WriterOptions wo = OrcFile.writerOptions(conf);
-      wo.inspector(inspector);
-      wo.callback(new OrcRecordUpdater.KeyIndexBuilder("testEmpty"));
-      Writer w = OrcFile.createWriter(AcidUtils.createBucketFile(new Path(root,
-        AcidUtils.baseDir(100)), BUCKET), wo);
-      w.close();
-    }
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     ValidWriteIdList writeIdList = new ValidReaderWriteIdList("testEmpty:200:" + Long.MAX_VALUE);
-    AcidUtils.Directory directory = AcidUtils.getAcidState(root, conf, writeIdList);
+    AcidUtils.Directory directory = AcidUtils.getAcidState(fs, root, conf, writeIdList, null, false, null, false);
 
     Path basePath = AcidUtils.createBucketFile(directory.getBaseDirectory(),
         BUCKET);
@@ -662,8 +658,11 @@ public class TestOrcRawRecordMerger {
     ru.delete(200, new MyRow("", 8, 0, BUCKET_PROPERTY));
     ru.close(false);
 
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     ValidWriteIdList writeIdList = new ValidReaderWriteIdList("testNewBaseAndDelta:200:" + Long.MAX_VALUE);
-    AcidUtils.Directory directory = AcidUtils.getAcidState(root, conf, writeIdList);
+    AcidUtils.Directory directory = AcidUtils.getAcidState(fs, root, conf, writeIdList, null, use130Format, null,
+        use130Format);
 
     assertEquals(new Path(root, "base_0000100"), directory.getBaseDirectory());
     assertEquals(new Path(root, use130Format ?
@@ -1147,6 +1146,8 @@ public class TestOrcRawRecordMerger {
 
     InputFormat inf = new OrcInputFormat();
     JobConf job = new JobConf();
+    job.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     job.set(IOConstants.SCHEMA_EVOLUTION_COLUMNS, BigRow.getColumnNamesProperty());
     job.set(IOConstants.SCHEMA_EVOLUTION_COLUMNS_TYPES, BigRow.getColumnTypesProperty());
     AcidUtils.setAcidOperationalProperties(job, true, null);
@@ -1280,6 +1281,8 @@ public class TestOrcRawRecordMerger {
 
     InputFormat inf = new OrcInputFormat();
     JobConf job = new JobConf();
+    job.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     job.set("mapred.min.split.size", "1");
     job.set("mapred.max.split.size", "2");
     job.set("mapred.input.dir", root.toString());
@@ -1377,6 +1380,8 @@ public class TestOrcRawRecordMerger {
 
     InputFormat inf = new OrcInputFormat();
     JobConf job = new JobConf();
+    job.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     job.set("mapred.min.split.size", "1");
     job.set("mapred.max.split.size", "2");
     job.set("mapred.input.dir", root.toString());
@@ -1454,6 +1459,8 @@ public class TestOrcRawRecordMerger {
     }
     InputFormat inf = new OrcInputFormat();
     JobConf job = new JobConf();
+    job.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     job.set("mapred.input.dir", root.toString());
     job.set("bucket_count", "2");
     job.set(IOConstants.SCHEMA_EVOLUTION_COLUMNS, MyRow.getColumnNamesProperty());

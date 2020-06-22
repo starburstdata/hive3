@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hive.metastore.api.Schema;
+import org.apache.hadoop.hive.ql.ddl.DDLDesc.DDLDescWithWriteId;
 import org.apache.hadoop.hive.ql.exec.ConditionalTask;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
@@ -48,8 +49,6 @@ import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.ColumnAccessInfo;
 import org.apache.hadoop.hive.ql.parse.TableAccessInfo;
-import org.apache.hadoop.hive.ql.plan.DDLDesc;
-import org.apache.hadoop.hive.ql.plan.DDLDesc.DDLDescWithWriteId;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -72,21 +71,23 @@ import com.google.common.annotations.VisibleForTesting;
 public class QueryPlan implements Serializable {
   private static final long serialVersionUID = 1L;
 
-
+  private String cboInfo;
   private String queryString;
+  private String optimizedCBOPlan;
+  private String optimizedQueryString;
 
-  private ArrayList<Task<? extends Serializable>> rootTasks;
+  private List<Task<? extends Serializable>> rootTasks;
   private FetchTask fetchTask;
   private final List<ReducerTimeStatsPerJob> reducerTimeStatsPerJobList;
 
-  private HashSet<ReadEntity> inputs;
+  private Set<ReadEntity> inputs;
   /**
    * Note: outputs are not all determined at compile time.
    * Some of the tasks can change the outputs at run time, because only at run
    * time, we know what are the changes.  These tasks should keep a reference
    * to the outputs here.
    */
-  private HashSet<WriteEntity> outputs;
+  private Set<WriteEntity> outputs;
   /**
    * Lineage information for the query.
    */
@@ -95,7 +96,7 @@ public class QueryPlan implements Serializable {
   private ColumnAccessInfo columnAccessInfo;
   private Schema resultSchema;
 
-  private HashMap<String, String> idToTableNameMap;
+  private Map<String, String> idToTableNameMap;
 
   private String queryId;
   private org.apache.hadoop.hive.ql.plan.api.Query query;
@@ -112,7 +113,8 @@ public class QueryPlan implements Serializable {
   private final HiveOperation operation;
   private final boolean acidResourcesInQuery;
   private final Set<FileSinkDesc> acidSinks; // Note: both full-ACID and insert-only sinks.
-  private final DDLDesc.DDLDescWithWriteId acidDdlDesc;
+  private final WriteEntity acidAnalyzeTable;
+  private final DDLDescWithWriteId acidDdlDesc;
   private Boolean autoCommitValue;
 
   public QueryPlan() {
@@ -125,6 +127,7 @@ public class QueryPlan implements Serializable {
     this.acidResourcesInQuery = false;
     this.acidSinks = Collections.emptySet();
     this.acidDdlDesc = null;
+    this.acidAnalyzeTable = null;
   }
 
   public QueryPlan(String queryString, BaseSemanticAnalyzer sem, Long startTime, String queryId,
@@ -151,9 +154,12 @@ public class QueryPlan implements Serializable {
     this.operation = operation;
     this.autoCommitValue = sem.getAutoCommitValue();
     this.resultSchema = resultSchema;
+    // TODO: all this ACID stuff should be in some sub-object
     this.acidResourcesInQuery = sem.hasTransactionalInQuery();
     this.acidSinks = sem.getAcidFileSinks();
     this.acidDdlDesc = sem.getAcidDdlDesc();
+    this.acidAnalyzeTable = sem.getAcidAnalyzeTable();
+    this.cboInfo = sem.getCboInfo();
   }
 
   /**
@@ -162,6 +168,11 @@ public class QueryPlan implements Serializable {
   public boolean hasAcidResourcesInQuery() {
     return acidResourcesInQuery;
   }
+
+  public WriteEntity getAcidAnalyzeTable() {
+    return acidAnalyzeTable;
+  }
+
   /**
    * @return Collection of FileSinkDesc representing writes to Acid resources
    */
@@ -685,11 +696,11 @@ public class QueryPlan implements Serializable {
     return done;
   }
 
-  public ArrayList<Task<? extends Serializable>> getRootTasks() {
+  public List<Task<? extends Serializable>> getRootTasks() {
     return rootTasks;
   }
 
-  public void setRootTasks(ArrayList<Task<? extends Serializable>> rootTasks) {
+  public void setRootTasks(List<Task<? extends Serializable>> rootTasks) {
     this.rootTasks = rootTasks;
   }
 
@@ -705,7 +716,7 @@ public class QueryPlan implements Serializable {
     this.fetchTask = fetchTask;
   }
 
-  public HashSet<ReadEntity> getInputs() {
+  public Set<ReadEntity> getInputs() {
     return inputs;
   }
 
@@ -713,7 +724,7 @@ public class QueryPlan implements Serializable {
     this.inputs = inputs;
   }
 
-  public HashSet<WriteEntity> getOutputs() {
+  public Set<WriteEntity> getOutputs() {
     return outputs;
   }
 
@@ -725,11 +736,11 @@ public class QueryPlan implements Serializable {
     return resultSchema;
   }
 
-  public HashMap<String, String> getIdToTableNameMap() {
+  public Map<String, String> getIdToTableNameMap() {
     return idToTableNameMap;
   }
 
-  public void setIdToTableNameMap(HashMap<String, String> idToTableNameMap) {
+  public void setIdToTableNameMap(Map<String, String> idToTableNameMap) {
     this.idToTableNameMap = idToTableNameMap;
   }
 
@@ -739,6 +750,22 @@ public class QueryPlan implements Serializable {
 
   public void setQueryString(String queryString) {
     this.queryString = queryString;
+  }
+
+  public String getOptimizedQueryString() {
+    return this.optimizedQueryString;
+  }
+
+  public void setOptimizedQueryString(String optimizedQueryString) {
+    this.optimizedQueryString = optimizedQueryString;
+  }
+
+  public String getOptimizedCBOPlan() {
+    return this.optimizedCBOPlan;
+  }
+
+  public void setOptimizedCBOPlan(String optimizedCBOPlan) {
+    this.optimizedCBOPlan = optimizedCBOPlan;
   }
 
   public org.apache.hadoop.hive.ql.plan.api.Query getQuery() {
@@ -836,5 +863,9 @@ public class QueryPlan implements Serializable {
   }
   public Boolean getAutoCommitValue() {
     return autoCommitValue;
+  }
+
+  public String getCboInfo() {
+    return cboInfo;
   }
 }

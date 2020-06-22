@@ -50,6 +50,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: foo is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: foo is not null (type: boolean)
@@ -60,11 +61,13 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
           TableScan
             alias: b
+            filterExpr: ((bar = 3) and foo is not null) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((bar = 3) and foo is not null) (type: boolean)
@@ -75,6 +78,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -135,6 +139,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: foo is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: foo is not null (type: boolean)
@@ -145,11 +150,13 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
           TableScan
             alias: b
+            filterExpr: ((bar = 3) and foo is not null) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((bar = 3) and foo is not null) (type: boolean)
@@ -160,6 +167,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -220,6 +228,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: ((bar = 3) and foo is not null) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((bar = 3) and foo is not null) (type: boolean)
@@ -230,11 +239,13 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
           TableScan
             alias: b
+            filterExpr: foo is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: foo is not null (type: boolean)
@@ -245,6 +256,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -255,10 +267,10 @@ STAGE PLANS:
           keys:
             0 _col0 (type: int)
             1 _col0 (type: int)
-          outputColumnNames: _col0, _col2
+          outputColumnNames: _col0, _col1
           Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
           Select Operator
-            expressions: _col0 (type: int), _col2 (type: int), 3 (type: int)
+            expressions: _col0 (type: int), _col1 (type: int), 3 (type: int)
             outputColumnNames: _col0, _col1, _col2
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             File Output Operator
@@ -275,7 +287,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Shuffle Join JOIN[15][tables = [$hdt$_0, $hdt$_1]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[14][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-2:MAPRED' is a cross product
 PREHOOK: query: explain select c.foo, d.bar from (select c.foo, b.bar, c.blah from pokes_n0 c left outer join pokes_n0 b on c.foo=b.foo) c left outer join pokes_n0 d where d.foo=1 and c.bar=2
 PREHOOK: type: QUERY
 PREHOOK: Input: default@pokes_n0
@@ -285,16 +297,34 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@pokes_n0
 #### A masked pattern was here ####
 STAGE DEPENDENCIES:
-  Stage-2 is a root stage
-  Stage-1 depends on stages: Stage-2
-  Stage-0 depends on stages: Stage-1
+  Stage-1 is a root stage
+  Stage-2 depends on stages: Stage-1
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
-  Stage: Stage-2
+  Stage: Stage-1
     Map Reduce
       Map Operator Tree:
           TableScan
+            alias: c
+            filterExpr: foo is not null (type: boolean)
+            Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+            Filter Operator
+              predicate: foo is not null (type: boolean)
+              Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+              Select Operator
+                expressions: foo (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: int)
+                  null sort order: a
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+          TableScan
             alias: b
+            filterExpr: ((bar = 2) and foo is not null) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((bar = 2) and foo is not null) (type: boolean)
@@ -305,21 +335,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: int)
-                  sort order: +
-                  Map-reduce partition columns: _col0 (type: int)
-                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-          TableScan
-            alias: c
-            Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-            Filter Operator
-              predicate: foo is not null (type: boolean)
-              Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-              Select Operator
-                expressions: foo (type: int)
-                outputColumnNames: _col0
-                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-                Reduce Output Operator
-                  key expressions: _col0 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: int)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -330,41 +346,40 @@ STAGE PLANS:
           keys:
             0 _col0 (type: int)
             1 _col0 (type: int)
-          outputColumnNames: _col2
+          outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-          Select Operator
-            expressions: _col2 (type: int)
-            outputColumnNames: _col0
-            Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-            File Output Operator
-              compressed: false
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
-  Stage: Stage-1
+  Stage: Stage-2
     Map Reduce
       Map Operator Tree:
           TableScan
+            Reduce Output Operator
+              null sort order: 
+              sort order: 
+              Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+              value expressions: _col0 (type: int)
+          TableScan
             alias: d
+            filterExpr: (foo = 1) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: (foo = 1) (type: boolean)
               Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
               Select Operator
                 expressions: bar (type: int)
-                outputColumnNames: _col1
+                outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-                  value expressions: _col1 (type: int)
-          TableScan
-            Reduce Output Operator
-              sort order: 
-              Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
-              value expressions: _col0 (type: int)
+                  value expressions: _col0 (type: int)
       Reduce Operator Tree:
         Join Operator
           condition map:
@@ -372,10 +387,10 @@ STAGE PLANS:
           keys:
             0 
             1 
-          outputColumnNames: _col1, _col2
+          outputColumnNames: _col0, _col2
           Statistics: Num rows: 1 Data size: 1 Basic stats: PARTIAL Column stats: NONE
           Select Operator
-            expressions: _col2 (type: int), _col1 (type: int)
+            expressions: _col0 (type: int), _col2 (type: int)
             outputColumnNames: _col0, _col1
             Statistics: Num rows: 1 Data size: 1 Basic stats: PARTIAL Column stats: NONE
             File Output Operator

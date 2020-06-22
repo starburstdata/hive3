@@ -54,6 +54,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: x
+            filterExpr: (d = '2009-01-01') (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Select Operator
               expressions: a (type: int), b (type: int)
@@ -63,6 +64,7 @@ STAGE PLANS:
                 Number of rows: 10
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   TopN Hash Memory Usage: 0.1
@@ -116,6 +118,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: x
+            filterExpr: (d = '2009-02-02') (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Select Operator
               expressions: a (type: int), b (type: int)
@@ -125,6 +128,7 @@ STAGE PLANS:
                 Number of rows: 10
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   TopN Hash Memory Usage: 0.1

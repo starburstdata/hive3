@@ -266,7 +266,9 @@ public class ATSHook implements ExecuteWithHookContext {
                   plan.getFetchTask(),// FetchTask
                   null,// analyzer
                   config, //explainConfig
-                  null// cboInfo
+                  null, // cboInfo
+                  plan.getOptimizedQueryString(), // optimizedSQL
+                  plan.getOptimizedCBOPlan()
               );
                 @SuppressWarnings("unchecked")
                 ExplainTask explain = (ExplainTask) TaskFactory.get(work);

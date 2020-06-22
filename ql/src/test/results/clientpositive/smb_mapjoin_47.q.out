@@ -114,14 +114,15 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test1_n8
+            filterExpr: (key BETWEEN 100 AND 102 and value is not null) (type: boolean)
             Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (key BETWEEN 100 AND 102 and value is not null) (type: boolean)
-              Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int), value (type: int), col_1 (type: string)
                 outputColumnNames: _col0, _col1, _col2
-                Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
                 Sorted Merge Bucket Map Join Operator
                   condition map:
                        Inner Join 0 to 1
@@ -193,6 +194,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test1_n8
+            filterExpr: value is not null (type: boolean)
             Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: value is not null (type: boolean)
@@ -282,14 +284,15 @@ STAGE PLANS:
         $hdt$_1:test2_n5 
           TableScan
             alias: test2_n5
+            filterExpr: key BETWEEN 100 AND 102 (type: boolean)
             Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key BETWEEN 100 AND 102 (type: boolean)
-              Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int), value (type: int), col_2 (type: string)
                 outputColumnNames: _col0, _col1, _col2
-                Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
                 HashTable Sink Operator
                   keys:
                     0 
@@ -300,14 +303,15 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: test1_n8
+            filterExpr: key BETWEEN 100 AND 102 (type: boolean)
             Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key BETWEEN 100 AND 102 (type: boolean)
-              Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+              Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: int), value (type: int), col_1 (type: string)
                 outputColumnNames: _col0, _col1, _col2
-                Statistics: Num rows: 1 Data size: 9 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
                 Map Join Operator
                   condition map:
                        Inner Join 0 to 1
@@ -315,13 +319,13 @@ STAGE PLANS:
                     0 
                     1 
                   outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  Statistics: Num rows: 1 Data size: 19 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 24 Data size: 476 Basic stats: COMPLETE Column stats: NONE
                   Limit
                     Number of rows: 10
-                    Statistics: Num rows: 1 Data size: 19 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                     File Output Operator
                       compressed: false
-                      Statistics: Num rows: 1 Data size: 19 Basic stats: COMPLETE Column stats: NONE
+                      Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                       table:
                           input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                           output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -400,8 +404,8 @@ STAGE PLANS:
             alias: test2_n5
             Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions: key (type: int), value (type: int), col_2 (type: string)
-              outputColumnNames: _col0, _col1, _col2
+              expressions: key (type: int), value (type: int), col_2 (type: string), key BETWEEN 100 AND 102 (type: boolean)
+              outputColumnNames: _col0, _col1, _col2, _col3
               Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
               HashTable Sink Operator
                 keys:
@@ -415,8 +419,8 @@ STAGE PLANS:
             alias: test1_n8
             Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions: key (type: int), value (type: int), col_1 (type: string)
-              outputColumnNames: _col0, _col1, _col2
+              expressions: key (type: int), value (type: int), col_1 (type: string), key BETWEEN 100 AND 102 (type: boolean)
+              outputColumnNames: _col0, _col1, _col2, _col3
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Map Join Operator
                 condition map:
@@ -424,19 +428,23 @@ STAGE PLANS:
                 keys:
                   0 
                   1 
-                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                residual filter predicates: {((_col1 = _col4) or _col0 BETWEEN 100 AND 102 or _col3 BETWEEN 100 AND 102)}
-                Statistics: Num rows: 16 Data size: 317 Basic stats: COMPLETE Column stats: NONE
-                Limit
-                  Number of rows: 10
-                  Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
-                  File Output Operator
-                    compressed: false
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5, _col6, _col7
+                residual filter predicates: {((_col1 = _col5) or _col3 or _col7)}
+                Statistics: Num rows: 24 Data size: 476 Basic stats: COMPLETE Column stats: NONE
+                Select Operator
+                  expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string), _col4 (type: int), _col5 (type: int), _col6 (type: string)
+                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                  Statistics: Num rows: 24 Data size: 476 Basic stats: COMPLETE Column stats: NONE
+                  Limit
+                    Number of rows: 10
                     Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    File Output Operator
+                      compressed: false
+                      Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
+                      table:
+                          input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                          output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                          serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
       Local Work:
         Map Reduce Local Work
 
@@ -541,14 +549,14 @@ STAGE PLANS:
                   0 
                   1 
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                residual filter predicates: {((_col0 + _col3) >= 100)} {((_col0 + _col3) <= 102)}
-                Statistics: Num rows: 2 Data size: 39 Basic stats: COMPLETE Column stats: NONE
+                residual filter predicates: {(_col0 + _col3) BETWEEN 100 AND 102}
+                Statistics: Num rows: 12 Data size: 238 Basic stats: COMPLETE Column stats: NONE
                 Limit
                   Number of rows: 10
-                  Statistics: Num rows: 2 Data size: 39 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                   File Output Operator
                     compressed: false
-                    Statistics: Num rows: 2 Data size: 39 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                     table:
                         input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                         output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -758,13 +766,13 @@ STAGE PLANS:
                   1 
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
                 residual filter predicates: {(struct(_col0,_col3)) IN (const struct(100,100), const struct(101,101), const struct(102,102))}
-                Statistics: Num rows: 6 Data size: 119 Basic stats: COMPLETE Column stats: NONE
+                Statistics: Num rows: 18 Data size: 357 Basic stats: COMPLETE Column stats: NONE
                 Limit
                   Number of rows: 10
-                  Statistics: Num rows: 6 Data size: 119 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                   File Output Operator
                     compressed: false
-                    Statistics: Num rows: 6 Data size: 119 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 10 Data size: 190 Basic stats: COMPLETE Column stats: NONE
                     table:
                         input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                         output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -795,7 +803,7 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@test1_n8
 POSTHOOK: Input: default@test2_n5
 #### A masked pattern was here ####
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: EXPLAIN
 SELECT *
 FROM test2_n5
@@ -839,6 +847,7 @@ STAGE PLANS:
                   1 _col1 (type: int)
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string), _col3 (type: int), _col4 (type: int), _col5 (type: string)
           TableScan
@@ -849,6 +858,7 @@ STAGE PLANS:
               outputColumnNames: _col0, _col1, _col2
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
+                null sort order: 
                 sort order: 
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
                 value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string)
@@ -879,7 +889,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: SELECT *
 FROM test2_n5
 JOIN test1_n8 a ON (a.key+test2_n5.key >= 100)
@@ -908,7 +918,7 @@ POSTHOOK: Input: default@test2_n5
 102	2	Del	99	0	Alice	101	2	Car
 103	2	Ema	100	1	Bob	101	2	Car
 103	2	Ema	99	0	Alice	101	2	Car
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: EXPLAIN
 SELECT *
 FROM test2_n5
@@ -952,6 +962,7 @@ STAGE PLANS:
                   1 _col1 (type: int)
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string), _col3 (type: int), _col4 (type: int), _col5 (type: string)
           TableScan
@@ -962,6 +973,7 @@ STAGE PLANS:
               outputColumnNames: _col0, _col1, _col2
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
+                null sort order: 
                 sort order: 
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
                 value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string)
@@ -989,7 +1001,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: SELECT *
 FROM test2_n5
 LEFT OUTER JOIN test1_n8 a ON (a.value = test2_n5.value)
@@ -1008,7 +1020,7 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@test1_n8
 POSTHOOK: Input: default@test2_n5
 #### A masked pattern was here ####
-Warning: Map Join MAPJOIN[26][bigTable=?] in task 'Stage-7:MAPRED' is a cross product
+Warning: Map Join MAPJOIN[28][bigTable=?] in task 'Stage-7:MAPRED' is a cross product
 PREHOOK: query: EXPLAIN
 SELECT *
 FROM test2_n5
@@ -1049,15 +1061,19 @@ STAGE PLANS:
         $hdt$_0:test2_n5 
           TableScan
             alias: test2_n5
+            filterExpr: value is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
-            Select Operator
-              expressions: key (type: int), value (type: int), col_2 (type: string)
-              outputColumnNames: _col0, _col1, _col2
+            Filter Operator
+              predicate: value is not null (type: boolean)
               Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
-              HashTable Sink Operator
-                keys:
-                  0 
-                  1 
+              Select Operator
+                expressions: key (type: int), value (type: int), col_2 (type: string)
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
+                HashTable Sink Operator
+                  keys:
+                    0 
+                    1 
 
   Stage: Stage-7
     Map Reduce
@@ -1142,6 +1158,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col1 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col1 (type: int)
               Statistics: Num rows: 8 Data size: 158 Basic stats: COMPLETE Column stats: NONE
@@ -1155,6 +1172,7 @@ STAGE PLANS:
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col1 (type: int)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: _col1 (type: int)
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
@@ -1185,7 +1203,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Map Join MAPJOIN[26][bigTable=?] in task 'Stage-7:MAPRED' is a cross product
+Warning: Map Join MAPJOIN[28][bigTable=?] in task 'Stage-7:MAPRED' is a cross product
 PREHOOK: query: SELECT *
 FROM test2_n5
 JOIN test1_n8 a ON (a.key+test2_n5.key >= 100)
@@ -1214,7 +1232,7 @@ NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	None
 102	2	Del	99	2	Mat	101	2	Car
 103	2	Ema	99	0	Alice	101	2	Car
 102	2	Del	99	0	Alice	101	2	Car
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: EXPLAIN
 SELECT *
 FROM test2_n5
@@ -1258,6 +1276,7 @@ STAGE PLANS:
                   1 _col1 (type: int)
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string), _col3 (type: int), _col4 (type: int), _col5 (type: string)
           TableScan
@@ -1268,6 +1287,7 @@ STAGE PLANS:
               outputColumnNames: _col0, _col1, _col2
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
+                null sort order: 
                 sort order: 
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
                 value expressions: _col0 (type: int), _col1 (type: int), _col2 (type: string)
@@ -1295,7 +1315,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Shuffle Join JOIN[11][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
+Warning: Shuffle Join JOIN[12][tables = [$hdt$_0, $hdt$_1, $hdt$_2]] in Stage 'Stage-1:MAPRED' is a cross product
 PREHOOK: query: SELECT *
 FROM test2_n5
 RIGHT OUTER JOIN test1_n8 a ON (a.value = test2_n5.value)
@@ -1373,6 +1393,7 @@ STAGE PLANS:
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col1 (type: int)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: _col1 (type: int)
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
@@ -1395,6 +1416,7 @@ STAGE PLANS:
                 Statistics: Num rows: 8 Data size: 158 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col1 (type: int)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col1 (type: int)
                   Statistics: Num rows: 8 Data size: 158 Basic stats: COMPLETE Column stats: NONE
@@ -1404,7 +1426,7 @@ STAGE PLANS:
       Reduce Operator Tree:
         Join Operator
           condition map:
-               Outer Join 0 to 1
+               Full Outer Join 0 to 1
           keys:
             0 _col1 (type: int)
             1 _col1 (type: int)
@@ -1496,6 +1518,7 @@ STAGE PLANS:
               Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col1 (type: int)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: _col1 (type: int)
                 Statistics: Num rows: 4 Data size: 38 Basic stats: COMPLETE Column stats: NONE
@@ -1509,6 +1532,7 @@ STAGE PLANS:
               Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col1 (type: int)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: _col1 (type: int)
                 Statistics: Num rows: 6 Data size: 56 Basic stats: COMPLETE Column stats: NONE
@@ -1516,7 +1540,7 @@ STAGE PLANS:
       Reduce Operator Tree:
         Join Operator
           condition map:
-               Outer Join 0 to 1
+               Full Outer Join 0 to 1
           keys:
             0 _col1 (type: int)
             1 _col1 (type: int)

@@ -85,17 +85,19 @@ STAGE PLANS:
                           serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
                           name: default.orcfile_merge1
                     Select Operator
-                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), UDFToString(_col2) (type: string)
+                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), CAST( _col2 AS STRING) (type: string)
                       outputColumnNames: key, value, ds, part
                       Statistics: Num rows: 500 Data size: 182000 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
                         keys: ds (type: string), part (type: string)
+                        minReductionHashAggr: 0.5
                         mode: hash
                         outputColumnNames: _col0, _col1, _col2, _col3
                         Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string)
+                          null sort order: aa
                           sort order: ++
                           Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                           Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
@@ -165,9 +167,9 @@ POSTHOOK: Lineage: orcfile_merge1 PARTITION(ds=1,part=0).value SIMPLE [(src)src.
 POSTHOOK: Lineage: orcfile_merge1 PARTITION(ds=1,part=1).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: orcfile_merge1 PARTITION(ds=1,part=1).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 Found 3 items
--rw-r--r--   3 ### USER ### ### GROUP ###        947 ### HDFS DATE ### hdfs://### HDFS PATH ###
--rw-r--r--   3 ### USER ### ### GROUP ###        875 ### HDFS DATE ### hdfs://### HDFS PATH ###
--rw-r--r--   3 ### USER ### ### GROUP ###        856 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###        949 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###        877 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###        858 ### HDFS DATE ### hdfs://### HDFS PATH ###
 PREHOOK: query: EXPLAIN
     INSERT OVERWRITE TABLE orcfile_merge1b PARTITION (ds='1', part)
         SELECT key, value, PMOD(HASH(key), 2) as part
@@ -218,17 +220,19 @@ STAGE PLANS:
                           serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
                           name: default.orcfile_merge1b
                     Select Operator
-                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), UDFToString(_col2) (type: string)
+                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), CAST( _col2 AS STRING) (type: string)
                       outputColumnNames: key, value, ds, part
                       Statistics: Num rows: 500 Data size: 182000 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
                         keys: ds (type: string), part (type: string)
+                        minReductionHashAggr: 0.5
                         mode: hash
                         outputColumnNames: _col0, _col1, _col2, _col3
                         Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string)
+                          null sort order: aa
                           sort order: ++
                           Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                           Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
@@ -343,7 +347,7 @@ POSTHOOK: Lineage: orcfile_merge1b PARTITION(ds=1,part=0).value SIMPLE [(src)src
 POSTHOOK: Lineage: orcfile_merge1b PARTITION(ds=1,part=1).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: orcfile_merge1b PARTITION(ds=1,part=1).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 Found 1 items
--rw-rw-rw-   3 ### USER ### ### GROUP ###       1754 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###       1756 ### HDFS DATE ### hdfs://### HDFS PATH ###
 PREHOOK: query: EXPLAIN
     INSERT OVERWRITE TABLE orcfile_merge1c PARTITION (ds='1', part)
         SELECT key, value, PMOD(HASH(key), 2) as part
@@ -394,17 +398,19 @@ STAGE PLANS:
                           serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
                           name: default.orcfile_merge1c
                     Select Operator
-                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), UDFToString(_col2) (type: string)
+                      expressions: _col0 (type: int), _col1 (type: string), '1' (type: string), CAST( _col2 AS STRING) (type: string)
                       outputColumnNames: key, value, ds, part
                       Statistics: Num rows: 500 Data size: 182000 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
                         keys: ds (type: string), part (type: string)
+                        minReductionHashAggr: 0.5
                         mode: hash
                         outputColumnNames: _col0, _col1, _col2, _col3
                         Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string)
+                          null sort order: aa
                           sort order: ++
                           Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                           Statistics: Num rows: 250 Data size: 283250 Basic stats: COMPLETE Column stats: COMPLETE
@@ -511,7 +517,7 @@ POSTHOOK: Lineage: orcfile_merge1c PARTITION(ds=1,part=0).value SIMPLE [(src)src
 POSTHOOK: Lineage: orcfile_merge1c PARTITION(ds=1,part=1).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: orcfile_merge1c PARTITION(ds=1,part=1).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 Found 1 items
--rw-rw-rw-   3 ### USER ### ### GROUP ###       2409 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###       2411 ### HDFS DATE ### hdfs://### HDFS PATH ###
 PREHOOK: query: SELECT SUM(HASH(c)) FROM (
     SELECT TRANSFORM(*) USING 'tr \t _' AS (c)
     FROM orcfile_merge1 WHERE ds='1'
@@ -591,6 +597,11 @@ STAGE DEPENDENCIES:
 
 STAGE PLANS:
   Stage: Stage-0
+    Concatenate
+      partition spec:
+        ds 1
+        part 0
+      table name: default.orcfile_merge1
 
   Stage: Stage-1
     Move Operator
@@ -618,7 +629,7 @@ POSTHOOK: type: ALTER_PARTITION_MERGE
 POSTHOOK: Input: default@orcfile_merge1
 POSTHOOK: Output: default@orcfile_merge1@ds=1/part=0
 Found 1 items
--rw-rw-rw-   3 ### USER ### ### GROUP ###       2409 ### HDFS DATE ### hdfs://### HDFS PATH ###
+-rw-rw-rw-   3 ### USER ### ### GROUP ###       2411 ### HDFS DATE ### hdfs://### HDFS PATH ###
 PREHOOK: query: SELECT SUM(HASH(c)) FROM (
     SELECT TRANSFORM(*) USING 'tr \t _' AS (c)
     FROM orcfile_merge1c WHERE ds='1'
@@ -690,10 +701,11 @@ PREHOOK: Input: default@orcfile_merge1@ds=1/part=0
 PREHOOK: Output: hdfs://### HDFS PATH ###
 -- BEGIN ORC FILE DUMP --
 Structure for hdfs://### HDFS PATH ###
-File Version: 0.12 with ORC_517
+File Version: 0.12 with ORC_135
 Rows: 242
 Compression: SNAPPY
 Compression size: 4096
+Calendar: Julian/Gregorian
 Type: struct<key:int,value:string>
 
 Stripe Statistics:
@@ -765,7 +777,7 @@ Stripes:
     Row group indices for column 2:
       Entry 0: count: 74 hasNull: false min: val_105 max: val_97 sum: 505 positions: 0,0,0,0,0
 
-File length: 2409 bytes
+File length: 2411 bytes
 Padding length: 0 bytes
 Padding ratio: 0%
 ________________________________________________________________________________________________________________________
@@ -779,10 +791,11 @@ PREHOOK: Input: default@orcfile_merge1c@ds=1/part=0
 PREHOOK: Output: hdfs://### HDFS PATH ###
 -- BEGIN ORC FILE DUMP --
 Structure for hdfs://### HDFS PATH ###
-File Version: 0.12 with ORC_517
+File Version: 0.12 with ORC_135
 Rows: 242
 Compression: SNAPPY
 Compression size: 4096
+Calendar: Julian/Gregorian
 Type: struct<key:int,value:string>
 
 Stripe Statistics:
@@ -854,7 +867,7 @@ Stripes:
     Row group indices for column 2:
       Entry 0: count: 74 hasNull: false min: val_105 max: val_97 sum: 505 positions: 0,0,0,0,0
 
-File length: 2409 bytes
+File length: 2411 bytes
 Padding length: 0 bytes
 Padding ratio: 0%
 ________________________________________________________________________________________________________________________

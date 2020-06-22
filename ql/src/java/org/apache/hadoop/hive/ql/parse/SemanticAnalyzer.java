@@ -20,11 +20,44 @@ package org.apache.hadoop.hive.ql.parse;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.math.IntMath;
 import com.google.common.math.LongMath;
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVESTATSDBCLASS;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.Serializable;
+import java.security.AccessControlException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import java.util.stream.Collectors;
+
 import org.antlr.runtime.ClassicToken;
 import org.antlr.runtime.CommonToken;
 import org.antlr.runtime.Token;
@@ -36,19 +69,23 @@ import org.antlr.runtime.tree.TreeWizard;
 import org.antlr.runtime.tree.TreeWizard.ContextVisitor;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.common.FileUtils;
-import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.StatsSetupConst.StatDB;
+import org.apache.hadoop.hive.common.StringInternUtils;
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
+import org.apache.hadoop.hive.conf.Constants;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.conf.HiveConf.StrictChecks;
@@ -67,6 +104,7 @@ import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
@@ -74,6 +112,16 @@ import org.apache.hadoop.hive.ql.QueryProperties;
 import org.apache.hadoop.hive.ql.QueryState;
 import org.apache.hadoop.hive.ql.cache.results.CacheUsage;
 import org.apache.hadoop.hive.ql.cache.results.QueryResultsCache;
+import org.apache.hadoop.hive.ql.ddl.DDLWork;
+import org.apache.hadoop.hive.ql.ddl.misc.hooks.InsertCommitHookDesc;
+import org.apache.hadoop.hive.ql.ddl.table.constraint.ConstraintsUtils;
+import org.apache.hadoop.hive.ql.ddl.table.create.CreateTableDesc;
+import org.apache.hadoop.hive.ql.ddl.table.create.like.CreateTableLikeDesc;
+import org.apache.hadoop.hive.ql.ddl.table.misc.preinsert.PreInsertTableDesc;
+import org.apache.hadoop.hive.ql.ddl.table.misc.properties.AlterTableUnsetPropertiesDesc;
+import org.apache.hadoop.hive.ql.ddl.table.storage.skewed.SkewedTableUtils;
+import org.apache.hadoop.hive.ql.ddl.view.create.CreateViewDesc;
+import org.apache.hadoop.hive.ql.ddl.view.materialized.update.MaterializedViewUpdateDesc;
 import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ArchiveUtils;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
@@ -87,7 +135,6 @@ import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
 import org.apache.hadoop.hive.ql.exec.LimitOperator;
-import org.apache.hadoop.hive.ql.exec.MaterializedViewDesc;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.OperatorFactory;
 import org.apache.hadoop.hive.ql.exec.RecordReader;
@@ -101,6 +148,7 @@ import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.Utilities.ReduceField;
 import org.apache.hadoop.hive.ql.exec.tez.TezTask;
 import org.apache.hadoop.hive.ql.hooks.Entity;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
@@ -144,7 +192,6 @@ import org.apache.hadoop.hive.ql.optimizer.calcite.translator.HiveOpConverterPos
 import org.apache.hadoop.hive.ql.optimizer.lineage.Generator;
 import org.apache.hadoop.hive.ql.optimizer.unionproc.UnionProcContext;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.TableSpec.SpecType;
-import org.apache.hadoop.hive.ql.parse.CalcitePlanner.ASTSearcher;
 import org.apache.hadoop.hive.ql.parse.ExplainConfiguration.AnalyzeState;
 import org.apache.hadoop.hive.ql.parse.PTFInvocationSpec.OrderExpression;
 import org.apache.hadoop.hive.ql.parse.PTFInvocationSpec.OrderSpec;
@@ -165,13 +212,6 @@ import org.apache.hadoop.hive.ql.parse.WindowingSpec.WindowFunctionSpec;
 import org.apache.hadoop.hive.ql.parse.WindowingSpec.WindowSpec;
 import org.apache.hadoop.hive.ql.parse.WindowingSpec.WindowType;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
-import org.apache.hadoop.hive.ql.plan.AlterTableDesc;
-import org.apache.hadoop.hive.ql.plan.AlterTableDesc.AlterTableTypes;
-import org.apache.hadoop.hive.ql.plan.BaseWork;
-import org.apache.hadoop.hive.ql.plan.CreateTableDesc;
-import org.apache.hadoop.hive.ql.plan.CreateTableLikeDesc;
-import org.apache.hadoop.hive.ql.plan.CreateViewDesc;
-import org.apache.hadoop.hive.ql.plan.DDLWork;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnListDesc;
@@ -186,7 +226,6 @@ import org.apache.hadoop.hive.ql.plan.FilterDesc.SampleDesc;
 import org.apache.hadoop.hive.ql.plan.ForwardDesc;
 import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
-import org.apache.hadoop.hive.ql.plan.InsertCommitHookDesc;
 import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.LateralViewForwardDesc;
@@ -215,13 +254,16 @@ import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.ResourceType;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator.Mode;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFArray;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFCardinalityViolation;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFHash;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFMurmurHash;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPOr;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFSurrogateKey;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDTFInline;
+import org.apache.hadoop.hive.ql.util.DirectionUtils;
 import org.apache.hadoop.hive.ql.util.ResourceDownloader;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.Deserializer;
@@ -247,46 +289,17 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.Serializable;
-import java.security.AccessControlException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVESTATSDBCLASS;
 
 /**
  * Implementation of the semantic analyzer. It generates the query plan.
  * There are other specific semantic analyzers for some hive operations such as
- * DDLSemanticAnalyzer for ddl operations.
+ * various analyzers for DDL commands.
  */
-
 public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
 
@@ -303,10 +316,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   /** Marks the temporary table created for a serialized CTE. The table is scoped to the query. */
   static final String MATERIALIZATION_MARKER = "$MATERIALIZATION";
 
-  private HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner;
-  private HashMap<TableScanOperator, PrunedPartitionList> opToPartList;
-  protected HashMap<String, TableScanOperator> topOps;
-  protected LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext> opParseCtx;
+  private Map<TableScanOperator, ExprNodeDesc> opToPartPruner;
+  private Map<TableScanOperator, PrunedPartitionList> opToPartList;
+  protected Map<String, TableScanOperator> topOps;
+  protected Map<Operator<? extends OperatorDesc>, OpParseContext> opParseCtx;
   private List<LoadTableDesc> loadTableWork;
   private List<LoadFileDesc> loadFileWork;
   private final List<ColumnStatsAutoGatherContext> columnStatsAutoGatherContexts;
@@ -319,21 +332,21 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private ASTNode ast;
   private int destTableId;
   private UnionProcContext uCtx;
-  List<AbstractMapJoinOperator<? extends MapJoinDesc>> listMapJoinOpsNoReducer;
-  private HashMap<TableScanOperator, SampleDesc> opToSamplePruner;
+  private List<AbstractMapJoinOperator<? extends MapJoinDesc>> listMapJoinOpsNoReducer;
+  private Map<TableScanOperator, SampleDesc> opToSamplePruner;
   private final Map<TableScanOperator, Map<String, ExprNodeDesc>> opToPartToSkewedPruner;
   private Map<SelectOperator, Table> viewProjectToTableSchema;
   /**
    * a map for the split sampling, from alias to an instance of SplitSample
    * that describes percentage and number.
    */
-  private final HashMap<String, SplitSample> nameToSplitSample;
-  Map<GroupByOperator, Set<String>> groupOpToInputTables;
-  Map<String, PrunedPartitionList> prunedPartitions;
+  private final Map<String, SplitSample> nameToSplitSample;
+  private Map<GroupByOperator, Set<String>> groupOpToInputTables;
+  protected Map<String, PrunedPartitionList> prunedPartitions;
   protected List<FieldSchema> resultSchema;
   protected CreateViewDesc createVwDesc;
-  protected MaterializedViewDesc materializedViewUpdateDesc;
-  protected ArrayList<String> viewsExpanded;
+  private  MaterializedViewUpdateDesc materializedViewUpdateDesc;
+  private List<String> viewsExpanded;
   protected ASTNode viewSelect;
   protected final UnparseTranslator unparseTranslator;
   private final GlobalLimitCtx globalLimitCtx;
@@ -353,7 +366,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private boolean mergeIsDirect;
 
   // flag for no scan during analyze ... compute statistics
-  protected boolean noscan;
+  private boolean noscan;
 
   // whether this is a mv rebuild rewritten expression
   protected MaterializationRebuildMode mvRebuildMode = MaterializationRebuildMode.NONE;
@@ -366,26 +379,25 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   /*
    * Capture the CTE definitions in a Query.
    */
-  final Map<String, CTEClause> aliasToCTEs;
+  protected final Map<String, CTEClause> aliasToCTEs;
 
   /*
    * Used to check recursive CTE invocations. Similar to viewsExpanded
    */
-  ArrayList<String> ctesExpanded;
+  private List<String> ctesExpanded;
 
   /*
    * Whether root tasks after materialized CTE linkage have been resolved
    */
-  boolean rootTasksResolved;
+  private boolean rootTasksResolved;
 
-  protected TableMask tableMask;
+  private TableMask tableMask;
 
   CreateTableDesc tableDesc;
 
-  /** Not thread-safe. */
-  final ASTSearcher astSearcher = new ASTSearcher();
-
   protected AnalyzeRewriteContext analyzeRewrite;
+
+  private WriteEntity acidAnalyzeTable;
 
   // A mapping from a tableName to a table object in metastore.
   Map<String, Table> tabNameToTabObject;
@@ -396,6 +408,21 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       HiveParser.TOK_DISTRIBUTEBY, HiveParser.TOK_SORTBY);
 
   private String invalidQueryMaterializationReason;
+
+  private static final CommonToken SELECTDI_TOKEN =
+      new ImmutableCommonToken(HiveParser.TOK_SELECTDI, "TOK_SELECTDI");
+  private static final CommonToken SELEXPR_TOKEN =
+      new ImmutableCommonToken(HiveParser.TOK_SELEXPR, "TOK_SELEXPR");
+  private static final CommonToken TABLEORCOL_TOKEN =
+      new ImmutableCommonToken(HiveParser.TOK_TABLE_OR_COL, "TOK_TABLE_OR_COL");
+  private static final CommonToken DOT_TOKEN =
+      new ImmutableCommonToken(HiveParser.DOT, ".");
+
+  private static final String[] UPDATED_TBL_PROPS = {
+      hive_metastoreConstants.TABLE_IS_TRANSACTIONAL,
+      hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES,
+      hive_metastoreConstants.TABLE_BUCKETING_VERSION
+  };
 
   static class Phase1Ctx {
     String dest;
@@ -458,7 +485,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     } else {
       mergeIsDirect = false;
     }
-    tabNameToTabObject.clear();
     loadTableWork.clear();
     loadFileWork.clear();
     columnStatsAutoGatherContexts.clear();
@@ -494,9 +520,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     unparseTranslator.clear();
     queryProperties.clear();
     outputs.clear();
+
+    if (ctx != null && ctx.enableUnparse()) {
+      unparseTranslator.enable();
+    }
   }
 
-  public void initParseCtx(ParseContext pctx) {
+  void initParseCtx(ParseContext pctx) {
     opToPartPruner = pctx.getOpToPartPruner();
     opToPartList = pctx.getOpToPartList();
     opToSamplePruner = pctx.getOpToSamplePruner();
@@ -526,14 +556,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         opToSamplePruner, globalLimitCtx, nameToSplitSample, inputs, rootTasks,
         opToPartToSkewedPruner, viewAliasToInput, reduceSinkOperatorsAddedByEnforceBucketingSorting,
         analyzeRewrite, tableDesc, createVwDesc, materializedViewUpdateDesc,
-        queryProperties, viewProjectToTableSchema, acidFileSinks);
+        queryProperties, viewProjectToTableSchema);
   }
 
   public CompilationOpContext getOpContext() {
     return ctx.getOpContext();
   }
 
-  public String genPartValueString(String partColType, String partVal) throws SemanticException {
+  static String genPartValueString(String partColType, String partVal) throws SemanticException {
     String returnVal = partVal;
     if (partColType.equals(serdeConstants.STRING_TYPE_NAME) ||
         partColType.contains(serdeConstants.VARCHAR_TYPE_NAME) ||
@@ -560,13 +590,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return returnVal;
   }
 
-  public void doPhase1QBExpr(ASTNode ast, QBExpr qbexpr, String id, String alias)
+  private void doPhase1QBExpr(ASTNode ast, QBExpr qbexpr, String id, String alias)
       throws SemanticException {
     doPhase1QBExpr(ast, qbexpr, id, alias, false);
   }
 
   @SuppressWarnings("nls")
-  public void doPhase1QBExpr(ASTNode ast, QBExpr qbexpr, String id, String alias, boolean insideView)
+  private void doPhase1QBExpr(ASTNode ast, QBExpr qbexpr, String id, String alias, boolean insideView)
       throws SemanticException {
 
     assert (ast.getToken() != null);
@@ -617,12 +647,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  private LinkedHashMap<String, ASTNode> doPhase1GetAggregationsFromSelect(
+  private Map<String, ASTNode> doPhase1GetAggregationsFromSelect(
       ASTNode selExpr, QB qb, String dest) throws SemanticException {
 
     // Iterate over the selects search for aggregation Trees.
     // Use String as keys to eliminate duplicate trees.
-    LinkedHashMap<String, ASTNode> aggregationTrees = new LinkedHashMap<String, ASTNode>();
+    Map<String, ASTNode> aggregationTrees = new LinkedHashMap<String, ASTNode>();
     List<ASTNode> wdwFns = new ArrayList<ASTNode>();
     for (int i = 0; i < selExpr.getChildCount(); ++i) {
       ASTNode function = (ASTNode) selExpr.getChild(i);
@@ -641,7 +671,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         spec = new WindowingSpec();
         qb.addDestToWindowingSpec(dest, spec);
       }
-      HashMap<String, ASTNode> wExprsInDest = qb.getParseInfo().getWindowingExprsForClause(dest);
+      Map<String, ASTNode> wExprsInDest = qb.getParseInfo().getWindowingExprsForClause(dest);
       int wColIdx = spec.getWindowExpressions() == null ? 0 : spec.getWindowExpressions().size();
       WindowFunctionSpec wFnSpec = processWindowFunction(wdwFn,
           (ASTNode)wdwFn.getChild(wdwFn.getChildCount()-1));
@@ -664,7 +694,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @param dest destination clause
    * @return true or false
    */
-  private boolean isInsertInto(QBParseInfo qbp, String dest) {
+  protected boolean isInsertInto(QBParseInfo qbp, String dest) {
     // get the destination and check if it is TABLE
     if(qbp == null || dest == null ) return false;
     ASTNode destNode = qbp.getDestForClause(dest);
@@ -711,17 +741,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @throws SemanticException
    */
   private static List<String> getDefaultConstraints(Table tbl, List<String> targetSchema) throws SemanticException{
-    Map<String, String> colNameToDefaultVal =  null;
-    try {
-      DefaultConstraint dc = Hive.get().getEnabledDefaultConstraints(tbl.getDbName(), tbl.getTableName());
-      colNameToDefaultVal = dc.getColNameToDefaultValueMap();
-    } catch (Exception e) {
-      if (e instanceof SemanticException) {
-        throw (SemanticException) e;
-      } else {
-        throw (new RuntimeException(e));
-      }
-    }
+    Map<String, String> colNameToDefaultVal = getColNameToDefaultValueMap(tbl);
     List<String> defaultConstraints = new ArrayList<>();
     if(targetSchema != null) {
       for (String colName : targetSchema) {
@@ -734,6 +754,21 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     }
     return defaultConstraints;
+  }
+
+  protected static Map<String, String> getColNameToDefaultValueMap(Table tbl) throws SemanticException {
+    Map<String, String> colNameToDefaultVal = null;
+    try {
+      DefaultConstraint dc = Hive.get().getEnabledDefaultConstraints(tbl.getDbName(), tbl.getTableName());
+      colNameToDefaultVal = dc.getColNameToDefaultValueMap();
+    } catch (Exception e) {
+      if (e instanceof SemanticException) {
+        throw (SemanticException) e;
+      } else {
+        throw (new RuntimeException(e));
+      }
+    }
+    return colNameToDefaultVal;
   }
 
   /**
@@ -755,28 +790,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     }
     return newNode;
-  }
-
-  public static String replaceDefaultKeywordForMerge(String valueClause,Table targetTable)
-      throws SemanticException {
-    List<String> defaultConstraints = null;
-    String[] values = valueClause.trim().split(",");
-    StringBuilder newValueClause = new StringBuilder();
-    for (int i = 0; i < values.length; i++) {
-      if (values[i].trim().toLowerCase().equals("`default`")) {
-        if (defaultConstraints == null) {
-          defaultConstraints = getDefaultConstraints(targetTable, null);
-        }
-        newValueClause.append(defaultConstraints.get(i));
-      }
-      else {
-        newValueClause.append(values[i]);
-      }
-      if(i != values.length-1) {
-        newValueClause.append(",");
-      }
-    }
-    return newValueClause.toString();
   }
 
   /**
@@ -845,13 +858,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (isInsertInto(qbp, dest)) {
       ASTNode tblAst = qbp.getDestForClause(dest);
       String tableName = getUnescapedName((ASTNode) tblAst.getChild(0));
-      Table targetTable = null;
+      Table targetTable;
       try {
         if (isValueClause(selectExpr)) {
-          targetTable = db.getTable(tableName, false);
+          targetTable = getTableObjectByName(tableName);
           replaceDefaultKeyword((ASTNode) selectExpr.getChild(0).getChild(0).getChild(1), targetTable, qbp.getDestSchemaForClause(dest));
         } else if (updating(dest)) {
-          targetTable = db.getTable(tableName, false);
+          targetTable = getTableObjectByName(tableName);
           replaceDefaultKeywordForUpdate(selectExpr, targetTable);
         }
       } catch (Exception e) {
@@ -883,7 +896,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @throws SemanticException
    */
   private void doPhase1GetAllAggregations(ASTNode expressionTree,
-                                          HashMap<String, ASTNode> aggregations, List<ASTNode> wdwFns,
+                                          Map<String, ASTNode> aggregations, List<ASTNode> wdwFns,
                                           ASTNode wndParent) throws SemanticException {
     int exprTokenType = expressionTree.getToken().getType();
     if(exprTokenType == HiveParser.TOK_SUBQUERY_EXPR) {
@@ -940,7 +953,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private List<ASTNode> doPhase1GetDistinctFuncExprs(
-      HashMap<String, ASTNode> aggregationTrees) throws SemanticException {
+      Map<String, ASTNode> aggregationTrees) throws SemanticException {
     List<ASTNode> exprs = new ArrayList<ASTNode>();
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       ASTNode value = entry.getValue();
@@ -952,7 +965,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return exprs;
   }
 
-  public static String generateErrorMessage(ASTNode ast, String message) {
+  static String generateErrorMessage(ASTNode ast, String message) {
     StringBuilder sb = new StringBuilder();
     if (ast == null) {
       sb.append(message).append(". Cannot tell the position of null AST.");
@@ -997,7 +1010,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     return new int[] {aliasIndex, propsIndex, tsampleIndex, ssampleIndex};
   }
-  String findSimpleTableName(ASTNode tabref, int aliasIndex) {
+
+  private String findSimpleTableName(ASTNode tabref, int aliasIndex) throws SemanticException {
     assert tabref.getType() == HiveParser.TOK_TABREF;
     ASTNode tableTree = (ASTNode) (tabref.getChild(0));
 
@@ -1035,7 +1049,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     if (propsIndex >= 0) {
       Tree propsAST = tabref.getChild(propsIndex);
-      Map<String, String> props = DDLSemanticAnalyzer.getProps((ASTNode) propsAST.getChild(0));
+      Map<String, String> props = getProps((ASTNode) propsAST.getChild(0));
       // We get the information from Calcite.
       if ("TRUE".equals(props.get("insideView"))) {
         qb.getAliasInsideView().add(alias.toLowerCase());
@@ -1050,7 +1064,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     if (tsampleIndex >= 0) {
       ASTNode sampleClause = (ASTNode) tabref.getChild(tsampleIndex);
-      ArrayList<ASTNode> sampleCols = new ArrayList<ASTNode>();
+      List<ASTNode> sampleCols = new ArrayList<ASTNode>();
       if (sampleClause.getChildCount() > 2) {
         for (int i = 2; i < sampleClause.getChildCount(); i++) {
           sampleCols.add((ASTNode) sampleClause.getChild(i));
@@ -1135,15 +1149,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   Map<String, SplitSample> getNameToSplitSampleMap() {
     return this.nameToSplitSample;
-  }
-
-  /**
-   * Convert a string to Text format and write its bytes in the same way TextOutputFormat would do.
-   * This is needed to properly encode non-ascii characters.
-   */
-  private static void writeAsText(String text, FSDataOutputStream out) throws IOException {
-    Text to = new Text(text);
-    out.write(to.getBytes(), 0, to.getLength());
   }
 
   private void assertCombineInputFormat(Tree numerator, String message) throws SemanticException {
@@ -1270,8 +1275,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @Override
-  public HashSet<ReadEntity> getAllInputs() {
-    HashSet<ReadEntity> readEntities = new HashSet<ReadEntity>(getInputs());
+  public Set<ReadEntity> getAllInputs() {
+    Set<ReadEntity> readEntities = new HashSet<ReadEntity>(getInputs());
     for (CTEClause cte : rootClause.asExecutionOrder()) {
       if (cte.source != null) {
         readEntities.addAll(cte.source.getInputs());
@@ -1281,8 +1286,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @Override
-  public HashSet<WriteEntity> getAllOutputs() {
-    HashSet<WriteEntity> writeEntities = new HashSet<WriteEntity>(getOutputs());
+  public Set<WriteEntity> getAllOutputs() {
+    Set<WriteEntity> writeEntities = new HashSet<WriteEntity>(getOutputs());
     for (CTEClause cte : rootClause.asExecutionOrder()) {
       if (cte.source != null) {
         writeEntities.addAll(cte.source.getOutputs());
@@ -1304,7 +1309,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<CTEClause> parents = new ArrayList<CTEClause>();
 
     // materialized
-    Table table;
     SemanticAnalyzer source;
 
     List<Task<? extends Serializable>> getTasks() {
@@ -1413,7 +1417,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     table.setMaterializedTable(true);
 
     LOG.info(cteName + " will be materialized into " + location);
-    cte.table = table;
     cte.source = analyzer;
 
     ctx.addMaterializedTable(cteName, table);
@@ -1532,15 +1535,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return alias;
   }
 
-  private String extractLateralViewAlias(ASTNode lateralView) {
-    // Lateral view AST has the following shape:
-    // ^(TOK_LATERAL_VIEW
-    //   ^(TOK_SELECT ^(TOK_SELEXPR ^(TOK_FUNCTION Identifier params) identifier* tableAlias)))
-    ASTNode selExpr = (ASTNode) lateralView.getChild(0).getChild(0);
-    ASTNode astTableAlias = (ASTNode) Iterables.getLast(selExpr.getChildren());
-    return astTableAlias.getChild(0).getText();
-  }
-
   /**
    * Phase 1: (including, but not limited to):
    *
@@ -1558,7 +1552,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @throws SemanticException
    */
   @SuppressWarnings({"fallthrough", "nls"})
-  public boolean doPhase1(ASTNode ast, QB qb, Phase1Ctx ctx_1, PlannerContext plannerCtx)
+  boolean doPhase1(ASTNode ast, QB qb, Phase1Ctx ctx_1, PlannerContext plannerCtx)
       throws SemanticException {
 
     boolean phase1Result = true;
@@ -1576,27 +1570,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         qbp.setSelExprForClause(ctx_1.dest, ast);
 
         int posn = 0;
-        if (((ASTNode) ast.getChild(0)).getToken().getType() == HiveParser.QUERY_HINT) {
-          ParseDriver pd = new ParseDriver();
-          String queryHintStr = ast.getChild(0).getText();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("QUERY HINT: "+queryHintStr);
-          }
-          try {
-            ASTNode hintNode = pd.parseHint(queryHintStr);
-            qbp.setHints(hintNode);
-            posn++;
-          } catch (ParseException e) {
-            throw new SemanticException("failed to parse query hint: "+e.getMessage(), e);
-          }
+        if (((ASTNode) ast.getChild(0)).getType() == HiveParser.QUERY_HINT) {
+          posn = processQueryHint((ASTNode)ast.getChild(0), qbp, posn);
         }
 
         if ((ast.getChild(posn).getChild(0).getType() == HiveParser.TOK_TRANSFORM)) {
           queryProperties.setUsesScript(true);
         }
 
-        LinkedHashMap<String, ASTNode> aggregations = doPhase1GetAggregationsFromSelect(ast,
-            qb, ctx_1.dest);
+        Map<String, ASTNode> aggregations = doPhase1GetAggregationsFromSelect(ast, qb, ctx_1.dest);
         doPhase1GetColumnAliasesFromSelect(ast, qbp, ctx_1.dest);
         qbp.setAggregationExprsForClause(ctx_1.dest, aggregations);
         qbp.setDistinctFuncExprsForClause(ctx_1.dest,
@@ -1707,8 +1689,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       case HiveParser.TOK_DISTRIBUTEBY:
         // Get the distribute by aliases - these are aliased to the entries in
-        // the
-        // select list
+        // the select list
         queryProperties.setHasDistributeBy(true);
         qbp.setDistributeByExprForClause(ctx_1.dest, ast);
         if (qbp.getClusterByForClause(ctx_1.dest) != null) {
@@ -1758,10 +1739,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         queryProperties.setHasGroupBy(true);
         if (qbp.getJoinExpr() != null) {
           queryProperties.setHasJoinFollowedByGroupBy(true);
-        }
-        if (qbp.getSelForClause(ctx_1.dest).getToken().getType() == HiveParser.TOK_SELECTDI) {
-          throw new SemanticException(generateErrorMessage(ast,
-              ErrorMsg.SELECT_DISTINCT_WITH_GROUPBY.getMsg()));
         }
         qbp.setGroupByExprForClause(ctx_1.dest, ast);
         skipRecursion = true;
@@ -1839,7 +1816,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
           Tree partitions = tab.getChild(1);
           int childCount = partitions.getChildCount();
-          HashMap<String, String> partition = new HashMap<String, String>();
+          Map<String, String> partition = new HashMap<String, String>();
           for (int i = 0; i < childCount; i++) {
             String partitionName = partitions.getChild(i).getChild(0).getText();
             // Convert to lowercase for the comparison
@@ -1858,7 +1835,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           }
           Table table = null;
           try {
-            table = this.getTableObjectByName(tableName);
+            table = getTableObjectByName(tableName);
           } catch (HiveException ex) {
             throw new SemanticException(ex);
           }
@@ -1888,6 +1865,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       case HiveParser.TOK_CTE:
         processCTE(qb, ast);
         break;
+      case HiveParser.QUERY_HINT:
+          processQueryHint(ast, qbp, 0);
       default:
         skipRecursion = false;
         break;
@@ -1906,10 +1885,25 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return phase1Result;
   }
 
+  private int processQueryHint(ASTNode ast, QBParseInfo qbp, int posn) throws SemanticException{
+    ParseDriver pd = new ParseDriver();
+    String queryHintStr = ast.getText();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("QUERY HINT: "+queryHintStr);
+    }
+    try {
+      ASTNode hintNode = pd.parseHint(queryHintStr);
+      qbp.setHints(hintNode);
+    } catch (ParseException e) {
+      throw new SemanticException("failed to parse query hint: "+e.getMessage(), e);
+    }
+    return posn + 1;
+  }
+
   /**
    * This is phase1 of supporting specifying schema in insert statement
    * insert into foo(z,y) select a,b from bar;
-   * @see #handleInsertStatementSpec(java.util.List, String, RowResolver, RowResolver, QB, ASTNode)
+   * @see #handleInsertStatementSpec(java.util.List, String, RowResolver, QB, ASTNode)
    * @throws SemanticException
    */
   private void handleInsertStatementSpecPhase1(ASTNode ast, QBParseInfo qbp, Phase1Ctx ctx_1) throws SemanticException {
@@ -1931,11 +1925,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         throw new SemanticException(generateErrorMessage(tabColName,
             "Duplicate column name detected in " + fullTableName + " table schema specification"));
       }
-      Table targetTable = null;
+      Table targetTable;
       try {
-        targetTable = db.getTable(fullTableName, false);
-      }
-      catch (HiveException ex) {
+        targetTable = getTableObjectByName(fullTableName);
+      } catch (HiveException ex) {
         LOG.error("Error processing HiveParser.TOK_DESTINATION: " + ex.getMessage(), ex);
         throw new SemanticException(ex);
       }
@@ -2003,7 +1996,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  public void getMaterializationMetadata(QB qb) throws SemanticException {
+  private void getMaterializationMetadata(QB qb) throws SemanticException {
     try {
       gatherCTEReferences(qb, rootClause);
       int threshold = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVE_CTE_MATERIALIZE_THRESHOLD);
@@ -2063,11 +2056,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  public void getMetaData(QB qb) throws SemanticException {
+  void getMetaData(QB qb) throws SemanticException {
     getMetaData(qb, false);
   }
 
-  public void getMetaData(QB qb, boolean enableMaterialization) throws SemanticException {
+  private void getMetaData(QB qb, boolean enableMaterialization) throws SemanticException {
     try {
       if (enableMaterialization) {
         getMaterializationMetadata(qb);
@@ -2108,8 +2101,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // For eg: for a query like 'select * from V3', where V3 -> V2, V2 -> V1, V1 -> T
     // keeps track of full view name and read entity corresponding to alias V3, V3:V2, V3:V2:V1.
     // This is needed for tracking the dependencies for inputs, along with their parents.
-    Map<String, ObjectPair<String, ReadEntity>> aliasToViewInfo =
-        new HashMap<String, ObjectPair<String, ReadEntity>>();
+    Map<String, Pair<String, ReadEntity>> aliasToViewInfo =
+        new HashMap<String, Pair<String, ReadEntity>>();
 
     /*
      * used to capture view to SQ conversions. This is used to check for
@@ -2124,8 +2117,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       // Get table details from tabNameToTabObject cache
       Table tab = getTableObjectByName(tabName, false);
       if (tab != null) {
-        // do a deep copy, in case downstream changes it.
-        tab = new Table(tab.getTTable().deepCopy());
+        Table newTab = tab.makeCopy();
+        tab = newTab;
       }
       if (tab == null ||
           tab.getDbName().equals(SessionState.get().getCurrentDatabase())) {
@@ -2178,7 +2171,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
         ReadEntity viewInput = new ReadEntity(tab, parentInput, !qb.isInsideView());
         viewInput = PlanUtils.addInput(inputs, viewInput);
-        aliasToViewInfo.put(alias, new ObjectPair<String, ReadEntity>(fullViewName, viewInput));
+        aliasToViewInfo.put(alias, Pair.of(fullViewName, viewInput));
         String aliasId = getAliasId(alias, qb);
         if (aliasId != null) {
           aliasId = aliasId.replace(SemanticAnalyzer.SUBQUERY_TAG_1, "")
@@ -2228,8 +2221,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       boolean wasCTE = sqAliasToCTEName.containsKey(alias);
       ReadEntity newParentInput = null;
       if (wasView) {
-        viewsExpanded.add(aliasToViewInfo.get(alias).getFirst());
-        newParentInput = aliasToViewInfo.get(alias).getSecond();
+        viewsExpanded.add(aliasToViewInfo.get(alias).getLeft());
+        newParentInput = aliasToViewInfo.get(alias).getRight();
       } else if (wasCTE) {
         ctesExpanded.add(sqAliasToCTEName.get(alias));
       }
@@ -2281,9 +2274,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             // Whether we are using an acid compliant transaction manager has already been caught in
             // UpdateDeleteSemanticAnalyzer, so if we are updating or deleting and getting nonAcid
             // here, it means the table itself doesn't support it.
-            throw new SemanticException(ErrorMsg.ACID_OP_ON_NONACID_TABLE, ts.tableName);
+            throw new SemanticException(ErrorMsg.ACID_OP_ON_NONACID_TABLE, ts.getTableName().getTable());
           } else {
-            throw new SemanticException(ErrorMsg.ACID_OP_ON_INSERTONLYTRAN_TABLE, ts.tableName);
+            throw new SemanticException(ErrorMsg.ACID_OP_ON_INSERTONLYTRAN_TABLE, ts.getTableName().getTable());
           }
         }
         // TableSpec ts is got from the query (user specified),
@@ -2302,7 +2295,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
         if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVESTATSAUTOGATHER)) {
           // Add the table spec for the destination table.
-          qb.getParseInfo().addTableSpec(ts.tableName.toLowerCase(), ts);
+          qb.getParseInfo().addTableSpec(ts.getTableName().getTable().toLowerCase(), ts);
         }
         break;
       }
@@ -2310,8 +2303,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       case HiveParser.TOK_DIR: {
         // This is a dfs file
         String fname = stripQuotes(ast.getChild(0).getText());
-        if ((!qb.getParseInfo().getIsSubQ())
-            && (((ASTNode) ast.getChild(0)).getToken().getType() == HiveParser.TOK_TMP_FILE)) {
+        if ((!qb.getParseInfo().getIsSubQ()) && (((ASTNode) ast.getChild(0)).getToken().getType()
+            == HiveParser.TOK_TMP_FILE)) {
 
           if (qb.isCTAS() || qb.isMaterializedView()) {
             qb.setIsQuery(false);
@@ -2320,7 +2313,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
             Path location;
             // If the CTAS query does specify a location, use the table location, else use the db location
-            if (qb.getTableDesc() != null && qb.getTableDesc().getLocation() != null) {
+            if (qb.isMaterializedView() && qb.getViewDesc() != null && qb.getViewDesc().getLocation() != null) {
+              location = new Path(qb.getViewDesc().getLocation());
+            } else if (qb.isCTAS() && qb.getTableDesc() != null && qb.getTableDesc().getLocation() != null) {
               location = new Path(qb.getTableDesc().getLocation());
             } else {
               // allocate a temporary output dir on the location of the table
@@ -2333,30 +2328,39 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                 if (destTableDb == null) {
                   destTableDb = names[0];
                 }
-                location = wh.getDatabasePath(db.getDatabase(destTableDb));
+                boolean useExternal = false;
+                if (qb.isMaterializedView()) {
+                  useExternal = !AcidUtils.isTransactionalView(qb.getViewDesc()) && !makeAcid();
+                } else {
+                  useExternal = (qb.getTableDesc() == null || qb.getTableDesc().isTemporary()
+                    || qb.getTableDesc().isExternal() || !makeAcid());
+                }
+                if (useExternal) {
+                  location = wh.getDatabaseExternalPath(db.getDatabase(destTableDb));
+                } else {
+                  location = wh.getDatabaseManagedPath(db.getDatabase(destTableDb));
+                }
               } catch (MetaException e) {
                 throw new SemanticException(e);
-                }
               }
-              try {
-                CreateTableDesc tblDesc = qb.getTableDesc();
-                if (tblDesc != null
-                    && tblDesc.isTemporary()
-                    && AcidUtils.isInsertOnlyTable(tblDesc.getTblProps(), true)) {
-                  fname = FileUtils.makeQualified(location, conf).toString();
-                } else {
-                  fname = ctx.getExtTmpPathRelTo(
-                      FileUtils.makeQualified(location, conf)).toString();
-                }
-              } catch (Exception e) {
-                throw new SemanticException(generateErrorMessage(ast,
-                    "Error creating temporary folder on: " + location.toString()), e);
+            }
+            try {
+              CreateTableDesc tblDesc = qb.getTableDesc();
+              if (tblDesc != null && tblDesc.isTemporary() && AcidUtils
+                  .isInsertOnlyTable(tblDesc.getTblProps(), true)) {
+                fname = FileUtils.makeQualified(location, conf).toString();
+              } else {
+                fname = ctx.getExtTmpPathRelTo(FileUtils.makeQualified(location, conf)).toString();
               }
-              if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVESTATSAUTOGATHER)) {
-                TableSpec ts = new TableSpec(db, conf, this.ast);
-                // Add the table spec for the destination table.
-                qb.getParseInfo().addTableSpec(ts.tableName.toLowerCase(), ts);
-              }
+            } catch (Exception e) {
+              throw new SemanticException(
+                  generateErrorMessage(ast, "Error creating temporary folder on: " + location.toString()), e);
+            }
+            if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVESTATSAUTOGATHER)) {
+              TableSpec ts = new TableSpec(db, conf, this.ast);
+              // Add the table spec for the destination table.
+              qb.getParseInfo().addTableSpec(ts.getTableName().getTable().toLowerCase(), ts);
+            }
           } else {
             // This is the only place where isQuery is set to true; it defaults to false.
             qb.setIsQuery(true);
@@ -2563,7 +2567,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         stagingPath = ctx.getMRTmpPath(tablePath.toUri());
       }
     } else {
-      stagingPath = ctx.getMRTmpPath();
+      stagingPath = ctx.getMRTmpPath(false);
     }
 
     return stagingPath;
@@ -2678,8 +2682,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @SuppressWarnings("nls")
   void parseJoinCondPopulateAlias(QBJoinTree joinTree, ASTNode condn,
-                                  ArrayList<String> leftAliases, ArrayList<String> rightAliases,
-                                  ArrayList<String> fields,
+                                  List<String> leftAliases, List<String> rightAliases,
+                                  List<String> fields,
                                   Map<String, Operator> aliasToOpInfo) throws SemanticException {
     // String[] allAliases = joinTree.getAllAliases();
     switch (condn.getToken().getType()) {
@@ -2734,6 +2738,16 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     case HiveParser.TOK_DATELITERAL:
     case HiveParser.TOK_TIMESTAMPLITERAL:
     case HiveParser.TOK_TIMESTAMPLOCALTZLITERAL:
+    case HiveParser.TOK_INTERVAL_DAY_LITERAL:
+    case HiveParser.TOK_INTERVAL_DAY_TIME:
+    case HiveParser.TOK_INTERVAL_DAY_TIME_LITERAL:
+    case HiveParser.TOK_INTERVAL_HOUR_LITERAL:
+    case HiveParser.TOK_INTERVAL_MINUTE_LITERAL:
+    case HiveParser.TOK_INTERVAL_MONTH_LITERAL:
+    case HiveParser.TOK_INTERVAL_SECOND_LITERAL:
+    case HiveParser.TOK_INTERVAL_YEAR_LITERAL:
+    case HiveParser.TOK_INTERVAL_YEAR_MONTH:
+    case HiveParser.TOK_INTERVAL_YEAR_MONTH_LITERAL:
       break;
 
     case HiveParser.TOK_FUNCTION:
@@ -2751,7 +2765,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             leftAliases, rightAliases, null, aliasToOpInfo);
       } else if (condn.getChildCount() == 2) {
 
-        ArrayList<String> fields1 = null;
+        List<String> fields1 = null;
         // if it is a dot operator, remember the field name of the rhs of the
         // left semijoin
         if (joinTree.getNoSemiJoin() == false
@@ -2961,7 +2975,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     JoinType type = cond.getJoinType();
     parseJoinCondition(joinTree, joinCond, leftSrc, type, aliasToOpInfo);
 
-    List<ArrayList<ASTNode>> filters = joinTree.getFilters();
+    List<List<ASTNode>> filters = joinTree.getFilters();
     if (type == JoinType.LEFTOUTER || type == JoinType.FULLOUTER) {
       joinTree.addFilterMapping(cond.getLeft(), cond.getRight(), filters.get(0).size());
     }
@@ -3015,14 +3029,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     case HiveParser.EQUAL_NS:
     case HiveParser.EQUAL:
       ASTNode leftCondn = (ASTNode) joinCond.getChild(0);
-      ArrayList<String> leftCondAl1 = new ArrayList<String>();
-      ArrayList<String> leftCondAl2 = new ArrayList<String>();
+      List<String> leftCondAl1 = new ArrayList<String>();
+      List<String> leftCondAl2 = new ArrayList<String>();
       parseJoinCondPopulateAlias(joinTree, leftCondn, leftCondAl1, leftCondAl2,
           null, aliasToOpInfo);
 
       ASTNode rightCondn = (ASTNode) joinCond.getChild(1);
-      ArrayList<String> rightCondAl1 = new ArrayList<String>();
-      ArrayList<String> rightCondAl2 = new ArrayList<String>();
+      List<String> rightCondAl1 = new ArrayList<String>();
+      List<String> rightCondAl2 = new ArrayList<String>();
       parseJoinCondPopulateAlias(joinTree, rightCondn, rightCondAl1,
           rightCondAl2, null, aliasToOpInfo);
 
@@ -3048,13 +3062,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       // Create all children
       int childrenBegin = (isFunction ? 1 : 0);
-      ArrayList<ArrayList<String>> leftAlias = new ArrayList<ArrayList<String>>(
-          joinCond.getChildCount() - childrenBegin);
-      ArrayList<ArrayList<String>> rightAlias = new ArrayList<ArrayList<String>>(
-          joinCond.getChildCount() - childrenBegin);
+      List<List<String>> leftAlias = new ArrayList<List<String>>(joinCond.getChildCount() - childrenBegin);
+      List<List<String>> rightAlias = new ArrayList<List<String>>(joinCond.getChildCount() - childrenBegin);
       for (int ci = 0; ci < joinCond.getChildCount() - childrenBegin; ci++) {
-        ArrayList<String> left = new ArrayList<String>();
-        ArrayList<String> right = new ArrayList<String>();
+        List<String> left = new ArrayList<String>();
+        List<String> right = new ArrayList<String>();
         leftAlias.add(left);
         rightAlias.add(right);
       }
@@ -3066,7 +3078,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
 
       boolean leftAliasNull = true;
-      for (ArrayList<String> left : leftAlias) {
+      for (List<String> left : leftAlias) {
         if (left.size() != 0) {
           leftAliasNull = false;
           break;
@@ -3074,7 +3086,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
 
       boolean rightAliasNull = true;
-      for (ArrayList<String> right : rightAlias) {
+      for (List<String> right : rightAlias) {
         if (right.size() != 0) {
           rightAliasNull = false;
           break;
@@ -3120,19 +3132,18 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     case HiveParser.EQUAL:
 
       ASTNode leftCondn = (ASTNode) predicate.getChild(0);
-      ArrayList<String> leftCondAl1 = new ArrayList<String>();
-      ArrayList<String> leftCondAl2 = new ArrayList<String>();
+      List<String> leftCondAl1 = new ArrayList<String>();
+      List<String> leftCondAl2 = new ArrayList<String>();
       try {
-        parseJoinCondPopulateAlias(joinTree, leftCondn, leftCondAl1, leftCondAl2,
-            null, aliasToOpInfo);
+        parseJoinCondPopulateAlias(joinTree, leftCondn, leftCondAl1, leftCondAl2, null, aliasToOpInfo);
       } catch(SemanticException se) {
         // suppress here; if it is a real issue will get caught in where clause handling.
         return;
       }
 
       ASTNode rightCondn = (ASTNode) predicate.getChild(1);
-      ArrayList<String> rightCondAl1 = new ArrayList<String>();
-      ArrayList<String> rightCondAl2 = new ArrayList<String>();
+      List<String> rightCondAl1 = new ArrayList<String>();
+      List<String> rightCondAl2 = new ArrayList<String>();
       try {
         parseJoinCondPopulateAlias(joinTree, rightCondn, rightCondAl1,
             rightCondAl2, null, aliasToOpInfo);
@@ -3173,7 +3184,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @SuppressWarnings("nls")
-  public <T extends OperatorDesc> Operator<T> putOpInsertMap(Operator<T> op,
+  <T extends OperatorDesc> Operator<T> putOpInsertMap(Operator<T> op,
                                                              RowResolver rr) {
     OpParseContext ctx = new OpParseContext(rr);
     opParseCtx.put(op, ctx);
@@ -3393,6 +3404,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         subQuery.validateAndRewriteAST(inputRR, forHavingClause, havingInputAlias, aliasToOpInfo.keySet());
 
         QB qbSQ = new QB(subQuery.getOuterQueryId(), subQuery.getAlias(), true);
+        qbSQ.setInsideView(qb.isInsideView());
         Operator sqPlanTopOp = genPlanForSubQueryPredicate(qbSQ, subQuery);
         aliasToOpInfo.put(subQuery.getAlias(), sqPlanTopOp);
         RowResolver sqRR = opParseCtx.get(sqPlanTopOp).getRowResolver();
@@ -3508,7 +3520,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (joinKeys == null || joinKeys.length == 0) {
       return input;
     }
-    Map<Integer, ExprNodeDesc> hashes = new HashMap<Integer, ExprNodeDesc>();
+    Multimap<Integer, ExprNodeColumnDesc> hashes = ArrayListMultimap.create();
     if (input instanceof FilterOperator) {
       ExprNodeDescUtils.getExprNodeColumnDesc(Arrays.asList(((FilterDesc)input.getConf()).getPredicate()), hashes);
     }
@@ -3521,7 +3533,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         // virtual column, since those columns can never be null.
         continue;
       }
-      if(null != hashes.get(joinKeys[i].hashCode())) {
+      boolean skip = false;
+      for (ExprNodeColumnDesc node : hashes.get(joinKeys[i].hashCode())) {
+        if (node.isSame(joinKeys[i])) {
+          skip = true;
+          break;
+        }
+      }
+      if (skip) {
         // there is already a predicate on this src.
         continue;
       }
@@ -3565,7 +3584,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   @SuppressWarnings("nls")
     // TODO: make aliases unique, otherwise needless rewriting takes place
   Integer genColListRegex(String colRegex, String tabAlias, ASTNode sel,
-                          ArrayList<ExprNodeDesc> col_list, HashSet<ColumnInfo> excludeCols, RowResolver input,
+                          List<ExprNodeDesc> col_list, Set<ColumnInfo> excludeCols, RowResolver input,
                           RowResolver colSrcRR, Integer pos, RowResolver output, List<String> aliases,
                           boolean ensureUniqueCols) throws SemanticException {
 
@@ -3606,9 +3625,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       // We got using() clause in previous join. Need to generate select list as
       // per standard. For * we will have joining columns first non-repeated
       // followed by other columns.
-      HashMap<String, ColumnInfo> leftMap = colSrcRR.getFieldMap(colSrcRR.getNamedJoinInfo().getAliases().get(0));
-      HashMap<String, ColumnInfo> rightMap = colSrcRR.getFieldMap(colSrcRR.getNamedJoinInfo().getAliases().get(1));
-      HashMap<String, ColumnInfo> chosenMap = null;
+      Map<String, ColumnInfo> leftMap = colSrcRR.getFieldMap(colSrcRR.getNamedJoinInfo().getAliases().get(0));
+      Map<String, ColumnInfo> rightMap = colSrcRR.getFieldMap(colSrcRR.getNamedJoinInfo().getAliases().get(1));
+      Map<String, ColumnInfo> chosenMap = null;
       if (colSrcRR.getNamedJoinInfo().getHiveJoinType() != JoinType.RIGHTOUTER) {
         chosenMap = leftMap;
       } else {
@@ -3665,7 +3684,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     }
     for (String alias : aliases) {
-      HashMap<String, ColumnInfo> fMap = colSrcRR.getFieldMap(alias);
+      Map<String, ColumnInfo> fMap = colSrcRR.getFieldMap(alias);
       if (fMap == null) {
         continue;
       }
@@ -3783,7 +3802,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return (end == -1) ? "" : cmd.substring(end, cmd.length());
   }
 
-  static int getPositionFromInternalName(String internalName) {
+  private static int getPositionFromInternalName(String internalName) {
     return HiveConf.getPositionFromInternalName(internalName);
   }
 
@@ -3897,7 +3916,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private Operator genScriptPlan(ASTNode trfm, QB qb, Operator input)
       throws SemanticException {
     // If there is no "AS" clause, the output schema will be "key,value"
-    ArrayList<ColumnInfo> outputCols = new ArrayList<ColumnInfo>();
+    List<ColumnInfo> outputCols = new ArrayList<ColumnInfo>();
     int inputSerDeNum = 1, inputRecordWriterNum = 2;
     int outputSerDeNum = 4, outputRecordReaderNum = 5;
     int outputColsNum = 6;
@@ -3980,8 +3999,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     StringBuilder inpColumns = new StringBuilder();
     StringBuilder inpColumnTypes = new StringBuilder();
-    ArrayList<ColumnInfo> inputSchema = opParseCtx.get(input).getRowResolver()
-        .getColumnInfos();
+    List<ColumnInfo> inputSchema = opParseCtx.get(input).getRowResolver().getColumnInfos();
     for (int i = 0; i < inputSchema.size(); ++i) {
       if (i != 0) {
         inpColumns.append(",");
@@ -4111,7 +4129,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  protected List<Long> getGroupingSetsForRollup(int size) {
+  private List<Long> getGroupingSetsForRollup(int size) {
     List<Long> groupingSetKeys = new ArrayList<Long>();
     for (int i = 0; i <= size; i++) {
       groupingSetKeys.add((1L << i) - 1);
@@ -4119,7 +4137,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return groupingSetKeys;
   }
 
-  protected List<Long> getGroupingSetsForCube(int size) {
+  private List<Long> getGroupingSetsForCube(int size) {
     long count = 1L << size;
     List<Long> results = new ArrayList<Long>();
     for (long i = 0; i < count; ++i) {
@@ -4131,13 +4149,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   // This function returns the grouping sets along with the grouping expressions
   // Even if rollups and cubes are present in the query, they are converted to
   // grouping sets at this point
-  ObjectPair<List<ASTNode>, List<Long>> getGroupByGroupingSetsForClause(
+  Pair<List<ASTNode>, List<Long>> getGroupByGroupingSetsForClause(
     QBParseInfo parseInfo, String dest) throws SemanticException {
     List<Long> groupingSets = new ArrayList<Long>();
     List<ASTNode> groupByExprs = getGroupByForClause(parseInfo, dest);
-    if (groupByExprs.size() > Long.SIZE) {
-      throw new SemanticException(ErrorMsg.HIVE_GROUPING_SETS_SIZE_LIMIT.getMsg());
-    }
 
     if (parseInfo.getDestRollups().contains(dest)) {
       groupingSets = getGroupingSetsForRollup(groupByExprs.size());
@@ -4147,10 +4162,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       groupingSets = getGroupingSets(groupByExprs, parseInfo, dest);
     }
 
-    return new ObjectPair<List<ASTNode>, List<Long>>(groupByExprs, groupingSets);
+    if (!groupingSets.isEmpty() && groupByExprs.size() > Long.SIZE) {
+      throw new SemanticException(ErrorMsg.HIVE_GROUPING_SETS_SIZE_LIMIT.getMsg());
+    }
+
+    return Pair.of(groupByExprs, groupingSets);
   }
 
-  protected List<Long> getGroupingSets(List<ASTNode> groupByExpr, QBParseInfo parseInfo,
+  private List<Long> getGroupingSets(List<ASTNode> groupByExpr, QBParseInfo parseInfo,
       String dest) throws SemanticException {
     Map<String, Integer> exprPos = new HashMap<String, Integer>();
     for (int i = 0; i < groupByExpr.size(); ++i) {
@@ -4200,35 +4219,37 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return bitmap | (1L << bitIdx);
   }
 
-  public static long unsetBit(long bitmap, int bitIdx) {
+  private static long unsetBit(long bitmap, int bitIdx) {
     return bitmap & ~(1L << bitIdx);
   }
 
   /**
-   * This function is a wrapper of parseInfo.getGroupByForClause which
-   * automatically translates SELECT DISTINCT a,b,c to SELECT a,b,c GROUP BY
-   * a,b,c.
+   * Returns the GBY, if present;
+   * DISTINCT, if present, will be handled when generating the SELECT.
    */
   List<ASTNode> getGroupByForClause(QBParseInfo parseInfo, String dest) throws SemanticException {
-    if (parseInfo.getSelForClause(dest).getToken().getType() == HiveParser.TOK_SELECTDI) {
-      ASTNode selectExprs = parseInfo.getSelForClause(dest);
-      List<ASTNode> result = new ArrayList<ASTNode>(selectExprs == null ? 0
-          : selectExprs.getChildCount());
-      if (selectExprs != null) {
-        for (int i = 0; i < selectExprs.getChildCount(); ++i) {
-          if (((ASTNode) selectExprs.getChild(i)).getToken().getType() == HiveParser.QUERY_HINT) {
-            continue;
-          }
-          // table.column AS alias
-          ASTNode grpbyExpr = (ASTNode) selectExprs.getChild(i).getChild(0);
-          result.add(grpbyExpr);
+    ASTNode selectExpr = parseInfo.getSelForClause(dest);
+    Collection<ASTNode> aggregateFunction = parseInfo.getDestToAggregationExprs().get(dest).values();
+    if (!(this instanceof CalcitePlanner) && isSelectDistinct(selectExpr) && hasGroupBySibling(selectExpr)) {
+      throw new SemanticException("SELECT DISTINCT with GROUP BY is only supported with CBO");
+    }
+
+    if (isSelectDistinct(selectExpr) && !hasGroupBySibling(selectExpr) &&
+        !isAggregateInSelect(selectExpr, aggregateFunction)) {
+      List<ASTNode> result = new ArrayList<ASTNode>(selectExpr.getChildCount());
+      for (int i = 0; i < selectExpr.getChildCount(); ++i) {
+        if (((ASTNode) selectExpr.getChild(i)).getToken().getType() == HiveParser.QUERY_HINT) {
+          continue;
         }
+        // table.column AS alias
+        ASTNode grpbyExpr = (ASTNode) selectExpr.getChild(i).getChild(0);
+        result.add(grpbyExpr);
       }
       return result;
     } else {
+      // look for a true GBY
       ASTNode grpByExprs = parseInfo.getGroupByForClause(dest);
-      List<ASTNode> result = new ArrayList<ASTNode>(grpByExprs == null ? 0
-          : grpByExprs.getChildCount());
+      List<ASTNode> result = new ArrayList<ASTNode>(grpByExprs == null ? 0 : grpByExprs.getChildCount());
       if (grpByExprs != null) {
         for (int i = 0; i < grpByExprs.getChildCount(); ++i) {
           ASTNode grpbyExpr = (ASTNode) grpByExprs.getChild(i);
@@ -4239,6 +4260,35 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
       return result;
     }
+  }
+
+  protected boolean hasGroupBySibling(ASTNode selectExpr) {
+    boolean isGroupBy = false;
+    if (selectExpr.getParent() != null && selectExpr.getParent() instanceof Node) {
+      for (Node sibling : ((Node)selectExpr.getParent()).getChildren()) {
+        isGroupBy |= sibling instanceof ASTNode && ((ASTNode)sibling).getType() == HiveParser.TOK_GROUPBY;
+      }
+    }
+
+    return isGroupBy;
+  }
+
+  protected boolean isSelectDistinct(ASTNode expr) {
+    return expr.getType() == HiveParser.TOK_SELECTDI;
+  }
+
+  private boolean isAggregateInSelect(Node node, Collection<ASTNode> aggregateFunction) {
+    if (node.getChildren() == null) {
+      return false;
+    }
+
+    for (Node child : node.getChildren()) {
+      if (aggregateFunction.contains(child) || isAggregateInSelect(child, aggregateFunction)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   static String[] getColAlias(ASTNode selExpr, String defaultName,
@@ -4352,7 +4402,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       LOG.debug("tree: " + selExprList.toStringTree());
     }
 
-    ArrayList<ExprNodeDesc> col_list = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> col_list = new ArrayList<ExprNodeDesc>();
     RowResolver out_rwsch = new RowResolver();
     ASTNode trfm = null;
     Integer pos = Integer.valueOf(0);
@@ -4383,7 +4433,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // the lack of a special token.
     boolean isUDTF = false;
     String udtfTableAlias = null;
-    ArrayList<String> udtfColAliases = new ArrayList<String>();
+    List<String> udtfColAliases = new ArrayList<String>();
     ASTNode udtfExpr = (ASTNode) selExprList.getChild(posn).getChild(0);
     GenericUDTF genericUDTF = null;
 
@@ -4589,9 +4639,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     selectStar = selectStar && exprList.getChildCount() == posn + 1;
 
-    out_rwsch = handleInsertStatementSpec(col_list, dest, out_rwsch, inputRR, qb, selExprList);
+    out_rwsch = handleInsertStatementSpec(col_list, dest, out_rwsch, qb, selExprList);
 
-    ArrayList<String> columnNames = new ArrayList<String>();
+    List<String> columnNames = new ArrayList<String>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     for (int i = 0; i < col_list.size(); i++) {
       String outputCol = getColumnInternalName(i);
@@ -4609,8 +4659,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if (isUDTF) {
-      output = genUDTFPlan(genericUDTF, udtfTableAlias, udtfColAliases, qb,
-          output, outerLV);
+      output = genUDTFPlan(genericUDTF, udtfTableAlias, udtfColAliases, qb, output, outerLV);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -4621,7 +4670,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   private RowResolver getColForInsertStmtSpec(Map<String, ExprNodeDesc> targetCol2Projection, final Table target,
                                               Map<String, ColumnInfo> targetCol2ColumnInfo, int colListPos,
-                                              List<TypeInfo> targetTableColTypes, ArrayList<ExprNodeDesc> new_col_list,
+                                              List<TypeInfo> targetTableColTypes, List<ExprNodeDesc> new_col_list,
                                               List<String> targetTableColNames)
       throws SemanticException {
     RowResolver newOutputRR = new RowResolver();
@@ -4629,19 +4678,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     // see if we need to fetch default constraints from metastore
     if(targetCol2Projection.size() < targetTableColNames.size()) {
-      try {
-          DefaultConstraint dc = Hive.get().getEnabledDefaultConstraints(target.getDbName(), target.getTableName());
-          colNameToDefaultVal = dc.getColNameToDefaultValueMap();
-      } catch (Exception e) {
-        if (e instanceof SemanticException) {
-          throw (SemanticException) e;
-        } else {
-          throw (new RuntimeException(e));
-        }
-      }
-
+      colNameToDefaultVal = getColNameToDefaultValueMap(target);
     }
-    boolean defaultConstraintsFetch = true;
     for (int i = 0; i < targetTableColNames.size(); i++) {
       String f = targetTableColNames.get(i);
       if(targetCol2Projection.containsKey(f)) {
@@ -4699,8 +4737,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @see #handleInsertStatementSpecPhase1(ASTNode, QBParseInfo, org.apache.hadoop.hive.ql.parse.SemanticAnalyzer.Phase1Ctx)
    * @throws SemanticException
    */
-  public RowResolver handleInsertStatementSpec(List<ExprNodeDesc> col_list, String dest,
-                                               RowResolver outputRR, RowResolver inputRR, QB qb,
+  RowResolver handleInsertStatementSpec(List<ExprNodeDesc> col_list, String dest,
+                                               RowResolver outputRR, QB qb,
                                                ASTNode selExprList) throws SemanticException {
     //(z,x)
     List<String> targetTableSchema = qb.getParseInfo().getDestSchemaForClause(dest);//specified in the query
@@ -4731,7 +4769,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException(generateErrorMessage(selExprList,
           "No table/partition found in QB metadata for dest='" + dest + "'"));
     }
-    ArrayList<ExprNodeDesc> new_col_list = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> new_col_list = new ArrayList<ExprNodeDesc>();
     colListPos = 0;
     List<FieldSchema> targetTableCols = target != null ? target.getCols() : partition.getCols();
     List<String> targetTableColNames = new ArrayList<String>();
@@ -4761,6 +4799,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     col_list.addAll(new_col_list);
     return newOutputRR;
   }
+
   String recommendName(ExprNodeDesc exp, String colAlias) {
     if (!colAlias.startsWith(autogenColAliasPrfxLbl)) {
       return null;
@@ -4784,41 +4823,18 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Class to store GenericUDAF related information.
    */
   public static class GenericUDAFInfo {
-    public ArrayList<ExprNodeDesc> convertedParameters;
+    public List<ExprNodeDesc> convertedParameters;
     public GenericUDAFEvaluator genericUDAFEvaluator;
     public TypeInfo returnType;
   }
 
   /**
-   * Convert exprNodeDesc array to Typeinfo array.
-   */
-  static ArrayList<TypeInfo> getTypeInfo(ArrayList<ExprNodeDesc> exprs) {
-    ArrayList<TypeInfo> result = new ArrayList<TypeInfo>();
-    for (ExprNodeDesc expr : exprs) {
-      result.add(expr.getTypeInfo());
-    }
-    return result;
-  }
-
-  /**
    * Convert exprNodeDesc array to ObjectInspector array.
    */
-  static ArrayList<ObjectInspector> getWritableObjectInspector(ArrayList<ExprNodeDesc> exprs) {
-    ArrayList<ObjectInspector> result = new ArrayList<ObjectInspector>();
+  static List<ObjectInspector> getWritableObjectInspector(List<ExprNodeDesc> exprs) {
+    List<ObjectInspector> result = new ArrayList<ObjectInspector>();
     for (ExprNodeDesc expr : exprs) {
       result.add(expr.getWritableObjectInspector());
-    }
-    return result;
-  }
-
-  /**
-   * Convert exprNodeDesc array to Typeinfo array.
-   */
-  static ObjectInspector[] getStandardObjectInspector(ArrayList<TypeInfo> exprs) {
-    ObjectInspector[] result = new ObjectInspector[exprs.size()];
-    for (int i = 0; i < exprs.size(); i++) {
-      result[i] = TypeInfoUtils
-          .getStandardWritableObjectInspectorFromTypeInfo(exprs.get(i));
     }
     return result;
   }
@@ -4828,11 +4844,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * for each GroupBy aggregation.
    */
   public static GenericUDAFEvaluator getGenericUDAFEvaluator(String aggName,
-                                                             ArrayList<ExprNodeDesc> aggParameters, ASTNode aggTree,
+                                                             List<ExprNodeDesc> aggParameters, ASTNode aggTree,
                                                              boolean isDistinct, boolean isAllColumns)
       throws SemanticException {
-    ArrayList<ObjectInspector> originalParameterTypeInfos =
-        getWritableObjectInspector(aggParameters);
+    List<ObjectInspector> originalParameterTypeInfos = getWritableObjectInspector(aggParameters);
     GenericUDAFEvaluator result = FunctionRegistry.getGenericUDAFEvaluator(
         aggName, originalParameterTypeInfos, isDistinct, isAllColumns);
     if (null == result) {
@@ -4856,7 +4871,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    *           when the UDAF is not found or has problems.
    */
   public static GenericUDAFInfo getGenericUDAFInfo(GenericUDAFEvaluator evaluator,
-                                                   GenericUDAFEvaluator.Mode emode, ArrayList<ExprNodeDesc> aggParameters)
+                                                   GenericUDAFEvaluator.Mode emode, List<ExprNodeDesc> aggParameters)
       throws SemanticException {
 
     GenericUDAFInfo r = new GenericUDAFInfo();
@@ -4867,7 +4882,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // set r.returnType
     ObjectInspector returnOI = null;
     try {
-      ArrayList<ObjectInspector> aggOIs = getWritableObjectInspector(aggParameters);
+      List<ObjectInspector> aggOIs = getWritableObjectInspector(aggParameters);
       ObjectInspector[] aggOIArray = new ObjectInspector[aggOIs.size()];
       for (int ii = 0; ii < aggOIs.size(); ++ii) {
         aggOIArray[ii] = aggOIs.get(ii);
@@ -4973,9 +4988,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         .get(input).getRowResolver();
     RowResolver groupByOutputRowResolver = new RowResolver();
     groupByOutputRowResolver.setIsExprResolver(true);
-    ArrayList<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
+    List<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
+    List<String> outputColumnNames = new ArrayList<String>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     List<ASTNode> grpByExprs = getGroupByForClause(parseInfo, dest);
     for (int i = 0; i < grpByExprs.size(); ++i) {
@@ -4997,7 +5012,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       colExprMap.put(field, groupByKeys.get(groupByKeys.size() - 1));
     }
     // For each aggregation
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
+    Map<String, ASTNode> aggregationTrees = parseInfo
         .getAggregationExprsForClause(dest);
     assert (aggregationTrees != null);
     // get the last colName for the reduce KEY
@@ -5018,7 +5033,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       boolean isAllColumns = value.getType() == HiveParser.TOK_FUNCTIONSTAR;
 
       // Convert children to aggParameters
-      ArrayList<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
       // 0 is the function name
       for (int i = 1; i < value.getChildCount(); i++) {
         ASTNode paraExpr = (ASTNode) value.getChild(i);
@@ -5060,8 +5075,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       GenericUDAFEvaluator genericUDAFEvaluator = getGenericUDAFEvaluator(
           aggName, aggParameters, value, isDistinct, isAllColumns);
       assert (genericUDAFEvaluator != null);
-      GenericUDAFInfo udaf = getGenericUDAFInfo(genericUDAFEvaluator, amode,
-          aggParameters);
+      GenericUDAFInfo udaf = getGenericUDAFInfo(genericUDAFEvaluator, amode, aggParameters);
       aggregations.add(new AggregationDesc(aggName.toLowerCase(),
           udaf.genericUDAFEvaluator, udaf.convertedParameters, isDistinct,
           amode));
@@ -5079,10 +5093,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     float groupByMemoryUsage = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMEMORY);
     float memoryThreshold = HiveConf
         .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRMEMORYTHRESHOLD);
+    float minReductionHashAggr = HiveConf
+        .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMINREDUCTION);
 
     Operator op = putOpInsertMap(OperatorFactory.getAndMakeChild(
         new GroupByDesc(mode, outputColumnNames, groupByKeys, aggregations,
-            false, groupByMemoryUsage, memoryThreshold, null, false, -1, numDistinctUDFs > 0),
+            false, groupByMemoryUsage, memoryThreshold, minReductionHashAggr, null, false, -1, numDistinctUDFs > 0),
         new RowSchema(groupByOutputRowResolver.getColumnInfos()),
         input), groupByOutputRowResolver);
     op.setColumnExprMap(colExprMap);
@@ -5179,13 +5195,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       List<Long> groupingSets,
       boolean groupingSetsPresent,
       boolean groupingSetsNeedAdditionalMRJob) throws SemanticException {
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<String> outputColumnNames = new ArrayList<String>();
     RowResolver groupByInputRowResolver = opParseCtx
         .get(reduceSinkOperatorInfo).getRowResolver();
     RowResolver groupByOutputRowResolver = new RowResolver();
     groupByOutputRowResolver.setIsExprResolver(true);
-    ArrayList<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
+    List<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
+    List<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
     List<ASTNode> grpByExprs = getGroupByForClause(parseInfo, dest);
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     for (int i = 0; i < grpByExprs.size(); ++i) {
@@ -5241,7 +5257,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     }
 
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
+    Map<String, ASTNode> aggregationTrees = parseInfo
         .getAggregationExprsForClause(dest);
     // get the last colName for the reduce KEY
     // it represents the column name corresponding to distinct aggr, if any
@@ -5260,7 +5276,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       ASTNode value = entry.getValue();
       String aggName = unescapeIdentifier(value.getChild(0).getText());
-      ArrayList<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
       boolean isDistinct = (value.getType() == HiveParser.TOK_FUNCTIONDI);
       containsDistinctAggr = containsDistinctAggr || isDistinct;
 
@@ -5341,6 +5357,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     float groupByMemoryUsage = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMEMORY);
     float memoryThreshold = HiveConf
         .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRMEMORYTHRESHOLD);
+    float minReductionHashAggr = HiveConf
+        .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMINREDUCTION);
 
     // Nothing special needs to be done for grouping sets if
     // this is the final group by operator, and multiple rows corresponding to the
@@ -5349,7 +5367,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // additional rows corresponding to grouping sets need to be created here.
     Operator op = putOpInsertMap(OperatorFactory.getAndMakeChild(
         new GroupByDesc(mode, outputColumnNames, groupByKeys, aggregations,
-            groupByMemoryUsage, memoryThreshold,
+            groupByMemoryUsage, memoryThreshold, minReductionHashAggr,
             groupingSets,
             groupingSetsPresent && groupingSetsNeedAdditionalMRJob,
             groupingSetsPosition, containsDistinctAggr),
@@ -5411,9 +5429,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     QBParseInfo parseInfo = qb.getParseInfo();
     RowResolver groupByOutputRowResolver = new RowResolver();
     groupByOutputRowResolver.setIsExprResolver(true);
-    ArrayList<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
-    ArrayList<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
+    List<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumnNames = new ArrayList<String>();
+    List<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     for (int i = 0; i < grpByExprs.size(); ++i) {
       ASTNode grpbyExpr = grpByExprs.get(i);
@@ -5475,15 +5493,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     // For each aggregation
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
-        .getAggregationExprsForClause(dest);
+    Map<String, ASTNode> aggregationTrees = parseInfo.getAggregationExprsForClause(dest);
     assert (aggregationTrees != null);
 
     boolean containsDistinctAggr = false;
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       ASTNode value = entry.getValue();
       String aggName = unescapeIdentifier(value.getChild(0).getText());
-      ArrayList<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
       // 0 is the function name
       for (int i = 1; i < value.getChildCount(); i++) {
         ASTNode paraExpr = (ASTNode) value.getChild(i);
@@ -5522,9 +5539,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     float groupByMemoryUsage = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMEMORY);
     float memoryThreshold = HiveConf
         .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRMEMORYTHRESHOLD);
+    float minReductionHashAggr = HiveConf
+        .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMINREDUCTION);
     Operator op = putOpInsertMap(OperatorFactory.getAndMakeChild(
         new GroupByDesc(mode, outputColumnNames, groupByKeys, aggregations,
-            false, groupByMemoryUsage, memoryThreshold,
+            false, groupByMemoryUsage, memoryThreshold, minReductionHashAggr,
             groupingSetKeys, groupingSetsPresent, groupingSetsPosition, containsDistinctAggr),
         new RowSchema(groupByOutputRowResolver.getColumnInfos()),
         inputOperatorInfo), groupByOutputRowResolver);
@@ -5568,7 +5587,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<String> outputKeyColumnNames = new ArrayList<String>();
     List<String> outputValueColumnNames = new ArrayList<String>();
 
-    ArrayList<ExprNodeDesc> reduceKeys = getReduceKeysForReduceSink(grpByExprs, dest,
+    List<ExprNodeDesc> reduceKeys = getReduceKeysForReduceSink(grpByExprs,
         reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
         colExprMap);
 
@@ -5594,9 +5613,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
         colExprMap);
 
-    ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
-        .getAggregationExprsForClause(dest);
+    List<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
+    Map<String, ASTNode> aggregationTrees = parseInfo.getAggregationExprsForClause(dest);
 
     if (!mapAggrDone) {
       getReduceValuesForReduceSinkNoMapAgg(parseInfo, dest, reduceSinkInputRowResolver,
@@ -5636,12 +5654,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return rsOp;
   }
 
-  private ArrayList<ExprNodeDesc> getReduceKeysForReduceSink(List<ASTNode> grpByExprs, String dest,
+  private List<ExprNodeDesc> getReduceKeysForReduceSink(List<ASTNode> grpByExprs,
                                                              RowResolver reduceSinkInputRowResolver, RowResolver reduceSinkOutputRowResolver,
                                                              List<String> outputKeyColumnNames, Map<String, ExprNodeDesc> colExprMap)
       throws SemanticException {
 
-    ArrayList<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
 
     for (int i = 0; i < grpByExprs.size(); ++i) {
       ASTNode grpbyExpr = grpByExprs.get(i);
@@ -5727,10 +5745,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   private void getReduceValuesForReduceSinkNoMapAgg(QBParseInfo parseInfo, String dest,
                                                     RowResolver reduceSinkInputRowResolver, RowResolver reduceSinkOutputRowResolver,
-                                                    List<String> outputValueColumnNames, ArrayList<ExprNodeDesc> reduceValues,
+                                                    List<String> outputValueColumnNames, List<ExprNodeDesc> reduceValues,
                                                     Map<String, ExprNodeDesc> colExprMap) throws SemanticException {
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
-        .getAggregationExprsForClause(dest);
+    Map<String, ASTNode> aggregationTrees = parseInfo.getAggregationExprsForClause(dest);
 
     // Put parameters to aggregations in reduceValues
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
@@ -5774,7 +5791,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<String> outputValueColumnNames = new ArrayList<String>();
     List<ASTNode> grpByExprs = getGroupByForClause(parseInfo, dest);
 
-    ArrayList<ExprNodeDesc> reduceKeys = getReduceKeysForReduceSink(grpByExprs, dest,
+    List<ExprNodeDesc> reduceKeys = getReduceKeysForReduceSink(grpByExprs,
         reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
         colExprMap);
 
@@ -5784,7 +5801,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
         colExprMap);
 
-    ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
 
     // The dests can have different non-distinct aggregations, so we have to iterate over all of
     // them
@@ -5892,8 +5909,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     RowResolver reduceSinkOutputRowResolver2 = new RowResolver();
     reduceSinkOutputRowResolver2.setIsExprResolver(true);
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumnNames = new ArrayList<String>();
     // Get group-by keys and store in reduceKeys
     List<ASTNode> grpByExprs = getGroupByForClause(parseInfo, dest);
     for (int i = 0; i < grpByExprs.size(); ++i) {
@@ -5924,10 +5941,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     // Get partial aggregation results and store in reduceValues
-    ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
     int inputField = reduceKeys.size();
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
-        .getAggregationExprsForClause(dest);
+    Map<String, ASTNode> aggregationTrees = parseInfo.getAggregationExprsForClause(dest);
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       String field = getColumnInternalName(inputField);
       ASTNode t = entry.getValue();
@@ -5980,11 +5996,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         reduceSinkOperatorInfo2).getRowResolver();
     RowResolver groupByOutputRowResolver2 = new RowResolver();
     groupByOutputRowResolver2.setIsExprResolver(true);
-    ArrayList<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
+    List<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
+    List<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     List<ASTNode> grpByExprs = getGroupByForClause(parseInfo, dest);
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<String> outputColumnNames = new ArrayList<String>();
     for (int i = 0; i < grpByExprs.size(); ++i) {
       ASTNode grpbyExpr = grpByExprs.get(i);
       ColumnInfo exprInfo = groupByInputRowResolver2.getExpression(grpbyExpr);
@@ -6016,11 +6032,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           colExprMap);
     }
 
-    HashMap<String, ASTNode> aggregationTrees = parseInfo
-        .getAggregationExprsForClause(dest);
+    Map<String, ASTNode> aggregationTrees = parseInfo.getAggregationExprsForClause(dest);
     boolean containsDistinctAggr = false;
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
-      ArrayList<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
       ASTNode value = entry.getValue();
       ColumnInfo paraExprInfo = groupByInputRowResolver2.getExpression(value);
       if (paraExprInfo == null) {
@@ -6036,7 +6051,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       boolean isDistinct = value.getType() == HiveParser.TOK_FUNCTIONDI;
       containsDistinctAggr = containsDistinctAggr || isDistinct;
-      boolean isStar = value.getType() == HiveParser.TOK_FUNCTIONSTAR;
       Mode amode = groupByDescModeToUDAFMode(mode, isDistinct);
       GenericUDAFEvaluator genericUDAFEvaluator = genericUDAFEvaluators
           .get(entry.getKey());
@@ -6060,10 +6074,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     float groupByMemoryUsage = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMEMORY);
     float memoryThreshold = HiveConf
         .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRMEMORYTHRESHOLD);
+    float minReductionHashAggr = HiveConf
+        .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMINREDUCTION);
 
     Operator op = putOpInsertMap(OperatorFactory.getAndMakeChild(
         new GroupByDesc(mode, outputColumnNames, groupByKeys, aggregations,
-            false, groupByMemoryUsage, memoryThreshold, null, false,
+            false, groupByMemoryUsage, memoryThreshold, minReductionHashAggr, null, false,
             groupingSetsPosition, containsDistinctAggr),
         new RowSchema(groupByOutputRowResolver2.getColumnInfos()),
         reduceSinkOperatorInfo2), groupByOutputRowResolver2);
@@ -6103,11 +6119,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     QBParseInfo parseInfo = qb.getParseInfo();
 
     int numReducers = -1;
-    ObjectPair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
-        getGroupByGroupingSetsForClause(parseInfo, dest);
+    Pair<List<ASTNode>, List<Long>> grpByExprsGroupingSets = getGroupByGroupingSetsForClause(parseInfo, dest);
 
-    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getFirst();
-    List<Long> groupingSets = grpByExprsGroupingSets.getSecond();
+    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getLeft();
+    List<Long> groupingSets = grpByExprsGroupingSets.getRight();
 
     if (grpByExprs.isEmpty()) {
       numReducers = 1;
@@ -6152,10 +6167,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<ExprNodeDesc.ExprNodeDescEqualityWrapper> whereExpressions =
         new ArrayList<ExprNodeDesc.ExprNodeDescEqualityWrapper>();
     for (String dest : dests) {
-      ObjectPair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
+      Pair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
           getGroupByGroupingSetsForClause(parseInfo, dest);
 
-      List<Long> groupingSets = grpByExprsGroupingSets.getSecond();
+      List<Long> groupingSets = grpByExprsGroupingSets.getRight();
       if (!groupingSets.isEmpty()) {
         throw new SemanticException(ErrorMsg.HIVE_GROUPING_SETS_AGGR_NOMAPAGGR_MULTIGBY.getMsg());
       }
@@ -6242,15 +6257,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return curr;
   }
 
-  static ArrayList<GenericUDAFEvaluator> getUDAFEvaluators(
-      ArrayList<AggregationDesc> aggs) {
-    ArrayList<GenericUDAFEvaluator> result = new ArrayList<GenericUDAFEvaluator>();
-    for (int i = 0; i < aggs.size(); i++) {
-      result.add(aggs.get(i).getGenericUDAFEvaluator());
-    }
-    return result;
-  }
-
   /**
    * Generate a Group-By plan using a 2 map-reduce jobs (5 operators will be
    * inserted):
@@ -6298,11 +6304,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     QBParseInfo parseInfo = qb.getParseInfo();
 
-    ObjectPair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
-        getGroupByGroupingSetsForClause(parseInfo, dest);
+    Pair<List<ASTNode>, List<Long>> grpByExprsGroupingSets = getGroupByGroupingSetsForClause(parseInfo, dest);
 
-    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getFirst();
-    List<Long> groupingSets = grpByExprsGroupingSets.getSecond();
+    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getLeft();
+    List<Long> groupingSets = grpByExprsGroupingSets.getRight();
 
     // Grouping sets are not allowed
     // This restriction can be lifted in future.
@@ -6425,7 +6430,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       ASTNode value = entry.getValue();
-      ArrayList<ExprNodeDesc> aggParameters = new ArrayList<ExprNodeDesc>();
       // 0 is the function name
       for (int i = 1; i < value.getChildCount(); i++) {
         ASTNode paraExpr = (ASTNode) value.getChild(i);
@@ -6494,11 +6498,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                                                Operator inputOperatorInfo) throws SemanticException {
 
     QBParseInfo parseInfo = qb.getParseInfo();
-    ObjectPair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
-        getGroupByGroupingSetsForClause(parseInfo, dest);
+    Pair<List<ASTNode>, List<Long>> grpByExprsGroupingSets = getGroupByGroupingSetsForClause(parseInfo, dest);
 
-    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getFirst();
-    List<Long> groupingSets = grpByExprsGroupingSets.getSecond();
+    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getLeft();
+    List<Long> groupingSets = grpByExprsGroupingSets.getRight();
     boolean groupingSetsPresent = !groupingSets.isEmpty();
 
     int newMRJobGroupingSetsThreshold =
@@ -6663,11 +6666,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     QBParseInfo parseInfo = qb.getParseInfo();
 
-    ObjectPair<List<ASTNode>, List<Long>> grpByExprsGroupingSets =
-        getGroupByGroupingSetsForClause(parseInfo, dest);
+    Pair<List<ASTNode>, List<Long>> grpByExprsGroupingSets = getGroupByGroupingSetsForClause(parseInfo, dest);
 
-    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getFirst();
-    List<Long> groupingSets = grpByExprsGroupingSets.getSecond();
+    List<ASTNode> grpByExprs = grpByExprsGroupingSets.getLeft();
+    List<Long> groupingSets = grpByExprsGroupingSets.getRight();
     boolean groupingSetsPresent = !groupingSets.isEmpty();
 
     if (groupingSetsPresent) {
@@ -6768,7 +6770,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private static class SortBucketRSCtx {
-    ArrayList<ExprNodeDesc> partnCols;
+    List<ExprNodeDesc> partnCols;
     boolean multiFileSpray;
     int numFiles;
     int totalFiles;
@@ -6783,7 +6785,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     /**
      * @return the partnCols
      */
-    public ArrayList<ExprNodeDesc> getPartnCols() {
+    public List<ExprNodeDesc> getPartnCols() {
       return partnCols;
     }
 
@@ -6791,7 +6793,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
      * @param partnCols
      *          the partnCols to set
      */
-    public void setPartnCols(ArrayList<ExprNodeDesc> partnCols) {
+    public void setPartnCols(List<ExprNodeDesc> partnCols) {
       this.partnCols = partnCols;
     }
 
@@ -6843,7 +6845,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @SuppressWarnings("nls")
   private Operator genBucketingSortingDest(String dest, Operator input, QB qb,
-                                           TableDesc table_desc, Table dest_tab, SortBucketRSCtx ctx) throws SemanticException {
+      TableDesc table_desc, Table dest_tab, SortBucketRSCtx ctx) throws SemanticException {
 
     // If the table is bucketed, and bucketing is enforced, do the following:
     // If the number of buckets is smaller than the number of maximum reducers,
@@ -6852,10 +6854,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // spray the data into multiple buckets. That way, we can support a very large
     // number of buckets without needing a very large number of reducers.
     boolean enforceBucketing = false;
-    ArrayList<ExprNodeDesc> partnCols = new ArrayList<ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> sortCols = new ArrayList<ExprNodeDesc>();
-    ArrayList<Integer> sortOrders = new ArrayList<Integer>();
-    ArrayList<Integer> nullSortOrders = new ArrayList<Integer>();
+    List<ExprNodeDesc> partnCols = new ArrayList<>();
+    List<ExprNodeDesc> sortCols = new ArrayList<>();
+    List<Integer> sortOrders = new ArrayList<>();
     boolean multiFileSpray = false;
     int numFiles = 1;
     int totalFiles = 1;
@@ -6867,8 +6868,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       } else {
         partnCols = getPartitionColsFromBucketCols(dest, qb, dest_tab, table_desc, input, true);
       }
-    }
-    else {
+    } else {
       if(updating(dest) || deleting(dest)) {
         partnCols = getPartitionColsFromBucketColsForUpdateDelete(input, true);
         enforceBucketing = true;
@@ -6881,18 +6881,28 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       sortOrders = getSortOrders(dest, qb, dest_tab, input);
       if (!enforceBucketing) {
         throw new SemanticException(ErrorMsg.TBL_SORTED_NOT_BUCKETED.getErrorCodedMsg(dest_tab.getCompleteName()));
-      } else {
-        if (!enforceBucketing) {
-          partnCols = sortCols;
-        }
       }
-      enforceBucketing = true;
+    } else if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_SORT_WHEN_BUCKETING) &&
+        enforceBucketing && !updating(dest) && !deleting(dest)) {
+      sortCols = new ArrayList<>();
+      for (ExprNodeDesc expr : partnCols) {
+        sortCols.add(expr.clone());
+      }
+      sortOrders = new ArrayList<>();
+      for (int i = 0; i < sortCols.size(); i++) {
+        sortOrders.add(DirectionUtils.ASCENDING_CODE);
+      }
     }
 
     if (enforceBucketing) {
+      Operation acidOp = AcidUtils.isFullAcidTable(dest_tab) ? getAcidType(table_desc.getOutputFileFormatClass(),
+              dest, AcidUtils.isInsertOnlyTable(dest_tab)) : Operation.NOT_ACID;
       int maxReducers = conf.getIntVar(HiveConf.ConfVars.MAXREDUCERS);
       if (conf.getIntVar(HiveConf.ConfVars.HADOOPNUMREDUCERS) > 0) {
         maxReducers = conf.getIntVar(HiveConf.ConfVars.HADOOPNUMREDUCERS);
+      }
+      if (acidOp == Operation.UPDATE || acidOp == Operation.DELETE) {
+        maxReducers = 1;
       }
       int numBuckets = dest_tab.getNumBuckets();
       if (numBuckets > maxReducers) {
@@ -6908,19 +6918,19 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           numFiles = totalFiles / maxReducers;
         }
       }
-      else {
+      else if (acidOp == Operation.NOT_ACID || acidOp == Operation.INSERT) {
         maxReducers = numBuckets;
       }
 
       StringBuilder order = new StringBuilder();
       StringBuilder nullOrder = new StringBuilder();
       for (int sortOrder : sortOrders) {
-        order.append(sortOrder == BaseSemanticAnalyzer.HIVE_COLUMN_ORDER_ASC ? '+' : '-');
-        nullOrder.append(sortOrder == BaseSemanticAnalyzer.HIVE_COLUMN_ORDER_ASC ? 'a' : 'z');
+        order.append(DirectionUtils.codeToSign(sortOrder));
+        nullOrder.append(sortOrder == DirectionUtils.ASCENDING_CODE ? 'a' : 'z');
       }
       input = genReduceSinkPlan(input, partnCols, sortCols, order.toString(), nullOrder.toString(),
-          maxReducers, (AcidUtils.isFullAcidTable(dest_tab) ?
-              getAcidType(table_desc.getOutputFileFormatClass(), dest) : AcidUtils.Operation.NOT_ACID));
+          maxReducers,
+              acidOp);
       reduceSinkOperatorsAddedByEnforceBucketingSorting.add((ReduceSinkOperator)input.getParentOperators().get(0));
       ctx.setMultiFileSpray(multiFileSpray);
       ctx.setNumFiles(numFiles);
@@ -6930,9 +6940,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private void genPartnCols(String dest, Operator input, QB qb,
-                            TableDesc table_desc, Table dest_tab, SortBucketRSCtx ctx) throws SemanticException {
+      TableDesc table_desc, Table dest_tab, SortBucketRSCtx ctx) throws SemanticException {
     boolean enforceBucketing = false;
-    ArrayList<ExprNodeDesc> partnColsNoConvert = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> partnColsNoConvert = new ArrayList<ExprNodeDesc>();
 
     if ((dest_tab.getNumBuckets() > 0)) {
       enforceBucketing = true;
@@ -6962,16 +6972,140 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  private void setStatsForNonNativeTable(Table tab) throws SemanticException {
-    String tableName = DDLSemanticAnalyzer.getDotName(new String[] { tab.getDbName(),
-        tab.getTableName() });
-    AlterTableDesc alterTblDesc = new AlterTableDesc(AlterTableTypes.DROPPROPS, null, false);
-    HashMap<String, String> mapProp = new HashMap<>();
+  private Operator genMaterializedViewDataOrgPlan(Table destinationTable, String sortColsStr, String distributeColsStr,
+      RowResolver inputRR, Operator input) throws SemanticException {
+    Map<String, Integer> colNameToIdx = new HashMap<>();
+    for (int i = 0; i < destinationTable.getCols().size(); i++) {
+      colNameToIdx.put(destinationTable.getCols().get(i).getName(), i);
+    }
+    List<ColumnInfo> colInfos = inputRR.getColumnInfos();
+    List<ColumnInfo> sortColInfos = new ArrayList<>();
+    if (sortColsStr != null) {
+      Utilities.decodeColumnNames(sortColsStr)
+          .forEach(s -> sortColInfos.add(colInfos.get(colNameToIdx.get(s))));
+    }
+    List<ColumnInfo> distributeColInfos = new ArrayList<>();
+    if (distributeColsStr != null) {
+      Utilities.decodeColumnNames(distributeColsStr)
+          .forEach(s -> distributeColInfos.add(colInfos.get(colNameToIdx.get(s))));
+    }
+    return genMaterializedViewDataOrgPlan(sortColInfos, distributeColInfos, inputRR, input);
+  }
+
+  private Operator genMaterializedViewDataOrgPlan(List<ColumnInfo> sortColInfos, List<ColumnInfo> distributeColInfos,
+      RowResolver inputRR, Operator input) {
+    // In this case, we will introduce a RS and immediately after a SEL that restores
+    // the row schema to what follow-up operations are expecting
+    Set<String> keys = sortColInfos.stream()
+        .map(ColumnInfo::getInternalName)
+        .collect(Collectors.toSet());
+    Set<String> distributeKeys = distributeColInfos.stream()
+        .map(ColumnInfo::getInternalName)
+        .collect(Collectors.toSet());
+    List<ExprNodeDesc> keyCols = new ArrayList<>();
+    List<String> keyColNames = new ArrayList<>();
+    StringBuilder order = new StringBuilder();
+    StringBuilder nullOrder = new StringBuilder();
+    List<ExprNodeDesc> valCols = new ArrayList<>();
+    List<String> valColNames = new ArrayList<>();
+    List<ExprNodeDesc> partCols = new ArrayList<>();
+    Map<String, ExprNodeDesc> colExprMap = new HashMap<>();
+    Map<String, String> nameMapping = new HashMap<>();
+    // map _col0 to KEY._col0, etc
+    for (ColumnInfo ci : inputRR.getRowSchema().getSignature()) {
+      ExprNodeColumnDesc e = new ExprNodeColumnDesc(ci);
+      String columnName = ci.getInternalName();
+      if (keys.contains(columnName)) {
+        // key (sort column)
+        keyColNames.add(columnName);
+        keyCols.add(e);
+        colExprMap.put(Utilities.ReduceField.KEY + "." + columnName, e);
+        nameMapping.put(columnName, Utilities.ReduceField.KEY + "." + columnName);
+        order.append("+");
+        nullOrder.append("a");
+      } else {
+        // value
+        valColNames.add(columnName);
+        valCols.add(e);
+        colExprMap.put(Utilities.ReduceField.VALUE + "." + columnName, e);
+        nameMapping.put(columnName, Utilities.ReduceField.VALUE + "." + columnName);
+      }
+      if (distributeKeys.contains(columnName)) {
+        // distribute column
+        partCols.add(e.clone());
+      }
+    }
+    // Create Key/Value TableDesc. When the operator plan is split into MR tasks,
+    // the reduce operator will initialize Extract operator with information
+    // from Key and Value TableDesc
+    List<FieldSchema> fields = PlanUtils.getFieldSchemasFromColumnList(keyCols,
+        keyColNames, 0, "");
+    TableDesc keyTable = PlanUtils.getReduceKeyTableDesc(fields, order.toString(), nullOrder.toString());
+    List<FieldSchema> valFields = PlanUtils.getFieldSchemasFromColumnList(valCols,
+        valColNames, 0, "");
+    TableDesc valueTable = PlanUtils.getReduceValueTableDesc(valFields);
+    List<List<Integer>> distinctColumnIndices = new ArrayList<>();
+    // Number of reducers is set to default (-1)
+    ReduceSinkDesc rsConf = new ReduceSinkDesc(keyCols, keyCols.size(), valCols,
+        keyColNames, distinctColumnIndices, valColNames, -1, partCols, -1, keyTable,
+        valueTable, Operation.NOT_ACID);
+    RowResolver rsRR = new RowResolver();
+    List<ColumnInfo> rsSignature = new ArrayList<>();
+    for (int index = 0; index < input.getSchema().getSignature().size(); index++) {
+      ColumnInfo colInfo = new ColumnInfo(input.getSchema().getSignature().get(index));
+      String[] nm = inputRR.reverseLookup(colInfo.getInternalName());
+      String[] nm2 = inputRR.getAlternateMappings(colInfo.getInternalName());
+      colInfo.setInternalName(nameMapping.get(colInfo.getInternalName()));
+      rsSignature.add(colInfo);
+      rsRR.put(nm[0], nm[1], colInfo);
+      if (nm2 != null) {
+        rsRR.addMappingOnly(nm2[0], nm2[1], colInfo);
+      }
+    }
+    Operator<?> result = putOpInsertMap(OperatorFactory.getAndMakeChild(
+        rsConf, new RowSchema(rsSignature), input), rsRR);
+    result.setColumnExprMap(colExprMap);
+
+    // Create SEL operator
+    RowResolver selRR = new RowResolver();
+    List<ColumnInfo> selSignature = new ArrayList<>();
+    List<ExprNodeDesc> columnExprs = new ArrayList<>();
+    List<String> colNames = new ArrayList<>();
+    Map<String, ExprNodeDesc> selColExprMap = new HashMap<>();
+    for (int index = 0; index < input.getSchema().getSignature().size(); index++) {
+      ColumnInfo colInfo = new ColumnInfo(input.getSchema().getSignature().get(index));
+      String[] nm = inputRR.reverseLookup(colInfo.getInternalName());
+      String[] nm2 = inputRR.getAlternateMappings(colInfo.getInternalName());
+      selSignature.add(colInfo);
+      selRR.put(nm[0], nm[1], colInfo);
+      if (nm2 != null) {
+        selRR.addMappingOnly(nm2[0], nm2[1], colInfo);
+      }
+      String colName = colInfo.getInternalName();
+      ExprNodeDesc exprNodeDesc;
+      if (keys.contains(colName)) {
+        exprNodeDesc = new ExprNodeColumnDesc(colInfo.getType(), ReduceField.KEY.toString() + "." + colName, null, false);
+        columnExprs.add(exprNodeDesc);
+      } else {
+        exprNodeDesc = new ExprNodeColumnDesc(colInfo.getType(), ReduceField.VALUE.toString() + "." + colName, null, false);
+        columnExprs.add(exprNodeDesc);
+      }
+      colNames.add(colName);
+      selColExprMap.put(colName, exprNodeDesc);
+    }
+    SelectDesc selConf = new SelectDesc(columnExprs, colNames);
+    result = putOpInsertMap(OperatorFactory.getAndMakeChild(selConf, new RowSchema(selSignature), result), selRR);
+    result.setColumnExprMap(selColExprMap);
+
+    return result;
+  }
+
+  private void setStatsForNonNativeTable(String dbName, String tableName) throws SemanticException {
+    TableName qTableName = HiveTableName.ofNullable(tableName, dbName);
+    Map<String, String> mapProp = new HashMap<>();
     mapProp.put(StatsSetupConst.COLUMN_STATS_ACCURATE, null);
-    alterTblDesc.setOldName(tableName);
-    alterTblDesc.setProps(mapProp);
-    alterTblDesc.setDropIfExists(true);
+    AlterTableUnsetPropertiesDesc alterTblDesc = new AlterTableUnsetPropertiesDesc(qTableName, null, null, false,
+        mapProp, false, null);
     this.rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), alterTblDesc)));
   }
 
@@ -7204,17 +7338,18 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     RowResolver inputRR = opParseCtx.get(input).getRowResolver();
     QBMetaData qbm = qb.getMetaData();
-    Integer dest_type = qbm.getDestTypeForAlias(dest);
+    Integer destType = qbm.getDestTypeForAlias(dest);
 
-    Table dest_tab = null; // destination table if any
+    Table destinationTable = null; // destination table if any
     boolean destTableIsTransactional;     // true for full ACID table and MM table
     boolean destTableIsFullAcid; // should the destination table be written to using ACID
+    boolean isDirectInsert = false; // should we add files directly to the final path
     boolean destTableIsTemporary = false;
     boolean destTableIsMaterialization = false;
-    Partition dest_part = null;// destination partition if any
+    Partition destinationPartition = null;// destination partition if any
     Path queryTmpdir = null; // the intermediate destination directory
-    Path dest_path = null; // the final destination directory
-    TableDesc table_desc = null;
+    Path destinationPath = null; // the final destination directory
+    TableDesc tableDescriptor = null;
     int currentTableId = 0;
     boolean isLocal = false;
     SortBucketRSCtx rsCtx = new SortBucketRSCtx();
@@ -7222,28 +7357,28 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     LoadTableDesc ltd = null;
     ListBucketingCtx lbCtx = null;
     Map<String, String> partSpec = null;
-    boolean isMmTable = false, isMmCtas = false;
+    boolean isMmTable = false, isMmCreate = false, isNonNativeTable = false;
     Long writeId = null;
     HiveTxnManager txnMgr = getTxnMgr();
 
-    switch (dest_type.intValue()) {
+    switch (destType.intValue()) {
     case QBMetaData.DEST_TABLE: {
 
-      dest_tab = qbm.getDestTableForAlias(dest);
-      destTableIsTransactional = AcidUtils.isTransactionalTable(dest_tab);
-      destTableIsFullAcid = AcidUtils.isFullAcidTable(dest_tab);
-      destTableIsTemporary = dest_tab.isTemporary();
+      destinationTable = qbm.getDestTableForAlias(dest);
+      destTableIsTransactional = AcidUtils.isTransactionalTable(destinationTable);
+      destTableIsFullAcid = AcidUtils.isFullAcidTable(destinationTable);
+      destTableIsTemporary = destinationTable.isTemporary();
 
       // Is the user trying to insert into a external tables
-      checkExternalTable(dest_tab);
+      checkExternalTable(destinationTable);
 
       partSpec = qbm.getPartSpecForAlias(dest);
-      dest_path = dest_tab.getPath();
+      destinationPath = destinationTable.getPath();
 
-      checkImmutableTable(qb, dest_tab, dest_path, false);
+      checkImmutableTable(qb, destinationTable, destinationPath, false);
 
       // check for partition
-      List<FieldSchema> parts = dest_tab.getPartitionKeys();
+      List<FieldSchema> parts = destinationTable.getPartitionKeys();
       if (parts != null && parts.size() > 0) { // table is partitioned
         if (partSpec == null || partSpec.size() == 0) { // user did NOT specify partition
           throw new SemanticException(generateErrorMessage(
@@ -7252,8 +7387,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
         dpCtx = qbm.getDPCtx(dest);
         if (dpCtx == null) {
-          dest_tab.validatePartColumnNames(partSpec, false);
-          dpCtx = new DynamicPartitionCtx(dest_tab, partSpec,
+          destinationTable.validatePartColumnNames(partSpec, false);
+          dpCtx = new DynamicPartitionCtx(partSpec,
               conf.getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME),
               conf.getIntVar(HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTSPERNODE));
           qbm.setDPCtx(dest, dpCtx);
@@ -7261,181 +7396,246 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
 
       // Check for dynamic partitions.
-      dpCtx = checkDynPart(qb, qbm, dest_tab, partSpec, dest);
+      dpCtx = checkDynPart(qb, qbm, destinationTable, partSpec, dest);
       if (dpCtx != null && dpCtx.getSPPath() != null) {
-        dest_path = new Path(dest_tab.getPath(), dpCtx.getSPPath());
+        destinationPath = new Path(destinationTable.getPath(), dpCtx.getSPPath());
       }
 
-      boolean isNonNativeTable = dest_tab.isNonNative();
-      isMmTable = AcidUtils.isInsertOnlyTable(dest_tab.getParameters());
-      if (isNonNativeTable || isMmTable) {
-        queryTmpdir = dest_path;
-      } else {
-        queryTmpdir = ctx.getTempDirForFinalJobPath(dest_path);
+      isNonNativeTable = destinationTable.isNonNative();
+      isMmTable = AcidUtils.isInsertOnlyTable(destinationTable.getParameters());
+      AcidUtils.Operation acidOp = AcidUtils.Operation.NOT_ACID;
+      // this table_desc does not contain the partitioning columns
+      tableDescriptor = Utilities.getTableDesc(destinationTable);
+
+      if (!isNonNativeTable) {
+        if (destTableIsTransactional) {
+          acidOp = getAcidType(tableDescriptor.getOutputFileFormatClass(), dest, isMmTable);
+        }
       }
+      isDirectInsert = isDirectInsert(destTableIsFullAcid, acidOp);
+      queryTmpdir = getTmpDir(isNonNativeTable, isMmTable, isDirectInsert, destinationPath);
       if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
         Utilities.FILE_OP_LOGGER.trace("create filesink w/DEST_TABLE specifying " + queryTmpdir
-            + " from " + dest_path);
+            + " from " + destinationPath);
       }
       if (dpCtx != null) {
         // set the root of the temporary path where dynamic partition columns will populate
         dpCtx.setRootPath(queryTmpdir);
       }
-      // this table_desc does not contain the partitioning columns
-      table_desc = Utilities.getTableDesc(dest_tab);
 
       // Add NOT NULL constraint check
       input = genConstraintsPlan(dest, qb, input);
 
-      // Add sorting/bucketing if needed
-      input = genBucketingSortingDest(dest, input, qb, table_desc, dest_tab, rsCtx);
+      if (destinationTable.isMaterializedView() &&
+          mvRebuildMode == MaterializationRebuildMode.INSERT_OVERWRITE_REBUILD) {
+        // Data organization (DISTRIBUTED, SORTED, CLUSTERED) for materialized view
+        // TODO: We only do this for a full rebuild
+        String sortColsStr = destinationTable.getProperty(Constants.MATERIALIZED_VIEW_SORT_COLUMNS);
+        String distributeColsStr = destinationTable.getProperty(Constants.MATERIALIZED_VIEW_DISTRIBUTE_COLUMNS);
+        if (sortColsStr != null || distributeColsStr != null) {
+          input = genMaterializedViewDataOrgPlan(destinationTable, sortColsStr, distributeColsStr, inputRR, input);
+        }
+      } else {
+        // Add sorting/bucketing if needed
+        input = genBucketingSortingDest(dest, input, qb, tableDescriptor, destinationTable, rsCtx);
+      }
 
-      idToTableNameMap.put(String.valueOf(destTableId), dest_tab.getTableName());
+      idToTableNameMap.put(String.valueOf(destTableId), destinationTable.getTableName());
       currentTableId = destTableId;
       destTableId++;
 
-      lbCtx = constructListBucketingCtx(dest_tab.getSkewedColNames(),
-          dest_tab.getSkewedColValues(), dest_tab.getSkewedColValueLocationMaps(),
-          dest_tab.isStoredAsSubDirectories(), conf);
+      lbCtx = constructListBucketingCtx(destinationTable.getSkewedColNames(),
+          destinationTable.getSkewedColValues(), destinationTable.getSkewedColValueLocationMaps(),
+          destinationTable.isStoredAsSubDirectories());
 
       // Create the work for moving the table
       // NOTE: specify Dynamic partitions in dest_tab for WriteEntity
       if (!isNonNativeTable) {
-        AcidUtils.Operation acidOp = AcidUtils.Operation.NOT_ACID;
-        if (destTableIsFullAcid) {
-          acidOp = getAcidType(table_desc.getOutputFileFormatClass(), dest);
-          //todo: should this be done for MM?  is it ok to use CombineHiveInputFormat with MM
-          checkAcidConstraints(qb, table_desc, dest_tab);
+        if (destTableIsTransactional) {
+          acidOp = getAcidType(tableDescriptor.getOutputFileFormatClass(), dest, isMmTable);
+          checkAcidConstraints(qb, tableDescriptor, destinationTable);
         }
         try {
           if (ctx.getExplainConfig() != null) {
-            writeId = 0L; // For explain plan, txn won't be opened and doesn't make sense to allocate write id
+            writeId = null; // For explain plan, txn won't be opened and doesn't make sense to allocate write id
           } else {
             if (isMmTable) {
-              writeId = txnMgr.getTableWriteId(dest_tab.getDbName(), dest_tab.getTableName());
+              writeId = txnMgr.getTableWriteId(destinationTable.getDbName(), destinationTable.getTableName());
             } else {
               writeId = acidOp == Operation.NOT_ACID ? null :
-                      txnMgr.getTableWriteId(dest_tab.getDbName(), dest_tab.getTableName());
+                      txnMgr.getTableWriteId(destinationTable.getDbName(), destinationTable.getTableName());
             }
           }
         } catch (LockException ex) {
           throw new SemanticException("Failed to allocate write Id", ex);
         }
         boolean isReplace = !qb.getParseInfo().isInsertIntoTable(
-            dest_tab.getDbName(), dest_tab.getTableName());
-        ltd = new LoadTableDesc(queryTmpdir, table_desc, dpCtx, acidOp, isReplace, writeId);
+            destinationTable.getDbName(), destinationTable.getTableName());
+        ltd = new LoadTableDesc(queryTmpdir, tableDescriptor, dpCtx, acidOp, isReplace, writeId);
+        if (writeId != null) {
+          ltd.setStmtId(txnMgr.getCurrentStmtId());
+        }
         // For Acid table, Insert Overwrite shouldn't replace the table content. We keep the old
         // deltas and base and leave them up to the cleaner to clean up
         boolean isInsertInto = qb.getParseInfo().isInsertIntoTable(
-            dest_tab.getDbName(), dest_tab.getTableName());
-        LoadFileType loadType = (!isInsertInto && !destTableIsTransactional)
-            ? LoadFileType.REPLACE_ALL : LoadFileType.KEEP_EXISTING;
+            destinationTable.getDbName(), destinationTable.getTableName());
+        LoadFileType loadType;
+        if (isDirectInsert) {
+          loadType = LoadFileType.IGNORE;
+        } else if (!isInsertInto && !destTableIsTransactional) {
+          loadType = LoadFileType.REPLACE_ALL;
+        } else {
+          loadType = LoadFileType.KEEP_EXISTING;
+        }
         ltd.setLoadFileType(loadType);
         ltd.setInsertOverwrite(!isInsertInto);
+        ltd.setIsDirectInsert(isDirectInsert);
         ltd.setLbCtx(lbCtx);
         loadTableWork.add(ltd);
       } else {
         // This is a non-native table.
         // We need to set stats as inaccurate.
-        setStatsForNonNativeTable(dest_tab);
+        setStatsForNonNativeTable(destinationTable.getDbName(), destinationTable.getTableName());
         // true if it is insert overwrite.
         boolean overwrite = !qb.getParseInfo().isInsertIntoTable(
-            String.format("%s.%s", dest_tab.getDbName(), dest_tab.getTableName()));
-        createPreInsertDesc(dest_tab, overwrite);
+            String.format("%s.%s", destinationTable.getDbName(), destinationTable.getTableName()));
+        createPreInsertDesc(destinationTable, overwrite);
 
-        ltd = new LoadTableDesc(queryTmpdir, table_desc, partSpec == null ? ImmutableMap.of() : partSpec);
+        ltd = new LoadTableDesc(queryTmpdir, tableDescriptor, partSpec == null ? ImmutableMap.of() : partSpec);
         ltd.setInsertOverwrite(overwrite);
         ltd.setLoadFileType(overwrite ? LoadFileType.REPLACE_ALL : LoadFileType.KEEP_EXISTING);
       }
 
-      if (dest_tab.isMaterializedView()) {
-        materializedViewUpdateDesc = new MaterializedViewDesc(
-            dest_tab.getFullyQualifiedName(), false, false, true);
+      if (destinationTable.isMaterializedView()) {
+        materializedViewUpdateDesc = new MaterializedViewUpdateDesc(
+            destinationTable.getFullyQualifiedName(), false, false, true);
       }
 
       WriteEntity output = generateTableWriteEntity(
-          dest, dest_tab, partSpec, ltd, dpCtx, isNonNativeTable);
+          dest, destinationTable, partSpec, ltd, dpCtx, isNonNativeTable);
       ctx.getLoadTableOutputMap().put(ltd, output);
       break;
     }
     case QBMetaData.DEST_PARTITION: {
 
-      dest_part = qbm.getDestPartitionForAlias(dest);
-      dest_tab = dest_part.getTable();
-      destTableIsTransactional = AcidUtils.isTransactionalTable(dest_tab);
-      destTableIsFullAcid = AcidUtils.isFullAcidTable(dest_tab);
+      destinationPartition = qbm.getDestPartitionForAlias(dest);
+      destinationTable = destinationPartition.getTable();
+      destTableIsTransactional = AcidUtils.isTransactionalTable(destinationTable);
+      destTableIsFullAcid = AcidUtils.isFullAcidTable(destinationTable);
 
-      checkExternalTable(dest_tab);
+      checkExternalTable(destinationTable);
 
-      Path tabPath = dest_tab.getPath();
-      Path partPath = dest_part.getDataLocation();
+      Path tabPath = destinationTable.getPath();
+      Path partPath = destinationPartition.getDataLocation();
 
-      checkImmutableTable(qb, dest_tab, partPath, true);
+      checkImmutableTable(qb, destinationTable, partPath, true);
 
-      // if the table is in a different dfs than the partition,
-      // replace the partition's dfs with the table's dfs.
-      dest_path = new Path(tabPath.toUri().getScheme(), tabPath.toUri()
-          .getAuthority(), partPath.toUri().getPath());
+      // Previous behavior (HIVE-1707) used to replace the partition's dfs with the table's dfs.
+      // The changes in HIVE-19891 appears to no longer support that behavior.
+      destinationPath = partPath;
 
-      isMmTable = AcidUtils.isInsertOnlyTable(dest_tab.getParameters());
-      queryTmpdir = isMmTable ? dest_path : ctx.getTempDirForFinalJobPath(dest_path);
+      if (MetaStoreUtils.isArchived(destinationPartition.getTPartition())) {
+        try {
+          String conflictingArchive = ArchiveUtils.conflictingArchiveNameOrNull(
+                  db, destinationTable, destinationPartition.getSpec());
+          String message = String.format("Insert conflict with existing archive: %s",
+                  conflictingArchive);
+          throw new SemanticException(message);
+        } catch (SemanticException err) {
+          throw err;
+        } catch (HiveException err) {
+          throw new SemanticException(err);
+        }
+      }
+
+      isNonNativeTable = destinationTable.isNonNative();
+      isMmTable = AcidUtils.isInsertOnlyTable(destinationTable.getParameters());
+      AcidUtils.Operation acidOp = AcidUtils.Operation.NOT_ACID;
+      // this table_desc does not contain the partitioning columns
+      tableDescriptor = Utilities.getTableDesc(destinationTable);
+
+      if (!isNonNativeTable) {
+        if (destTableIsTransactional) {
+          acidOp = getAcidType(tableDescriptor.getOutputFileFormatClass(), dest, isMmTable);
+        }
+      }
+      isDirectInsert = isDirectInsert(destTableIsFullAcid, acidOp);
+      queryTmpdir = getTmpDir(isNonNativeTable, isMmTable, isDirectInsert, destinationPath);
       if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
         Utilities.FILE_OP_LOGGER.trace("create filesink w/DEST_PARTITION specifying "
-            + queryTmpdir + " from " + dest_path);
+            + queryTmpdir + " from " + destinationPath);
       }
-      table_desc = Utilities.getTableDesc(dest_tab);
 
       // Add NOT NULL constraint check
       input = genConstraintsPlan(dest, qb, input);
 
-      // Add sorting/bucketing if needed
-      input = genBucketingSortingDest(dest, input, qb, table_desc, dest_tab, rsCtx);
+      if (destinationTable.isMaterializedView() &&
+          mvRebuildMode == MaterializationRebuildMode.INSERT_OVERWRITE_REBUILD) {
+        // Data organization (DISTRIBUTED, SORTED, CLUSTERED) for materialized view
+        // TODO: We only do this for a full rebuild
+        String sortColsStr = destinationTable.getProperty(Constants.MATERIALIZED_VIEW_SORT_COLUMNS);
+        String distributeColsStr = destinationTable.getProperty(Constants.MATERIALIZED_VIEW_DISTRIBUTE_COLUMNS);
+        if (sortColsStr != null || distributeColsStr != null) {
+          input = genMaterializedViewDataOrgPlan(destinationTable, sortColsStr, distributeColsStr, inputRR, input);
+        }
+      } else {
+        // Add sorting/bucketing if needed
+        input = genBucketingSortingDest(dest, input, qb, tableDescriptor, destinationTable, rsCtx);
+      }
 
-      idToTableNameMap.put(String.valueOf(destTableId), dest_tab.getTableName());
+      idToTableNameMap.put(String.valueOf(destTableId), destinationTable.getTableName());
       currentTableId = destTableId;
       destTableId++;
 
-      lbCtx = constructListBucketingCtx(dest_part.getSkewedColNames(),
-          dest_part.getSkewedColValues(), dest_part.getSkewedColValueLocationMaps(),
-          dest_part.isStoredAsSubDirectories(), conf);
-      AcidUtils.Operation acidOp = AcidUtils.Operation.NOT_ACID;
-      if (destTableIsFullAcid) {
-        acidOp = getAcidType(table_desc.getOutputFileFormatClass(), dest);
-        //todo: should this be done for MM?  is it ok to use CombineHiveInputFormat with MM?
-        checkAcidConstraints(qb, table_desc, dest_tab);
+      lbCtx = constructListBucketingCtx(destinationPartition.getSkewedColNames(),
+          destinationPartition.getSkewedColValues(), destinationPartition.getSkewedColValueLocationMaps(),
+          destinationPartition.isStoredAsSubDirectories());
+      if (destTableIsTransactional) {
+        acidOp = getAcidType(tableDescriptor.getOutputFileFormatClass(), dest, isMmTable);
+        checkAcidConstraints(qb, tableDescriptor, destinationTable);
       }
       try {
         if (ctx.getExplainConfig() != null) {
           writeId = 0L; // For explain plan, txn won't be opened and doesn't make sense to allocate write id
         } else {
           if (isMmTable) {
-            writeId = txnMgr.getTableWriteId(dest_tab.getDbName(), dest_tab.getTableName());
+            writeId = txnMgr.getTableWriteId(destinationTable.getDbName(), destinationTable.getTableName());
           } else {
             writeId = (acidOp == Operation.NOT_ACID) ? null :
-                    txnMgr.getTableWriteId(dest_tab.getDbName(), dest_tab.getTableName());
+                    txnMgr.getTableWriteId(destinationTable.getDbName(), destinationTable.getTableName());
           }
         }
       } catch (LockException ex) {
         throw new SemanticException("Failed to allocate write Id", ex);
       }
-      ltd = new LoadTableDesc(queryTmpdir, table_desc, dest_part.getSpec(), acidOp, writeId);
+      ltd = new LoadTableDesc(queryTmpdir, tableDescriptor, destinationPartition.getSpec(), acidOp, writeId);
+      if (writeId != null) {
+        ltd.setStmtId(txnMgr.getCurrentStmtId());
+      }
       // For the current context for generating File Sink Operator, it is either INSERT INTO or INSERT OVERWRITE.
       // So the next line works.
       boolean isInsertInto = !qb.getParseInfo().isDestToOpTypeInsertOverwrite(dest);
       // For Acid table, Insert Overwrite shouldn't replace the table content. We keep the old
       // deltas and base and leave them up to the cleaner to clean up
-      LoadFileType loadType = (!isInsertInto && !destTableIsTransactional)
-          ? LoadFileType.REPLACE_ALL : LoadFileType.KEEP_EXISTING;
+      LoadFileType loadType;
+      if (isDirectInsert) {
+        loadType = LoadFileType.IGNORE;
+      } else if (!isInsertInto && !destTableIsTransactional) {
+        loadType = LoadFileType.REPLACE_ALL;
+      } else {
+        loadType = LoadFileType.KEEP_EXISTING;
+      }
       ltd.setLoadFileType(loadType);
       ltd.setInsertOverwrite(!isInsertInto);
+      ltd.setIsDirectInsert(isDirectInsert);
       ltd.setLbCtx(lbCtx);
 
       loadTableWork.add(ltd);
-      if (!outputs.add(new WriteEntity(dest_part,
-          determineWriteType(ltd, dest_tab.isNonNative(), dest)))) {
+      if (!outputs.add(new WriteEntity(destinationPartition,
+          determineWriteType(ltd, destinationTable.isNonNative(), dest)))) {
 
         throw new SemanticException(ErrorMsg.OUTPUT_SPECIFIED_MULTIPLE_TIMES
-            .getMsg(dest_tab.getTableName() + "@" + dest_part.getName()));
+            .getMsg(destinationTable.getTableName() + "@" + destinationPartition.getName()));
       }
      break;
     }
@@ -7443,36 +7643,69 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       isLocal = true;
       // fall through
     case QBMetaData.DEST_DFS_FILE: {
-      dest_path = new Path(qbm.getDestFileForAlias(dest));
-
-      ArrayList<ColumnInfo> colInfos = inputRR.getColumnInfos();
+      destinationPath = new Path(qbm.getDestFileForAlias(dest));
 
       // CTAS case: the file output format and serde are defined by the create
       // table command rather than taking the default value
-      List<FieldSchema> field_schemas = null;
+      List<FieldSchema> fieldSchemas = null;
+      List<FieldSchema> partitionColumns = null;
+      List<String> partitionColumnNames = null;
+      List<FieldSchema> sortColumns = null;
+      List<String> sortColumnNames = null;
+      List<FieldSchema> distributeColumns = null;
+      List<String> distributeColumnNames = null;
+      List<ColumnInfo> fileSinkColInfos = null;
+      List<ColumnInfo> sortColInfos = null;
+      List<ColumnInfo> distributeColInfos = null;
+      TableName tableName = null;
+      Map<String, String> tblProps = null;
       CreateTableDesc tblDesc = qb.getTableDesc();
       CreateViewDesc viewDesc = qb.getViewDesc();
-      boolean isCtas = false;
       if (tblDesc != null) {
-        field_schemas = new ArrayList<FieldSchema>();
+        fieldSchemas = new ArrayList<>();
+        partitionColumns = new ArrayList<>();
+        partitionColumnNames = tblDesc.getPartColNames();
+        fileSinkColInfos = new ArrayList<>();
         destTableIsTemporary = tblDesc.isTemporary();
         destTableIsMaterialization = tblDesc.isMaterialization();
-        if (AcidUtils.isInsertOnlyTable(tblDesc.getTblProps(), true)) {
-          isMmTable = isMmCtas = true;
-          try {
-            if (ctx.getExplainConfig() != null) {
-              writeId = 0L; // For explain plan, txn won't be opened and doesn't make sense to allocate write id
-            } else {
-              writeId = txnMgr.getTableWriteId(tblDesc.getDatabaseName(), tblDesc.getTableName());
-            }
-          } catch (LockException ex) {
-            throw new SemanticException("Failed to allocate write Id", ex);
-          }
-          tblDesc.setInitialMmWriteId(writeId);
-        }
+        tableName = TableName.fromString(tblDesc.getDbTableName(), null, tblDesc.getDatabaseName());
+        tblProps = tblDesc.getTblProps();
       } else if (viewDesc != null) {
-        field_schemas = new ArrayList<FieldSchema>();
+        fieldSchemas = new ArrayList<>();
+        partitionColumns = new ArrayList<>();
+        partitionColumnNames = viewDesc.getPartColNames();
+        sortColumns = new ArrayList<>();
+        sortColumnNames = viewDesc.getSortColNames();
+        distributeColumns = new ArrayList<>();
+        distributeColumnNames = viewDesc.getDistributeColNames();
+        fileSinkColInfos = new ArrayList<>();
+        sortColInfos = new ArrayList<>();
+        distributeColInfos = new ArrayList<>();
         destTableIsTemporary = false;
+        destTableIsMaterialization = false;
+        tableName = HiveTableName.ofNullableWithNoDefault(viewDesc.getViewName());
+        tblProps = viewDesc.getTblProps();
+      }
+
+      destTableIsTransactional = tblProps != null && AcidUtils.isTablePropertyTransactional(tblProps);
+      if (destTableIsTransactional) {
+        try {
+          if (ctx.getExplainConfig() != null) {
+            writeId = 0L; // For explain plan, txn won't be opened and doesn't make sense to allocate write id
+          } else {
+            writeId = txnMgr.getTableWriteId(tableName.getDb(), tableName.getTable());
+          }
+        } catch (LockException ex) {
+          throw new SemanticException("Failed to allocate write Id", ex);
+        }
+        if (AcidUtils.isInsertOnlyTable(tblProps, true)) {
+          isMmTable = isMmCreate = true;
+          if (tblDesc != null) {
+            tblDesc.setInitialMmWriteId(writeId);
+          } else {
+            viewDesc.setInitialMmWriteId(writeId);
+          }
+        }
       }
 
       if (isLocal) {
@@ -7484,55 +7717,76 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         // otherwise write to the file system implied by the directory
         // no copy is required. we may want to revisit this policy in future
         try {
-          Path qPath = FileUtils.makeQualified(dest_path, conf);
+          Path qPath = FileUtils.makeQualified(destinationPath, conf);
           queryTmpdir = isMmTable ? qPath : ctx.getTempDirForFinalJobPath(qPath);
           if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
             Utilities.FILE_OP_LOGGER.trace("Setting query directory " + queryTmpdir
-                + " from " + dest_path + " (" + isMmTable + ")");
+                + " from " + destinationPath + " (" + isMmTable + ")");
           }
         } catch (Exception e) {
           throw new SemanticException("Error creating temporary folder on: "
-              + dest_path, e);
+              + destinationPath, e);
         }
       }
 
-      ColsAndTypes ct = deriveFileSinkColTypes(inputRR, field_schemas);
-      String cols = ct.cols, colTypes = ct.colTypes;
+      // Check for dynamic partitions.
+      final String cols, colTypes;
+      final boolean isPartitioned;
+      if (dpCtx != null) {
+        throw new SemanticException("Dynamic partition context has already been created, this should not happen");
+      }
+      if (!CollectionUtils.isEmpty(partitionColumnNames)) {
+        ColsAndTypes ct = deriveFileSinkColTypes(
+            inputRR, partitionColumnNames, sortColumnNames, distributeColumnNames, fieldSchemas, partitionColumns,
+            sortColumns, distributeColumns, fileSinkColInfos, sortColInfos, distributeColInfos);
+        cols = ct.cols;
+        colTypes = ct.colTypes;
+        dpCtx = new DynamicPartitionCtx(partitionColumnNames,
+            conf.getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME),
+            conf.getIntVar(HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTSPERNODE));
+        qbm.setDPCtx(dest, dpCtx);
+        // set the root of the temporary path where dynamic partition columns will populate
+        dpCtx.setRootPath(queryTmpdir);
+        isPartitioned = true;
+      } else {
+        ColsAndTypes ct = deriveFileSinkColTypes(
+            inputRR, sortColumnNames, distributeColumnNames, fieldSchemas, sortColumns, distributeColumns,
+            sortColInfos, distributeColInfos);
+        cols = ct.cols;
+        colTypes = ct.colTypes;
+        isPartitioned = false;
+      }
 
       // update the create table descriptor with the resulting schema.
       if (tblDesc != null) {
-        tblDesc.setCols(new ArrayList<FieldSchema>(field_schemas));
+        tblDesc.setCols(new ArrayList<>(fieldSchemas));
+        tblDesc.setPartCols(new ArrayList<>(partitionColumns));
       } else if (viewDesc != null) {
-        viewDesc.setSchema(new ArrayList<FieldSchema>(field_schemas));
+        viewDesc.setSchema(new ArrayList<>(fieldSchemas));
+        viewDesc.setPartCols(new ArrayList<>(partitionColumns));
+        if (viewDesc.isOrganized()) {
+          viewDesc.setSortCols(new ArrayList<>(sortColumns));
+          viewDesc.setDistributeCols(new ArrayList<>(distributeColumns));
+        }
       }
 
-      destTableIsTransactional = tblDesc != null && AcidUtils.isTransactionalTable(tblDesc);
-      destTableIsFullAcid = tblDesc != null && AcidUtils.isFullAcidTable(tblDesc);
-
       boolean isDestTempFile = true;
-      if (!ctx.isMRTmpFileURI(dest_path.toUri().toString())) {
-        idToTableNameMap.put(String.valueOf(destTableId), dest_path.toUri().toString());
+      if (!ctx.isMRTmpFileURI(destinationPath.toUri().toString())) {
+        idToTableNameMap.put(String.valueOf(destTableId), destinationPath.toUri().toString());
         currentTableId = destTableId;
         destTableId++;
         isDestTempFile = false;
       }
 
-      boolean isDfsDir = (dest_type.intValue() == QBMetaData.DEST_DFS_FILE);
-      // Create LFD even for MM CTAS - it's a no-op move, but it still seems to be used for stats.
-      loadFileWork.add(new LoadFileDesc(tblDesc, viewDesc, queryTmpdir, dest_path, isDfsDir, cols,
-          colTypes,
-          destTableIsFullAcid ?//there is a change here - prev version had 'transadtional', one beofre' acid'
-              Operation.INSERT : Operation.NOT_ACID,
-          isMmCtas));
       if (tblDesc == null) {
         if (viewDesc != null) {
-          table_desc = PlanUtils.getTableDesc(viewDesc, cols, colTypes);
+          tableDescriptor = PlanUtils.getTableDesc(viewDesc, cols, colTypes);
         } else if (qb.getIsQuery()) {
           String fileFormat;
           if (SessionState.get().getIsUsingThriftJDBCBinarySerDe()) {
             fileFormat = "SequenceFile";
             HiveConf.setVar(conf, HiveConf.ConfVars.HIVEQUERYRESULTFILEFORMAT, fileFormat);
-            table_desc=
+            tableDescriptor =
                 PlanUtils.getDefaultQueryOutputTableDesc(cols, colTypes, fileFormat,
                     ThriftJDBCBinarySerDe.class);
             // Set the fetch formatter to be a no-op for the ListSinkOperator, since we'll
@@ -7549,41 +7803,114 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                 serdeClass = LazyBinarySerDe2.class;
               }
             }
-            table_desc =
+            tableDescriptor =
                 PlanUtils.getDefaultQueryOutputTableDesc(cols, colTypes, fileFormat,
                     serdeClass);
           }
         } else {
-          table_desc = PlanUtils.getDefaultTableDesc(qb.getDirectoryDesc(), cols, colTypes);
+          tableDescriptor = PlanUtils.getDefaultTableDesc(qb.getDirectoryDesc(), cols, colTypes);
         }
       } else {
-        table_desc = PlanUtils.getTableDesc(tblDesc, cols, colTypes);
+        tableDescriptor = PlanUtils.getTableDesc(tblDesc, cols, colTypes);
       }
 
-      if (!outputs.add(new WriteEntity(dest_path, !isDfsDir, isDestTempFile))) {
-        throw new SemanticException(ErrorMsg.OUTPUT_SPECIFIED_MULTIPLE_TIMES
-            .getMsg(dest_path.toUri().toString()));
+      boolean isDfsDir = (destType == QBMetaData.DEST_DFS_FILE);
+
+      try {
+        destinationTable = tblDesc != null ? tblDesc.toTable(conf) : viewDesc != null ? viewDesc.toTable(conf) : null;
+      } catch (HiveException e) {
+        throw new SemanticException(e);
+      }
+
+      destTableIsFullAcid = AcidUtils.isFullAcidTable(destinationTable);
+
+      // Data organization (DISTRIBUTED, SORTED, CLUSTERED) for materialized view
+      if (viewDesc != null && viewDesc.isOrganized()) {
+        input = genMaterializedViewDataOrgPlan(sortColInfos, distributeColInfos, inputRR, input);
+      }
+
+      if (isPartitioned) {
+        // Create a SELECT that may reorder the columns if needed
+        RowResolver rowResolver = new RowResolver();
+        List<ExprNodeDesc> columnExprs = new ArrayList<>();
+        List<String> colNames = new ArrayList<>();
+        Map<String, ExprNodeDesc> colExprMap = new HashMap<>();
+        for (int i = 0; i < fileSinkColInfos.size(); i++) {
+          ColumnInfo ci = fileSinkColInfos.get(i);
+          ExprNodeDesc columnExpr = new ExprNodeColumnDesc(ci);
+          String name = getColumnInternalName(i);
+          rowResolver.put("", name, new ColumnInfo(name, columnExpr.getTypeInfo(), "", false));
+          columnExprs.add(columnExpr);
+          colNames.add(name);
+          colExprMap.put(name, columnExpr);
+        }
+        input = putOpInsertMap(OperatorFactory.getAndMakeChild(
+            new SelectDesc(columnExprs, colNames), new RowSchema(rowResolver
+                .getColumnInfos()), input), rowResolver);
+        input.setColumnExprMap(colExprMap);
+
+        // If this is a partitioned CTAS or MV statement, we are going to create a LoadTableDesc
+        // object. Although the table does not exist in metastore, we will swap the CreateTableTask
+        // and MoveTask resulting from this LoadTable so in this specific case, first we create
+        // the metastore table, then we move and commit the partitions. At least for the time being,
+        // this order needs to be enforced because metastore expects a table to exist before we can
+        // add any partitions to it.
+        isNonNativeTable = tableDescriptor.isNonNative();
+        if (!isNonNativeTable) {
+          AcidUtils.Operation acidOp = AcidUtils.Operation.NOT_ACID;
+          if (destTableIsTransactional) {
+            acidOp = getAcidType(tableDescriptor.getOutputFileFormatClass(), dest, isMmTable);
+            checkAcidConstraints(qb, tableDescriptor, null);
+          }
+          // isReplace = false in case concurrent operation is executed
+          ltd = new LoadTableDesc(queryTmpdir, tableDescriptor, dpCtx, acidOp, false, writeId);
+          ltd.setLoadFileType(LoadFileType.KEEP_EXISTING);
+          ltd.setInsertOverwrite(false);
+          loadTableWork.add(ltd);
+        } else {
+          // This is a non-native table.
+          // We need to set stats as inaccurate.
+          setStatsForNonNativeTable(tableDescriptor.getDbName(), tableDescriptor.getTableName());
+          ltd = new LoadTableDesc(queryTmpdir, tableDescriptor, dpCtx.getPartSpec());
+          ltd.setInsertOverwrite(false);
+          ltd.setLoadFileType(LoadFileType.KEEP_EXISTING);
+        }
+        ltd.setMdTable(destinationTable);
+        WriteEntity output = generateTableWriteEntity(
+            dest, destinationTable, dpCtx.getPartSpec(), ltd, dpCtx, isNonNativeTable);
+        ctx.getLoadTableOutputMap().put(ltd, output);
+      } else {
+        // Create LFD even for MM CTAS - it's a no-op move, but it still seems to be used for stats.
+        loadFileWork.add(new LoadFileDesc(tblDesc, viewDesc, queryTmpdir, destinationPath, isDfsDir, cols,
+            colTypes,
+            destTableIsFullAcid ?//there is a change here - prev version had 'transactional', one before 'acid'
+                Operation.INSERT : Operation.NOT_ACID,
+            isMmCreate));
+        if (!outputs.add(new WriteEntity(destinationPath, !isDfsDir, isDestTempFile))) {
+          throw new SemanticException(ErrorMsg.OUTPUT_SPECIFIED_MULTIPLE_TIMES
+              .getMsg(destinationPath.toUri().toString()));
+        }
       }
       break;
     }
     default:
-      throw new SemanticException("Unknown destination type: " + dest_type);
+      throw new SemanticException("Unknown destination type: " + destType);
     }
 
-    if (!(dest_type.intValue() == QBMetaData.DEST_DFS_FILE && qb.getIsQuery())) {
-      input = genConversionSelectOperator(dest, qb, input, table_desc, dpCtx);
+    if (!(destType == QBMetaData.DEST_DFS_FILE && qb.getIsQuery())) {
+      input = genConversionSelectOperator(dest, qb, input, tableDescriptor, dpCtx);
     }
 
     inputRR = opParseCtx.get(input).getRowResolver();
 
-    ArrayList<ColumnInfo> vecCol = new ArrayList<ColumnInfo>();
+    List<ColumnInfo> vecCol = new ArrayList<ColumnInfo>();
 
     if (updating(dest) || deleting(dest)) {
       vecCol.add(new ColumnInfo(VirtualColumn.ROWID.getName(), VirtualColumn.ROWID.getTypeInfo(),
           "", true));
     } else {
       try {
-        StructObjectInspector rowObjectInspector = (StructObjectInspector) table_desc
+        StructObjectInspector rowObjectInspector = (StructObjectInspector) tableDescriptor
             .getDeserializer(conf).getObjectInspector();
         List<? extends StructField> fields = rowObjectInspector
             .getAllStructFieldRefs();
@@ -7602,25 +7929,28 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // The output files of a FileSink can be merged if they are either not being written to a table
     // or are being written to a table which is not bucketed
     // and table the table is not sorted
-    boolean canBeMerged = (dest_tab == null || !((dest_tab.getNumBuckets() > 0) ||
-        (dest_tab.getSortCols() != null && dest_tab.getSortCols().size() > 0)));
+    boolean canBeMerged = (destinationTable == null || !((destinationTable.getNumBuckets() > 0) ||
+        (destinationTable.getSortCols() != null && destinationTable.getSortCols().size() > 0)));
 
     // If this table is working with ACID semantics, turn off merging
     canBeMerged &= !destTableIsFullAcid;
 
     // Generate the partition columns from the parent input
-    if (dest_type.intValue() == QBMetaData.DEST_TABLE
-        || dest_type.intValue() == QBMetaData.DEST_PARTITION) {
-      genPartnCols(dest, input, qb, table_desc, dest_tab, rsCtx);
+    if (destType == QBMetaData.DEST_TABLE || destType == QBMetaData.DEST_PARTITION) {
+      genPartnCols(dest, input, qb, tableDescriptor, destinationTable, rsCtx);
     }
 
-    FileSinkDesc fileSinkDesc = createFileSinkDesc(dest, table_desc, dest_part,
-        dest_path, currentTableId, destTableIsFullAcid, destTableIsTemporary,//this was 1/4 acid
+    FileSinkDesc fileSinkDesc = createFileSinkDesc(dest, tableDescriptor, destinationPartition,
+        destinationPath, currentTableId, destTableIsFullAcid, destTableIsTemporary,//this was 1/4 acid
         destTableIsMaterialization, queryTmpdir, rsCtx, dpCtx, lbCtx, fsRS,
-        canBeMerged, dest_tab, writeId, isMmCtas, dest_type, qb);
-    if (isMmCtas) {
+        canBeMerged, destinationTable, writeId, isMmCreate, destType, qb, isDirectInsert);
+    if (isMmCreate) {
       // Add FSD so that the LoadTask compilation could fix up its path to avoid the move.
-      tableDesc.setWriter(fileSinkDesc);
+      if (tableDesc != null) {
+        tableDesc.setWriter(fileSinkDesc);
+      } else {
+        createVwDesc.setWriter(fileSinkDesc);
+      }
     }
 
     if (fileSinkDesc.getInsertOverwrite()) {
@@ -7628,7 +7958,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         ltd.setInsertOverwrite(true);
       }
     }
-    if (null != table_desc && useBatchingSerializer(table_desc.getSerdeClassName())) {
+    if (null != tableDescriptor && useBatchingSerializer(tableDescriptor.getSerdeClassName())) {
       fileSinkDesc.setIsUsingBatchingSerDe(true);
     } else {
       fileSinkDesc.setIsUsingBatchingSerDe(false);
@@ -7638,32 +7968,62 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         fileSinkDesc, fsRS, input), inputRR);
 
     handleLineage(ltd, output);
+    setWriteIdForSurrogateKeys(ltd, input);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created FileSink Plan for clause: " + dest + "dest_path: "
-          + dest_path + " row schema: " + inputRR.toString());
+          + destinationPath + " row schema: " + inputRR.toString());
     }
 
     FileSinkOperator fso = (FileSinkOperator) output;
-    fso.getConf().setTable(dest_tab);
+    fso.getConf().setTable(destinationTable);
     // the following code is used to collect column stats when
     // hive.stats.autogather=true
     // and it is an insert overwrite or insert into table
-    if (dest_tab != null
-        && !dest_tab.isNonNative()
-        && conf.getBoolVar(ConfVars.HIVESTATSAUTOGATHER)
+    if (conf.getBoolVar(ConfVars.HIVESTATSAUTOGATHER)
         && conf.getBoolVar(ConfVars.HIVESTATSCOLAUTOGATHER)
+        && destinationTable != null && !destinationTable.isNonNative()
+        && !destTableIsTemporary && !destTableIsMaterialization
         && ColumnStatsAutoGatherContext.canRunAutogatherStats(fso)) {
-      if (dest_type.intValue() == QBMetaData.DEST_TABLE) {
-        genAutoColumnStatsGatheringPipeline(qb, table_desc, partSpec, input, qb.getParseInfo()
-            .isInsertIntoTable(dest_tab.getDbName(), dest_tab.getTableName()));
-      } else if (dest_type.intValue() == QBMetaData.DEST_PARTITION) {
-        genAutoColumnStatsGatheringPipeline(qb, table_desc, dest_part.getSpec(), input, qb
-            .getParseInfo().isInsertIntoTable(dest_tab.getDbName(), dest_tab.getTableName()));
-
+      if (destType == QBMetaData.DEST_TABLE) {
+        genAutoColumnStatsGatheringPipeline(qb, destinationTable, partSpec, input,
+            qb.getParseInfo().isInsertIntoTable(destinationTable.getDbName(), destinationTable.getTableName()),
+            false);
+      } else if (destType == QBMetaData.DEST_PARTITION) {
+        genAutoColumnStatsGatheringPipeline(qb, destinationTable, destinationPartition.getSpec(), input,
+            qb.getParseInfo().isInsertIntoTable(destinationTable.getDbName(), destinationTable.getTableName()),
+            false);
+      } else if (destType == QBMetaData.DEST_LOCAL_FILE || destType == QBMetaData.DEST_DFS_FILE) {
+        // CTAS or CMV statement
+        genAutoColumnStatsGatheringPipeline(qb, destinationTable, null, input,
+            false, true);
       }
     }
     return output;
+  }
+
+  private boolean isDirectInsert(boolean destTableIsFullAcid, AcidUtils.Operation acidOp) {
+    boolean directInsertEnabled = conf.getBoolVar(HiveConf.ConfVars.HIVE_ACID_DIRECT_INSERT_ENABLED);
+    boolean directInsert = directInsertEnabled && destTableIsFullAcid && (acidOp == AcidUtils.Operation.INSERT);
+    if (LOG.isDebugEnabled() && directInsert) {
+      LOG.debug("Direct insert for ACID tables is enabled.");
+    }
+    return directInsert;
+  }
+
+  private Path getTmpDir(boolean isNonNativeTable, boolean isMmTable, boolean isDirectInsert,
+      Path destinationPath) {
+    /**
+     * We will directly insert to the final destination in the following cases:
+     * 1. Non native table
+     * 2. Micro-managed (insert only table)
+     * 3. Full ACID table and operation type is INSERT
+     */
+    if (isNonNativeTable || isMmTable || isDirectInsert) {
+      return destinationPath;
+    } else {
+      return ctx.getTempDirForFinalJobPath(destinationPath);
+    }
   }
 
   private boolean useBatchingSerializer(String serdeClassName) {
@@ -7677,61 +8037,141 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     serdeClassName.equalsIgnoreCase(ArrowColumnarBatchSerDe.class.getName());
   }
 
+  private ColsAndTypes deriveFileSinkColTypes(RowResolver inputRR, List<String> sortColumnNames, List<String> distributeColumnNames,
+      List<FieldSchema> fieldSchemas, List<FieldSchema> sortColumns, List<FieldSchema> distributeColumns,
+      List<ColumnInfo> sortColInfos, List<ColumnInfo> distributeColInfos) throws SemanticException {
+    return deriveFileSinkColTypes(inputRR, new ArrayList<>(), sortColumnNames, distributeColumnNames,
+        fieldSchemas, new ArrayList<>(), sortColumns, distributeColumns, new ArrayList<>(),
+        sortColInfos, distributeColInfos);
+  }
+
   private ColsAndTypes deriveFileSinkColTypes(
-      RowResolver inputRR, List<FieldSchema> field_schemas) throws SemanticException {
+      RowResolver inputRR, List<String> partitionColumnNames, List<String> sortColumnNames, List<String> distributeColumnNames,
+      List<FieldSchema> columns, List<FieldSchema> partitionColumns, List<FieldSchema> sortColumns, List<FieldSchema> distributeColumns,
+      List<ColumnInfo> fileSinkColInfos, List<ColumnInfo> sortColInfos, List<ColumnInfo> distributeColInfos) throws SemanticException {
     ColsAndTypes result = new ColsAndTypes("", "");
-    ArrayList<ColumnInfo> colInfos = inputRR.getColumnInfos();
+    List<String> allColumns = new ArrayList<>();
+    List<ColumnInfo> colInfos = inputRR.getColumnInfos();
+    List<ColumnInfo> nonPartColInfos = new ArrayList<>();
+    SortedMap<Integer, Pair<FieldSchema, ColumnInfo>> partColInfos = new TreeMap<>();
+    SortedMap<Integer, Pair<FieldSchema, ColumnInfo>> sColInfos = new TreeMap<>();
+    SortedMap<Integer, Pair<FieldSchema, ColumnInfo>> dColInfos = new TreeMap<>();
     boolean first = true;
-    for (ColumnInfo colInfo : colInfos) {
+    int numNonPartitionedCols = colInfos.size() - partitionColumnNames.size();
+    if (numNonPartitionedCols <= 0) {
+      throw new SemanticException("Too many partition columns declared");
+    }
+    for (int i = 0; i < colInfos.size(); i++) {
+      ColumnInfo colInfo = colInfos.get(i);
       String[] nm = inputRR.reverseLookup(colInfo.getInternalName());
 
       if (nm[1] != null) { // non-null column alias
         colInfo.setAlias(nm[1]);
       }
 
+      boolean isPartitionCol = false;
       String colName = colInfo.getInternalName();  //default column name
-      if (field_schemas != null) {
+      if (columns != null) {
         FieldSchema col = new FieldSchema();
         if (!("".equals(nm[0])) && nm[1] != null) {
           colName = unescapeIdentifier(colInfo.getAlias()).toLowerCase(); // remove ``
         }
         colName = fixCtasColumnName(colName);
         col.setName(colName);
+        allColumns.add(colName);
         String typeName = colInfo.getType().getTypeName();
         // CTAS should NOT create a VOID type
         if (typeName.equals(serdeConstants.VOID_TYPE_NAME)) {
           throw new SemanticException(ErrorMsg.CTAS_CREATES_VOID_TYPE.getMsg(colName));
         }
         col.setType(typeName);
-        field_schemas.add(col);
+        int idx = partitionColumnNames.indexOf(colName);
+        if (idx >= 0) {
+          partColInfos.put(idx, Pair.of(col, colInfo));
+          isPartitionCol = true;
+        } else {
+          if (sortColumnNames != null) {
+            idx = sortColumnNames.indexOf(colName);
+            if (idx >= 0) {
+              sColInfos.put(idx, Pair.of(col, colInfo));
+            }
+          }
+          if (distributeColumnNames != null) {
+            idx = distributeColumnNames.indexOf(colName);
+            if (idx >= 0) {
+              dColInfos.put(idx, Pair.of(col, colInfo));
+            }
+          }
+          columns.add(col);
+          nonPartColInfos.add(colInfo);
+        }
       }
 
-      if (!first) {
-        result.cols = result.cols.concat(",");
-        result.colTypes = result.colTypes.concat(":");
+      if (!isPartitionCol) {
+        if (!first) {
+          result.cols = result.cols.concat(",");
+          result.colTypes = result.colTypes.concat(":");
+        }
+
+        first = false;
+        result.cols = result.cols.concat(colName);
+
+        // Replace VOID type with string when the output is a temp table or
+        // local files.
+        // A VOID type can be generated under the query:
+        //
+        // select NULL from tt;
+        // or
+        // insert overwrite local directory "abc" select NULL from tt;
+        //
+        // where there is no column type to which the NULL value should be
+        // converted.
+        //
+        String tName = colInfo.getType().getTypeName();
+        if (tName.equals(serdeConstants.VOID_TYPE_NAME)) {
+          result.colTypes = result.colTypes.concat(serdeConstants.STRING_TYPE_NAME);
+        } else {
+          result.colTypes = result.colTypes.concat(tName);
+        }
       }
 
-      first = false;
-      result.cols = result.cols.concat(colName);
-
-      // Replace VOID type with string when the output is a temp table or
-      // local files.
-      // A VOID type can be generated under the query:
-      //
-      // select NULL from tt;
-      // or
-      // insert overwrite local directory "abc" select NULL from tt;
-      //
-      // where there is no column type to which the NULL value should be
-      // converted.
-      //
-      String tName = colInfo.getType().getTypeName();
-      if (tName.equals(serdeConstants.VOID_TYPE_NAME)) {
-        result.colTypes = result.colTypes.concat(serdeConstants.STRING_TYPE_NAME);
-      } else {
-        result.colTypes = result.colTypes.concat(tName);
-      }
     }
+
+    if (partColInfos.size() != partitionColumnNames.size()) {
+      throw new SemanticException("Table declaration contains partition columns that are not present " +
+        "in query result schema. " +
+        "Query columns: " + allColumns + ". " +
+        "Partition columns: " + partitionColumnNames);
+    }
+
+    if (sortColumnNames != null && sColInfos.size() != sortColumnNames.size()) {
+      throw new SemanticException("Table declaration contains cluster/sort columns that are not present " +
+          "in query result schema. " +
+          "Query columns: " + allColumns + ". " +
+          "Organization columns: " + sortColumnNames);
+    }
+
+    if (distributeColumnNames != null && dColInfos.size() != distributeColumnNames.size()) {
+      throw new SemanticException("Table declaration contains cluster/distribute columns that are not present " +
+          "in query result schema. " +
+          "Query columns: " + allColumns + ". " +
+          "Organization columns: " + distributeColumnNames);
+    }
+
+    // FileSinkColInfos comprise nonPartCols followed by partCols
+    fileSinkColInfos.addAll(nonPartColInfos);
+    partitionColumns.addAll(partColInfos.values().stream().map(Pair::getLeft).collect(Collectors.toList()));
+    fileSinkColInfos.addAll(partColInfos.values().stream().map(Pair::getRight).collect(Collectors.toList()));
+    // data org columns
+    if (sortColumnNames != null) {
+      sortColumns.addAll(sColInfos.values().stream().map(Pair::getLeft).collect(Collectors.toList()));
+      sortColInfos.addAll(sColInfos.values().stream().map(Pair::getRight).collect(Collectors.toList()));
+    }
+    if (distributeColumnNames != null) {
+      distributeColumns.addAll(dColInfos.values().stream().map(Pair::getLeft).collect(Collectors.toList()));
+      distributeColInfos.addAll(dColInfos.values().stream().map(Pair::getRight).collect(Collectors.toList()));
+    }
+
     return result;
   }
 
@@ -7741,7 +8181,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                                           boolean destTableIsMaterialization, Path queryTmpdir,
                                           SortBucketRSCtx rsCtx, DynamicPartitionCtx dpCtx, ListBucketingCtx lbCtx,
                                           RowSchema fsRS, boolean canBeMerged, Table dest_tab, Long mmWriteId, boolean isMmCtas,
-                                          Integer dest_type, QB qb) throws SemanticException {
+                                          Integer dest_type, QB qb, boolean isDirectInsert) throws SemanticException {
     boolean isInsertOverwrite = false;
     switch (dest_type) {
     case QBMetaData.DEST_PARTITION:
@@ -7765,7 +8205,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     FileSinkDesc fileSinkDesc = new FileSinkDesc(queryTmpdir, table_desc,
         conf.getBoolVar(HiveConf.ConfVars.COMPRESSRESULT), currentTableId, rsCtx.isMultiFileSpray(),
         canBeMerged, rsCtx.getNumFiles(), rsCtx.getTotalFiles(), rsCtx.getPartnCols(), dpCtx,
-        dest_path, mmWriteId, isMmCtas, isInsertOverwrite);
+        dest_path, mmWriteId, isMmCtas, isInsertOverwrite, qb.getIsQuery(),
+        qb.isCTAS() || qb.isMaterializedView(), isDirectInsert);
 
     boolean isHiveServerQuery = SessionState.get().isHiveServerQuery();
     fileSinkDesc.setHiveServerQuery(isHiveServerQuery);
@@ -7830,7 +8271,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     } else if ( queryState.getCommandType().equals(HiveOperation.CREATETABLE_AS_SELECT.getOperationName())) {
 
       Path tlocation = null;
-      String tName = Utilities.getDbTableName(tableDesc.getTableName())[1];
+      String tName = Utilities.getDbTableName(tableDesc.getDbTableName())[1];
       try {
         Warehouse wh = new Warehouse(conf);
         tlocation = wh.getDefaultTablePath(db.getDatabase(tableDesc.getDatabaseName()),
@@ -7841,6 +8282,28 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       queryState.getLineageState()
           .mapDirToOp(tlocation, output);
+    }
+  }
+
+  private void setWriteIdForSurrogateKeys(LoadTableDesc ltd, Operator input) throws SemanticException {
+    if (ltd == null) {
+      return;
+    }
+
+    Map<String, ExprNodeDesc> columnExprMap = input.getConf().getColumnExprMap();
+    if (columnExprMap != null) {
+      for (ExprNodeDesc desc : columnExprMap.values()) {
+        if (desc instanceof ExprNodeGenericFuncDesc) {
+          GenericUDF genericUDF = ((ExprNodeGenericFuncDesc)desc).getGenericUDF();
+          if (genericUDF instanceof GenericUDFSurrogateKey) {
+            ((GenericUDFSurrogateKey)genericUDF).setWriteId(ltd.getWriteId());
+          }
+        }
+      }
+    }
+
+    for (Operator<? extends OperatorDesc> parent : (List<Operator<? extends OperatorDesc>>)input.getParentOperators()) {
+      setWriteIdForSurrogateKeys(ltd, parent);
     }
   }
 
@@ -7856,8 +8319,16 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if ((dpCtx == null || dpCtx.getNumDPCols() == 0)) {
       output = new WriteEntity(dest_tab, determineWriteType(ltd, isNonNativeTable, dest));
       if (!outputs.add(output)) {
-        throw new SemanticException(ErrorMsg.OUTPUT_SPECIFIED_MULTIPLE_TIMES
-            .getMsg(dest_tab.getTableName()));
+        if(!((this instanceof MergeSemanticAnalyzer) &&
+            conf.getBoolVar(ConfVars.MERGE_SPLIT_UPDATE))) {
+          /**
+           * Merge stmt with early split update may create several (2) writes to the same
+           * table with the same {@link WriteType}, e.g. if original Merge stmt has both update and
+           * delete clauses, and update is split into insert + delete, in which case it's not an
+           * error*/
+          throw new SemanticException(ErrorMsg.OUTPUT_SPECIFIED_MULTIPLE_TIMES
+              .getMsg(dest_tab.getTableName()));
+        }
       }
     }
 
@@ -7935,7 +8406,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     DynamicPartitionCtx dpCtx = qbm.getDPCtx(dest);
     if (dpCtx == null) {
       dest_tab.validatePartColumnNames(partSpec, false);
-      dpCtx = new DynamicPartitionCtx(dest_tab, partSpec,
+      dpCtx = new DynamicPartitionCtx(partSpec,
           conf.getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME),
           conf.getIntVar(HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTSPERNODE));
       qbm.setDPCtx(dest, dpCtx);
@@ -7959,20 +8430,20 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
 
-  private void genAutoColumnStatsGatheringPipeline(QB qb, TableDesc table_desc,
-                                                   Map<String, String> partSpec, Operator curr, boolean isInsertInto) throws SemanticException {
-    String tableName = table_desc.getTableName();
-    Table table = null;
-    try {
-      table = db.getTable(tableName);
-    } catch (HiveException e) {
-      throw new SemanticException(e.getMessage());
-    }
-    LOG.info("Generate an operator pipeline to autogather column stats for table " + tableName
+  private void genAutoColumnStatsGatheringPipeline(QB qb, Table table, Map<String, String> partSpec,
+      Operator curr, boolean isInsertInto, boolean useTableValueConstructor)
+      throws SemanticException {
+    LOG.info("Generate an operator pipeline to autogather column stats for table " + table.getTableName()
         + " in query " + ctx.getCmd());
     ColumnStatsAutoGatherContext columnStatsAutoGatherContext = null;
     columnStatsAutoGatherContext = new ColumnStatsAutoGatherContext(this, conf, curr, table, partSpec, isInsertInto, ctx);
-    columnStatsAutoGatherContext.insertAnalyzePipeline();
+    if (useTableValueConstructor) {
+      // Table does not exist, use table value constructor to simulate
+      columnStatsAutoGatherContext.insertTableValuesAnalyzePipeline();
+    } else {
+      // Table already exists
+      columnStatsAutoGatherContext.insertAnalyzePipeline();
+    }
     columnStatsAutoGatherContexts.add(columnStatsAutoGatherContext);
   }
 
@@ -7999,7 +8470,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Generate the conversion SelectOperator that converts the columns into the
    * types that are expected by the table_desc.
    */
-  Operator genConversionSelectOperator(String dest, QB qb, Operator input,
+  private Operator genConversionSelectOperator(String dest, QB qb, Operator input,
                                        TableDesc table_desc, DynamicPartitionCtx dpCtx) throws SemanticException {
     StructObjectInspector oi = null;
     try {
@@ -8014,8 +8485,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // Check column number
     List<? extends StructField> tableFields = oi.getAllStructFieldRefs();
     boolean dynPart = HiveConf.getBoolVar(conf, HiveConf.ConfVars.DYNAMICPARTITIONING);
-    ArrayList<ColumnInfo> rowFields = opParseCtx.get(input).getRowResolver()
-        .getColumnInfos();
+    List<ColumnInfo> rowFields = opParseCtx.get(input).getRowResolver().getColumnInfos();
     int inColumnCnt = rowFields.size();
     int outColumnCnt = tableFields.size();
     if (dynPart && dpCtx != null) {
@@ -8033,8 +8503,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // Check column types
     boolean converted = false;
     int columnNumber = tableFields.size();
-    ArrayList<ExprNodeDesc> expressions = new ArrayList<ExprNodeDesc>(
-        columnNumber);
+    List<ExprNodeDesc> expressions = new ArrayList<ExprNodeDesc>(columnNumber);
 
     // MetadataTypedColumnsetSerDe does not need type conversions because it
     // does the conversion to String by itself.
@@ -8101,7 +8570,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (converted) {
       // add the select operator
       RowResolver rowResolver = new RowResolver();
-      ArrayList<String> colNames = new ArrayList<String>();
+      List<String> colNames = new ArrayList<String>();
       Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
       for (int i = 0; i < expressions.size(); i++) {
         String name = getColumnInternalName(i);
@@ -8145,9 +8614,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return limitMap;
   }
 
-  private Operator genUDTFPlan(GenericUDTF genericUDTF,
-                               String outputTableAlias, ArrayList<String> colAliases, QB qb,
-                               Operator input, boolean outerLV) throws SemanticException {
+  private Operator genUDTFPlan(GenericUDTF genericUDTF, String outputTableAlias, List<String> colAliases, QB qb,
+      Operator input, boolean outerLV) throws SemanticException {
 
     // No GROUP BY / DISTRIBUTE BY / SORT BY / CLUSTER BY
     QBParseInfo qbp = qb.getParseInfo();
@@ -8178,10 +8646,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // resulting output object inspector can be used to make the RowResolver
     // for the UDTF operator
     RowResolver selectRR = opParseCtx.get(input).getRowResolver();
-    ArrayList<ColumnInfo> inputCols = selectRR.getColumnInfos();
+    List<ColumnInfo> inputCols = selectRR.getColumnInfos();
 
     // Create the object inspector for the input columns and initialize the UDTF
-    ArrayList<String> colNames = new ArrayList<String>();
+    List<String> colNames = new ArrayList<String>();
     ObjectInspector[] colOIs = new ObjectInspector[inputCols.size()];
     for (int i = 0; i < inputCols.size(); i++) {
       colNames.add(inputCols.get(i).getInternalName());
@@ -8208,7 +8676,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     // Generate the output column info's / row resolver using internal names.
-    ArrayList<ColumnInfo> udtfCols = new ArrayList<ColumnInfo>();
+    List<ColumnInfo> udtfCols = new ArrayList<ColumnInfo>();
 
     Iterator<String> colAliasesIter = colAliases.iterator();
     for (StructField sf : outputOI.getAllStructFieldRefs()) {
@@ -8240,7 +8708,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @SuppressWarnings("nls")
   private Operator genLimitMapRedPlan(String dest, QB qb, Operator input,
-                                      int offset, int limit, boolean extraMRStep) throws SemanticException {
+      int offset, int limit, boolean extraMRStep) throws SemanticException {
     // A map-only job can be optimized - instead of converting it to a
     // map-reduce job, we can have another map
     // job to do the same to avoid the cost of sorting in the map-reduce phase.
@@ -8259,8 +8727,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return genLimitPlan(dest, qb, curr, offset, limit);
   }
 
-  private ArrayList<ExprNodeDesc> getPartitionColsFromBucketCols(String dest, QB qb, Table tab,
-                                                                 TableDesc table_desc, Operator input, boolean convert)
+  private List<ExprNodeDesc> getPartitionColsFromBucketCols(String dest, QB qb, Table tab, TableDesc table_desc,
+      Operator input, boolean convert)
       throws SemanticException {
     List<String> tabBucketCols = tab.getBucketCols();
     List<FieldSchema> tabCols = tab.getCols();
@@ -8284,7 +8752,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   // We have to set up the bucketing columns differently for update and deletes,
   // as it is always using the ROW__ID column.
-  private ArrayList<ExprNodeDesc> getPartitionColsFromBucketColsForUpdateDelete(
+  private List<ExprNodeDesc> getPartitionColsFromBucketColsForUpdateDelete(
       Operator input, boolean convert) throws SemanticException {
     //return genConvertCol(dest, qb, tab, table_desc, input, Arrays.asList(0), convert);
     // In the case of update and delete the bucketing column is always the first column,
@@ -8298,14 +8766,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (convert) {
       column = ParseUtils.createConversionCast(column, TypeInfoFactory.intTypeInfo);
     }
-    ArrayList<ExprNodeDesc> rlist = new ArrayList<ExprNodeDesc>(1);
+    List<ExprNodeDesc> rlist = new ArrayList<ExprNodeDesc>(1);
     rlist.add(column);
     return rlist;
   }
 
-  private ArrayList<ExprNodeDesc> genConvertCol(String dest, QB qb, Table tab,
-                                                TableDesc table_desc, Operator input, List<Integer> posns, boolean convert)
-      throws SemanticException {
+  private List<ExprNodeDesc> genConvertCol(String dest, QB qb, Table tab, TableDesc table_desc, Operator input,
+      List<Integer> posns, boolean convert) throws SemanticException {
     StructObjectInspector oi = null;
     try {
       Deserializer deserializer = table_desc.getDeserializerClass()
@@ -8317,12 +8784,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     List<? extends StructField> tableFields = oi.getAllStructFieldRefs();
-    ArrayList<ColumnInfo> rowFields = opParseCtx.get(input).getRowResolver()
-        .getColumnInfos();
+    List<ColumnInfo> rowFields = opParseCtx.get(input).getRowResolver().getColumnInfos();
 
     // Check column type
     int columnNumber = posns.size();
-    ArrayList<ExprNodeDesc> expressions = new ArrayList<ExprNodeDesc>(columnNumber);
+    List<ExprNodeDesc> expressions = new ArrayList<ExprNodeDesc>(columnNumber);
     for (Integer posn : posns) {
       ObjectInspector tableFieldOI = tableFields.get(posn).getFieldObjectInspector();
       TypeInfo tableFieldTypeInfo = TypeInfoUtils.getTypeInfoFromObjectInspector(tableFieldOI);
@@ -8353,7 +8819,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return expressions;
   }
 
-  private ArrayList<ExprNodeDesc> getSortCols(String dest, QB qb, Table tab, TableDesc table_desc,
+  private List<ExprNodeDesc> getSortCols(String dest, QB qb, Table tab, TableDesc table_desc,
                                               Operator input, boolean convert)
       throws SemanticException {
     List<Order> tabSortCols = tab.getSortCols();
@@ -8375,12 +8841,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return genConvertCol(dest, qb, tab, table_desc, input, posns, convert);
   }
 
-  private ArrayList<Integer> getSortOrders(String dest, QB qb, Table tab, Operator input)
+  private List<Integer> getSortOrders(String dest, QB qb, Table tab, Operator input)
       throws SemanticException {
     List<Order> tabSortCols = tab.getSortCols();
     List<FieldSchema> tabCols = tab.getCols();
 
-    ArrayList<Integer> orders = new ArrayList<Integer>();
+    List<Integer> orders = new ArrayList<Integer>();
     for (Order sortCol : tabSortCols) {
       for (FieldSchema tabCol : tabCols) {
         if (sortCol.getCol().equals(tabCol.getName())) {
@@ -8404,7 +8870,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (partitionExprs == null) {
       partitionExprs = qb.getParseInfo().getDistributeByForClause(dest);
     }
-    ArrayList<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
     if (partitionExprs != null) {
       int ccount = partitionExprs.getChildCount();
       for (int i = 0; i < ccount; ++i) {
@@ -8430,7 +8896,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
       }
     }
-    ArrayList<ExprNodeDesc> sortCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> sortCols = new ArrayList<ExprNodeDesc>();
     StringBuilder order = new StringBuilder();
     StringBuilder nullOrder = new StringBuilder();
     if (sortExprs != null) {
@@ -8476,8 +8942,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     Table dest_tab = qb.getMetaData().getDestTableForAlias(dest);
     AcidUtils.Operation acidOp = Operation.NOT_ACID;
-    if (AcidUtils.isFullAcidTable(dest_tab)) {
-      acidOp = getAcidType(Utilities.getTableDesc(dest_tab).getOutputFileFormatClass(), dest);
+    if (AcidUtils.isTransactionalTable(dest_tab)) {
+      acidOp = getAcidType(Utilities.getTableDesc(dest_tab).getOutputFileFormatClass(), dest,
+          AcidUtils.isInsertOnlyTable(dest_tab));
     }
     Operator result = genReduceSinkPlan(
         input, partCols, sortCols, order.toString(), nullOrder.toString(),
@@ -8491,7 +8958,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private Operator genReduceSinkPlan(Operator<?> input,
-                                     ArrayList<ExprNodeDesc> partitionCols, ArrayList<ExprNodeDesc> sortCols,
+                                     List<ExprNodeDesc> partitionCols, List<ExprNodeDesc> sortCols,
                                      String sortOrder, String nullOrder, int numReducers, AcidUtils.Operation acidOp)
       throws SemanticException {
     return genReduceSinkPlan(input, partitionCols, sortCols, sortOrder, nullOrder, numReducers,
@@ -8499,8 +8966,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @SuppressWarnings("nls")
-  private Operator genReduceSinkPlan(Operator<?> input,
-                                     ArrayList<ExprNodeDesc> partitionCols, ArrayList<ExprNodeDesc> sortCols,
+  private Operator genReduceSinkPlan(Operator<?> input, List<ExprNodeDesc> partitionCols, List<ExprNodeDesc> sortCols,
                                      String sortOrder, String nullOrder, int numReducers, AcidUtils.Operation acidOp,
                                      boolean pullConstants) throws SemanticException {
 
@@ -8509,10 +8975,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     Operator dummy = Operator.createDummy();
     dummy.setParentOperators(Arrays.asList(input));
 
-    ArrayList<ExprNodeDesc> newSortCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> newSortCols = new ArrayList<ExprNodeDesc>();
     StringBuilder newSortOrder = new StringBuilder();
     StringBuilder newNullOrder = new StringBuilder();
-    ArrayList<ExprNodeDesc> sortColsBack = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> sortColsBack = new ArrayList<ExprNodeDesc>();
     for (int i = 0; i < sortCols.size(); i++) {
       ExprNodeDesc sortCol = sortCols.get(i);
       // If we are not pulling constants, OR
@@ -8528,13 +8994,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // For the generation of the values expression just get the inputs
     // signature and generate field expressions for those
     RowResolver rsRR = new RowResolver();
-    ArrayList<String> outputColumns = new ArrayList<String>();
-    ArrayList<ExprNodeDesc> valueCols = new ArrayList<ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> valueColsBack = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumns = new ArrayList<String>();
+    List<ExprNodeDesc> valueCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> valueColsBack = new ArrayList<ExprNodeDesc>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> constantCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> constantCols = new ArrayList<ExprNodeDesc>();
 
-    ArrayList<ColumnInfo> columnInfos = inputRR.getColumnInfos();
+    List<ColumnInfo> columnInfos = inputRR.getColumnInfos();
 
     int[] index = new int[columnInfos.size()];
     for (int i = 0; i < index.length; i++) {
@@ -8604,8 +9070,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     interim.setColumnExprMap(colExprMap);
 
     RowResolver selectRR = new RowResolver();
-    ArrayList<ExprNodeDesc> selCols = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> selOutputCols = new ArrayList<String>();
+    List<ExprNodeDesc> selCols = new ArrayList<ExprNodeDesc>();
+    List<String> selOutputCols = new ArrayList<String>();
     Map<String, ExprNodeDesc> selColExprMap = new HashMap<String, ExprNodeDesc>();
 
     Iterator<ExprNodeDesc> constants = constantCols.iterator();
@@ -8647,20 +9113,19 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private Operator genJoinOperatorChildren(QBJoinTree join, Operator left,
-                                           Operator[] right, HashSet<Integer> omitOpts, ExprNodeDesc[][] joinKeys) throws SemanticException {
+                                           Operator[] right, Set<Integer> omitOpts, ExprNodeDesc[][] joinKeys) throws SemanticException {
 
     RowResolver outputRR = new RowResolver();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<String> outputColumnNames = new ArrayList<String>();
     // all children are base classes
     Operator<?>[] rightOps = new Operator[right.length];
     int outputPos = 0;
 
     Map<String, Byte> reversedExprs = new HashMap<String, Byte>();
-    HashMap<Byte, List<ExprNodeDesc>> exprMap = new HashMap<Byte, List<ExprNodeDesc>>();
+    Map<Byte, List<ExprNodeDesc>> exprMap = new HashMap<Byte, List<ExprNodeDesc>>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
-    HashMap<Integer, Set<String>> posToAliasMap = new HashMap<Integer, Set<String>>();
-    HashMap<Byte, List<ExprNodeDesc>> filterMap =
-        new HashMap<Byte, List<ExprNodeDesc>>();
+    Map<Integer, Set<String>> posToAliasMap = new HashMap<Integer, Set<String>>();
+    Map<Byte, List<ExprNodeDesc>> filterMap = new HashMap<Byte, List<ExprNodeDesc>>();
 
     // Only used for semijoin with residual predicates
     List<ColumnInfo> topSelectInputColumns = new ArrayList<>();
@@ -8679,8 +9144,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       int[] index = rs.getValueIndex();
 
-      ArrayList<ExprNodeDesc> valueDesc = new ArrayList<ExprNodeDesc>();
-      ArrayList<ExprNodeDesc> filterDesc = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> valueDesc = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> filterDesc = new ArrayList<ExprNodeDesc>();
       Byte tag = (byte) rsDesc.getTag();
 
       // check whether this input operator produces output
@@ -8835,9 +9300,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     RowResolver inputRR = opParseCtx.get(child).getRowResolver();
     RowResolver outputRR = new RowResolver();
-    ArrayList<String> outputColumns = new ArrayList<String>();
-    ArrayList<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> reduceKeysBack = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumns = new ArrayList<String>();
+    List<ExprNodeDesc> reduceKeys = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceKeysBack = new ArrayList<ExprNodeDesc>();
 
     // Compute join keys and store in reduceKeys
     for (ExprNodeDesc joinKey : joinKeys) {
@@ -8846,8 +9311,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     // Walk over the input row resolver and copy in the output
-    ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> reduceValuesBack = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> reduceValuesBack = new ArrayList<ExprNodeDesc>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
 
     List<ColumnInfo> columns = inputRR.getColumnInfos();
@@ -8941,7 +9406,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if ( joinSrcOp != null ) {
-      ArrayList<ASTNode> filter = joinTree.getFiltersForPushing().get(0);
+      List<ASTNode> filter = joinTree.getFiltersForPushing().get(0);
       for (ASTNode cond : filter) {
         joinSrcOp = genFilterPlan(qb, cond, joinSrcOp, false);
       }
@@ -8950,7 +9415,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     String[] baseSrc = joinTree.getBaseSrc();
     Operator[] srcOps = new Operator[baseSrc.length];
 
-    HashSet<Integer> omitOpts = null; // set of input to the join that should be
+    Set<Integer> omitOpts = null; // set of input to the join that should be
     // omitted by the output
     int pos = 0;
     for (String src : baseSrc) {
@@ -8959,7 +9424,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
         // for left-semi join, generate an additional selection & group-by
         // operator before ReduceSink
-        ArrayList<ASTNode> fields = joinTree.getRHSSemijoinColumns(src);
+        List<ASTNode> fields = joinTree.getRHSSemijoinColumns(src);
         if (fields != null) {
           // the RHS table columns should be not be output from the join
           if (omitOpts == null) {
@@ -8972,8 +9437,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
           // generate a groupby operator (HASH mode) for a map-side partial
           // aggregation for semijoin
-          srcOps[pos++] = genMapGroupByForSemijoin(qb, fields, srcOp,
-              GroupByDesc.Mode.HASH);
+          srcOps[pos++] = genMapGroupByForSemijoin(qb, fields, srcOp, GroupByDesc.Mode.HASH);
         } else {
           srcOps[pos++] = srcOp;
         }
@@ -8994,8 +9458,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       srcOps[i] = genJoinReduceSinkChild(qb, joinKeys[i], srcOps[i], srcs, joinTree.getNextTag());
     }
 
-    Operator<?> topOp = genJoinOperatorChildren(joinTree,
-        joinSrcOp, srcOps, omitOpts, joinKeys);
+    Operator<?> topOp = genJoinOperatorChildren(joinTree, joinSrcOp, srcOps, omitOpts, joinKeys);
     JoinOperator joinOp;
     if (topOp instanceof JoinOperator) {
       joinOp = (JoinOperator) topOp;
@@ -9032,12 +9495,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @return the selection operator.
    * @throws SemanticException
    */
-  private Operator insertSelectForSemijoin(ArrayList<ASTNode> fields,
+  private Operator insertSelectForSemijoin(List<ASTNode> fields,
                                            Operator<?> input) throws SemanticException {
 
     RowResolver inputRR = opParseCtx.get(input).getRowResolver();
-    ArrayList<ExprNodeDesc> colList = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    List<ExprNodeDesc> colList = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumnNames = new ArrayList<String>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
 
     RowResolver outputRR = new RowResolver();
@@ -9088,16 +9551,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return output;
   }
 
-  private Operator genMapGroupByForSemijoin(QB qb, ArrayList<ASTNode> fields,
+  private Operator genMapGroupByForSemijoin(QB qb, List<ASTNode> fields,
                                             Operator<?> input, GroupByDesc.Mode mode)
       throws SemanticException {
 
-    RowResolver groupByInputRowResolver = opParseCtx.get(input)
-        .getRowResolver();
+    RowResolver groupByInputRowResolver = opParseCtx.get(input).getRowResolver();
     RowResolver groupByOutputRowResolver = new RowResolver();
-    ArrayList<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
-    ArrayList<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
+    List<ExprNodeDesc> groupByKeys = new ArrayList<ExprNodeDesc>();
+    List<String> outputColumnNames = new ArrayList<String>();
+    List<AggregationDesc> aggregations = new ArrayList<AggregationDesc>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
 
     for (int i = 0; i < fields.size(); ++i) {
@@ -9145,9 +9607,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     float groupByMemoryUsage = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMEMORY);
     float memoryThreshold = HiveConf
         .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRMEMORYTHRESHOLD);
+    float minReductionHashAggr = HiveConf
+        .getFloatVar(conf, HiveConf.ConfVars.HIVEMAPAGGRHASHMINREDUCTION);
     Operator op = putOpInsertMap(OperatorFactory.getAndMakeChild(
         new GroupByDesc(mode, outputColumnNames, groupByKeys, aggregations,
-            false, groupByMemoryUsage, memoryThreshold, null, false, -1, false),
+            false, groupByMemoryUsage, memoryThreshold, minReductionHashAggr, null, false, -1, false),
         new RowSchema(groupByOutputRowResolver.getColumnInfos()),
         input), groupByOutputRowResolver);
 
@@ -9224,12 +9688,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         pushJoinFilters(qb, joinTree.getJoinSrc(), map);
       }
     }
-    ArrayList<ArrayList<ASTNode>> filters = joinTree.getFiltersForPushing();
+    List<List<ASTNode>> filters = joinTree.getFiltersForPushing();
     int pos = 0;
     for (String src : joinTree.getBaseSrc()) {
       if (src != null) {
         Operator srcOp = map.get(src);
-        ArrayList<ASTNode> filter = filters.get(pos);
+        List<ASTNode> filter = filters.get(pos);
         for (ASTNode cond : filter) {
           srcOp = genFilterPlan(qb, cond, srcOp, false);
         }
@@ -9282,15 +9746,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     QBJoinTree joinTree = new QBJoinTree();
     joinTree.setNoOuterJoin(false);
 
-    joinTree.setExpressions(new ArrayList<ArrayList<ASTNode>>());
-    joinTree.setFilters(new ArrayList<ArrayList<ASTNode>>());
-    joinTree.setFiltersForPushing(new ArrayList<ArrayList<ASTNode>>());
+    joinTree.setExpressions(new ArrayList<List<ASTNode>>());
+    joinTree.setFilters(new ArrayList<List<ASTNode>>());
+    joinTree.setFiltersForPushing(new ArrayList<List<ASTNode>>());
 
     // Create joinTree structures to fill them up later
-    ArrayList<String> rightAliases = new ArrayList<String>();
-    ArrayList<String> leftAliases = new ArrayList<String>();
-    ArrayList<String> baseSrc = new ArrayList<String>();
-    ArrayList<Boolean> preserved = new ArrayList<Boolean>();
+    List<String> rightAliases = new ArrayList<String>();
+    List<String> leftAliases = new ArrayList<String>();
+    List<String> baseSrc = new ArrayList<String>();
+    List<Boolean> preserved = new ArrayList<Boolean>();
 
     boolean lastPreserved = false;
     int cols = -1;
@@ -9316,8 +9780,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         } else {
           rightAliases.add(alias);
         }
-        joinTree.getAliasToOpInfo().put(
-            getModifiedAlias(qb, alias), aliasToOpInfo.get(alias));
+        joinTree.getAliasToOpInfo().put(getModifiedAlias(qb, alias), aliasToOpInfo.get(alias));
         joinTree.setId(qb.getId());
         baseSrc.add(alias);
 
@@ -9333,9 +9796,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
               + "number of keys in UNIQUEJOIN");
         }
 
-        ArrayList<ASTNode> expressions = new ArrayList<ASTNode>();
-        ArrayList<ASTNode> filt = new ArrayList<ASTNode>();
-        ArrayList<ASTNode> filters = new ArrayList<ASTNode>();
+        List<ASTNode> expressions = new ArrayList<ASTNode>();
+        List<ASTNode> filt = new ArrayList<ASTNode>();
+        List<ASTNode> filters = new ArrayList<ASTNode>();
 
         for (Node exp : child.getChildren()) {
           expressions.add((ASTNode) exp);
@@ -9475,28 +9938,27 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       joinTree.addRHSSemijoin(rightalias);
     }
 
-    ArrayList<ArrayList<ASTNode>> expressions = new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> expressions = new ArrayList<List<ASTNode>>();
     expressions.add(new ArrayList<ASTNode>());
     expressions.add(new ArrayList<ASTNode>());
     joinTree.setExpressions(expressions);
 
-    ArrayList<Boolean> nullsafes = new ArrayList<Boolean>();
+    List<Boolean> nullsafes = new ArrayList<Boolean>();
     joinTree.setNullSafes(nullsafes);
 
-    ArrayList<ArrayList<ASTNode>> filters = new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> filters = new ArrayList<List<ASTNode>>();
     filters.add(new ArrayList<ASTNode>());
     filters.add(new ArrayList<ASTNode>());
     joinTree.setFilters(filters);
     joinTree.setFilterMap(new int[2][]);
 
-    ArrayList<ArrayList<ASTNode>> filtersForPushing =
-        new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> filtersForPushing = new ArrayList<List<ASTNode>>();
     filtersForPushing.add(new ArrayList<ASTNode>());
     filtersForPushing.add(new ArrayList<ASTNode>());
     joinTree.setFiltersForPushing(filtersForPushing);
 
     ASTNode joinCond = subQuery.getJoinConditionAST();
-    ArrayList<String> leftSrc = new ArrayList<String>();
+    List<String> leftSrc = new ArrayList<String>();
     parseJoinCondition(joinTree, joinCond, leftSrc, aliasToOpInfo);
     if (leftSrc.size() == 1) {
       joinTree.setLeftAlias(leftSrc.get(0));
@@ -9560,9 +10022,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if (isValidLeftToken) {
-      String tableName = getUnescapedUnqualifiedTableName((ASTNode) left.getChild(0))
-          .toLowerCase();
-      String alias = extractJoinAlias(left, tableName);
+      String alias = extractJoinAlias(left);
       joinTree.setLeftAlias(alias);
       String[] leftAliases = new String[1];
       leftAliases[0] = alias;
@@ -9588,9 +10048,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if (isValidRightToken) {
-      String tableName = getUnescapedUnqualifiedTableName((ASTNode) right.getChild(0))
-          .toLowerCase();
-      String alias = extractJoinAlias(right, tableName);
+      String alias = extractJoinAlias(right);
       String[] rightAliases = new String[1];
       rightAliases[0] = alias;
       joinTree.setRightAliases(rightAliases);
@@ -9611,28 +10069,27 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       assert false;
     }
 
-    ArrayList<ArrayList<ASTNode>> expressions = new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> expressions = new ArrayList<List<ASTNode>>();
     expressions.add(new ArrayList<ASTNode>());
     expressions.add(new ArrayList<ASTNode>());
     joinTree.setExpressions(expressions);
 
-    ArrayList<Boolean> nullsafes = new ArrayList<Boolean>();
+    List<Boolean> nullsafes = new ArrayList<Boolean>();
     joinTree.setNullSafes(nullsafes);
 
-    ArrayList<ArrayList<ASTNode>> filters = new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> filters = new ArrayList<List<ASTNode>>();
     filters.add(new ArrayList<ASTNode>());
     filters.add(new ArrayList<ASTNode>());
     joinTree.setFilters(filters);
     joinTree.setFilterMap(new int[2][]);
 
-    ArrayList<ArrayList<ASTNode>> filtersForPushing =
-        new ArrayList<ArrayList<ASTNode>>();
+    List<List<ASTNode>> filtersForPushing = new ArrayList<List<ASTNode>>();
     filtersForPushing.add(new ArrayList<ASTNode>());
     filtersForPushing.add(new ArrayList<ASTNode>());
     joinTree.setFiltersForPushing(filtersForPushing);
 
     ASTNode joinCond = (ASTNode) joinParseTree.getChild(2);
-    ArrayList<String> leftSrc = new ArrayList<String>();
+    List<String> leftSrc = new ArrayList<String>();
     parseJoinCondition(joinTree, joinCond, leftSrc, aliasToOpInfo);
     if (leftSrc.size() == 1) {
       joinTree.setLeftAlias(leftSrc.get(0));
@@ -9683,7 +10140,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         || (right.getToken().getType() == HiveParser.TOK_PTBLFUNCTION);
   }
 
-  private String extractJoinAlias(ASTNode node, String tableName) {
+  private String extractJoinAlias(ASTNode node) throws SemanticException {
     // ptf node form is:
     // ^(TOK_PTBLFUNCTION $name $alias? partitionTableFunctionSource partitioningSpec? expression*)
     // guaranteed to have an alias here: check done in processJoin
@@ -9691,14 +10148,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       return unescapeIdentifier(node.getChild(1).getText().toLowerCase());
     }
     if (node.getChildCount() == 1) {
-      return tableName;
+      return getUnescapedUnqualifiedTableName((ASTNode) node.getChild(0)).toLowerCase();
     }
     for (int i = node.getChildCount() - 1; i >= 1; i--) {
       if (node.getChild(i).getType() == HiveParser.Identifier) {
         return unescapeIdentifier(node.getChild(i).getText().toLowerCase());
       }
     }
-    return tableName;
+    throw new SemanticException("Unable to get join alias.");
   }
 
   private void parseStreamTables(QBJoinTree joinTree, QB qb) {
@@ -9861,29 +10318,29 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     target.setBaseSrc(baseSrc);
 
-    ArrayList<ArrayList<ASTNode>> expr = target.getExpressions();
+    List<List<ASTNode>> expr = target.getExpressions();
     for (int i = 0; i < nodeRightAliases.length; i++) {
       List<ASTNode> nodeConds = node.getExpressions().get(i + 1);
-      ArrayList<ASTNode> reordereNodeConds = new ArrayList<ASTNode>();
+      List<ASTNode> reordereNodeConds = new ArrayList<ASTNode>();
       for(int k=0; k < tgtToNodeExprMap.length; k++) {
         reordereNodeConds.add(nodeConds.get(tgtToNodeExprMap[k]));
       }
       expr.add(reordereNodeConds);
     }
 
-    ArrayList<Boolean> nns = node.getNullSafes();
-    ArrayList<Boolean> tns = target.getNullSafes();
+    List<Boolean> nns = node.getNullSafes();
+    List<Boolean> tns = target.getNullSafes();
     for (int i = 0; i < tns.size(); i++) {
       tns.set(i, tns.get(i) & nns.get(i)); // any of condition contains non-NS, non-NS
     }
 
-    ArrayList<ArrayList<ASTNode>> filters = target.getFilters();
+    List<List<ASTNode>> filters = target.getFilters();
     for (int i = 0; i < nodeRightAliases.length; i++) {
       filters.add(node.getFilters().get(i + 1));
     }
 
     if (node.getFilters().get(0).size() != 0) {
-      ArrayList<ASTNode> filterPos = filters.get(pos);
+      List<ASTNode> filterPos = filters.get(pos);
       filterPos.addAll(node.getFilters().get(0));
     }
 
@@ -9914,7 +10371,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     System.arraycopy(nmap, 1, newmap, tmap.length, nmap.length - 1);
     target.setFilterMap(newmap);
 
-    ArrayList<ArrayList<ASTNode>> filter = target.getFiltersForPushing();
+    List<List<ASTNode>> filter = target.getFiltersForPushing();
     for (int i = 0; i < nodeRightAliases.length; i++) {
       filter.add(node.getFiltersForPushing().get(i + 1));
     }
@@ -9997,16 +10454,16 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  private ObjectPair<Integer, int[]> findMergePos(QBJoinTree node, QBJoinTree target) {
+  private Pair<Integer, int[]> findMergePos(QBJoinTree node, QBJoinTree target) {
     int res = -1;
     String leftAlias = node.getLeftAlias();
     if (leftAlias == null && (!node.getNoOuterJoin() || !target.getNoOuterJoin())) {
       // Cross with outer join: currently we do not merge
-      return new ObjectPair(-1, null);
+      return Pair.of(-1, null);
     }
 
-    ArrayList<ASTNode> nodeCondn = node.getExpressions().get(0);
-    ArrayList<ASTNode> targetCondn = null;
+    List<ASTNode> nodeCondn = node.getExpressions().get(0);
+    List<ASTNode> targetCondn = null;
 
     if (leftAlias == null || leftAlias.equals(target.getLeftAlias())) {
       targetCondn = target.getExpressions().get(0);
@@ -10022,7 +10479,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if ( targetCondn == null || (nodeCondn.size() != targetCondn.size())) {
-      return new ObjectPair(-1, null);
+      return Pair.of(-1, null);
     }
 
     /*
@@ -10045,17 +10502,17 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
       }
       if ( tgtToNodeExprMap[i] == -1) {
-        return new ObjectPair(-1, null);
+        return Pair.of(-1, null);
       }
     }
 
     for(j=0; j < nodeCondn.size(); j++) {
       if ( !nodeFiltersMapped[j]) {
-        return new ObjectPair(-1, null);
+        return Pair.of(-1, null);
       }
     }
 
-    return new ObjectPair(res, tgtToNodeExprMap);
+    return Pair.of(res, tgtToNodeExprMap);
   }
 
   boolean isCBOExecuted() {
@@ -10070,7 +10527,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return true;
   }
 
-  boolean shouldMerge(final QBJoinTree node, final QBJoinTree target) {
+  private boolean shouldMerge(final QBJoinTree node, final QBJoinTree target) {
     boolean isNodeOuterJoin=false, isNodeSemiJoin=false, hasNodePostJoinFilters=false;
     boolean isTargetOuterJoin=false, isTargetSemiJoin=false, hasTargetPostJoinFilters=false;
 
@@ -10129,8 +10586,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           // Outer joins with post-filtering conditions cannot be merged
           break;
         }
-        ObjectPair<Integer, int[]> mergeDetails = findMergePos(node, target);
-        int pos = mergeDetails.getFirst();
+        Pair<Integer, int[]> mergeDetails = findMergePos(node, target);
+        int pos = mergeDetails.getLeft();
         if (pos >= 0) {
           // for outer joins, it should not exceed 16 aliases (short type)
           if (!node.getNoOuterJoin() || !target.getNoOuterJoin()) {
@@ -10140,7 +10597,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
               continue;
             }
           }
-          mergeJoins(qb, node, target, pos, mergeDetails.getSecond());
+          mergeJoins(qb, node, target, pos, mergeDetails.getRight());
           trees.set(j, null);
           mergedQBJTree = true;
           continue; // continue merging with next alias
@@ -10165,7 +10622,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         curQBJTree = trees.get(i);
         if (curQBJTree != null) {
           if (prevQBJTree != null) {
-            ArrayList<String> newCurLeftAliases = new ArrayList<String>();
+            List<String> newCurLeftAliases = new ArrayList<String>();
             newCurLeftAliases.addAll(Arrays.asList(prevQBJTree.getLeftAliases()));
             newCurLeftAliases.addAll(Arrays.asList(prevQBJTree.getRightAliases()));
             curQBJTree
@@ -10206,11 +10663,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private Operator genSelectAllDesc(Operator input) throws SemanticException {
     OpParseContext inputCtx = opParseCtx.get(input);
     RowResolver inputRR = inputCtx.getRowResolver();
-    ArrayList<ColumnInfo> columns = inputRR.getColumnInfos();
-    ArrayList<ExprNodeDesc> colList = new ArrayList<ExprNodeDesc>();
-    ArrayList<String> columnNames = new ArrayList<String>();
-    Map<String, ExprNodeDesc> columnExprMap =
-        new HashMap<String, ExprNodeDesc>();
+    List<ColumnInfo> columns = inputRR.getColumnInfos();
+    List<ExprNodeDesc> colList = new ArrayList<ExprNodeDesc>();
+    List<String> columnNames = new ArrayList<String>();
+    Map<String, ExprNodeDesc> columnExprMap = new HashMap<String, ExprNodeDesc>();
     for (int i = 0; i < columns.size(); i++) {
       ColumnInfo col = columns.get(i);
       colList.add(new ExprNodeColumnDesc(col, true));
@@ -10233,7 +10689,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     QBParseInfo qbp = qb.getParseInfo();
 
-    TreeSet<String> ks = new TreeSet<String>();
+    SortedSet<String> ks = new TreeSet<String>();
     ks.addAll(qbp.getClauseNames());
 
     List<List<String>> commonGroupByDestGroups = new ArrayList<List<String>>();
@@ -10333,7 +10789,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return commonGroupByDestGroups;
   }
 
-  protected List<ExprNodeDesc> determineSprayKeys(QBParseInfo qbp, String dest,
+  private List<ExprNodeDesc> determineSprayKeys(QBParseInfo qbp, String dest,
       RowResolver inputRR) throws SemanticException {
     List<ExprNodeDesc> sprayKeys = new ArrayList<ExprNodeDesc>();
 
@@ -10399,7 +10855,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       throws SemanticException {
     QBParseInfo qbp = qb.getParseInfo();
 
-    TreeSet<String> ks = new TreeSet<String>(qbp.getClauseNames());
+    SortedSet<String> ks = new TreeSet<String>(qbp.getClauseNames());
     Map<String, Operator<? extends OperatorDesc>> inputs = createInputForDests(qb, input, ks);
 
     Operator curr = input;
@@ -10611,23 +11067,23 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       if (limit != null) {
         // In case of order by, only 1 reducer is used, so no need of
         // another shuffle
-        curr = genLimitMapRedPlan(dest, qb, curr, offset.intValue(),
-            limit.intValue(), !hasOrderBy);
+        curr = genLimitMapRedPlan(dest, qb, curr, offset,
+            limit, limit != 0 && !hasOrderBy);
       }
     } else {
       // exact limit can be taken care of by the fetch operator
       if (limit != null) {
         boolean extraMRStep = true;
 
-        if (hasOrderBy ||
+        if (limit == 0 || hasOrderBy ||
             qb.getIsQuery() && qbp.getClusterByForClause(dest) == null &&
                 qbp.getSortByForClause(dest) == null) {
           extraMRStep = false;
         }
 
-        curr = genLimitMapRedPlan(dest, qb, curr, offset.intValue(),
-            limit.intValue(), extraMRStep);
-        qb.getParseInfo().setOuterQueryLimit(limit.intValue());
+        curr = genLimitMapRedPlan(dest, qb, curr, offset,
+            limit, extraMRStep);
+        qb.getParseInfo().setOuterQueryLimit(limit);
       }
       if (!queryState.getHiveOperation().equals(HiveOperation.CREATEVIEW)) {
         curr = genFileSinkPlan(dest, qb, curr);
@@ -10647,8 +11103,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // This can be easily merged into 1 union
     RowResolver leftRR = opParseCtx.get(leftOp).getRowResolver();
     RowResolver rightRR = opParseCtx.get(rightOp).getRowResolver();
-    LinkedHashMap<String, ColumnInfo> leftmap = leftRR.getFieldMap(leftalias);
-    LinkedHashMap<String, ColumnInfo> rightmap = rightRR.getFieldMap(rightalias);
+    Map<String, ColumnInfo> leftmap = leftRR.getFieldMap(leftalias);
+    Map<String, ColumnInfo> rightmap = rightRR.getFieldMap(rightalias);
     // make sure the schemas of both sides are the same
     ASTNode tabref = qb.getAliases().isEmpty() ? null :
         qb.getParseInfo().getSrcForAlias(qb.getAliases().get(0));
@@ -10811,7 +11267,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       String origInputAlias, RowResolver unionoutRR, String unionalias)
       throws SemanticException {
 
-    HashMap<String, ColumnInfo> fieldMap = unionoutRR.getFieldMap(unionalias);
+    Map<String, ColumnInfo> fieldMap = unionoutRR.getFieldMap(unionalias);
 
     Iterator<ColumnInfo> oIter = origInputFieldMap.values().iterator();
     Iterator<ColumnInfo> uIter = fieldMap.values().iterator();
@@ -10902,7 +11358,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     ExprNodeDesc intMaxExpr = new ExprNodeConstantDesc(
         TypeInfoFactory.intTypeInfo, Integer.valueOf(Integer.MAX_VALUE));
 
-    ArrayList<ExprNodeDesc> args = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> args = new ArrayList<ExprNodeDesc>();
     if (planExpr != null) {
       args.add(planExpr);
     } else if (useBucketCols) {
@@ -10999,11 +11455,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       Iterator<VirtualColumn> vcs = VirtualColumn.getRegistry(conf).iterator();
       // use a list for easy cumtomize
       List<VirtualColumn> vcList = new ArrayList<VirtualColumn>();
-      while (vcs.hasNext()) {
-        VirtualColumn vc = vcs.next();
-        rwsch.put(alias, vc.getName().toLowerCase(), new ColumnInfo(vc.getName(),
-            vc.getTypeInfo(), alias, true, vc.getIsHidden()));
-        vcList.add(vc);
+      if(!tab.isNonNative()) {
+        // Virtual columns are only for native tables
+        while (vcs.hasNext()) {
+          VirtualColumn vc = vcs.next();
+          rwsch.put(alias, vc.getName().toLowerCase(), new ColumnInfo(vc.getName(),
+                  vc.getTypeInfo(), alias, true, vc.getIsHidden()
+          ));
+          vcList.add(vc);
+        }
       }
 
       // Create the root of the operator tree
@@ -11049,7 +11509,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       tableScanOp.getConf().setTableSample(ts);
       int num = ts.getNumerator();
       int den = ts.getDenominator();
-      ArrayList<ASTNode> sampleExprs = ts.getExprs();
+      List<ASTNode> sampleExprs = ts.getExprs();
 
       // TODO: Do the type checking of the expressions
       List<String> tabBucketCols = tab.getBucketCols();
@@ -11206,64 +11666,76 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // if it is not analyze command and not column stats, then do not gatherstats
     if (!qbp.isAnalyzeCommand() && qbp.getAnalyzeRewrite() == null) {
       tsDesc.setGatherStats(false);
-    } else {
-      if (HiveConf.getVar(conf, HIVESTATSDBCLASS).equalsIgnoreCase(StatDB.fs.name())) {
-        String statsTmpLoc = ctx.getTempDirForInterimJobPath(tab.getPath()).toString();
-        LOG.debug("Set stats collection dir : " + statsTmpLoc);
-        tsDesc.setTmpStatsDir(statsTmpLoc);
+      return;
+    }
+
+    if (HiveConf.getVar(conf, HIVESTATSDBCLASS).equalsIgnoreCase(StatDB.fs.name())) {
+      String statsTmpLoc = ctx.getTempDirForInterimJobPath(tab.getPath()).toString();
+      LOG.debug("Set stats collection dir : " + statsTmpLoc);
+      tsDesc.setTmpStatsDir(statsTmpLoc);
+    }
+    tsDesc.setGatherStats(true);
+    tsDesc.setStatsReliable(conf.getBoolVar(HiveConf.ConfVars.HIVE_STATS_RELIABLE));
+
+    // append additional virtual columns for storing statistics
+    Iterator<VirtualColumn> vcs = VirtualColumn.getStatsRegistry(conf).iterator();
+    List<VirtualColumn> vcList = new ArrayList<VirtualColumn>();
+    while (vcs.hasNext()) {
+      VirtualColumn vc = vcs.next();
+      rwsch.put(alias, vc.getName(), new ColumnInfo(vc.getName(),
+          vc.getTypeInfo(), alias, true, vc.getIsHidden()));
+      vcList.add(vc);
+    }
+    tsDesc.addVirtualCols(vcList);
+
+    String tblName = tab.getTableName();
+    // Theoretically the key prefix could be any unique string shared
+    // between TableScanOperator (when publishing) and StatsTask (when aggregating).
+    // Here we use
+    // db_name.table_name + partitionSec
+    // as the prefix for easy of read during explain and debugging.
+    // Currently, partition spec can only be static partition.
+    String k = org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.encodeTableName(tblName) + Path.SEPARATOR;
+    tsDesc.setStatsAggPrefix(tab.getDbName()+"."+k);
+
+    // set up WriteEntity for replication and txn stats
+    WriteEntity we = new WriteEntity(tab, WriteEntity.WriteType.DDL_SHARED);
+    we.setTxnAnalyze(true);
+    outputs.add(we);
+    if (AcidUtils.isTransactionalTable(tab)) {
+      if (acidAnalyzeTable != null) {
+        throw new IllegalStateException("Multiple ACID tables in analyze: "
+            + we + ", " + acidAnalyzeTable);
       }
-      tsDesc.setGatherStats(true);
-      tsDesc.setStatsReliable(conf.getBoolVar(HiveConf.ConfVars.HIVE_STATS_RELIABLE));
+      acidAnalyzeTable = we;
+    }
 
-      // append additional virtual columns for storing statistics
-      Iterator<VirtualColumn> vcs = VirtualColumn.getStatsRegistry(conf).iterator();
-      List<VirtualColumn> vcList = new ArrayList<VirtualColumn>();
-      while (vcs.hasNext()) {
-        VirtualColumn vc = vcs.next();
-        rwsch.put(alias, vc.getName(), new ColumnInfo(vc.getName(),
-            vc.getTypeInfo(), alias, true, vc.getIsHidden()));
-        vcList.add(vc);
+    // add WriteEntity for each matching partition
+    if (tab.isPartitioned()) {
+      List<String> cols = new ArrayList<String>();
+      if (qbp.getAnalyzeRewrite() != null) {
+        List<FieldSchema> partitionCols = tab.getPartCols();
+        for (FieldSchema fs : partitionCols) {
+          cols.add(fs.getName());
+        }
+        tsDesc.setPartColumns(cols);
+        return;
       }
-      tsDesc.addVirtualCols(vcList);
-
-      String tblName = tab.getTableName();
-      // Theoretically the key prefix could be any unique string shared
-      // between TableScanOperator (when publishing) and StatsTask (when aggregating).
-      // Here we use
-      // db_name.table_name + partitionSec
-      // as the prefix for easy of read during explain and debugging.
-      // Currently, partition spec can only be static partition.
-      String k = org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.encodeTableName(tblName) + Path.SEPARATOR;
-      tsDesc.setStatsAggPrefix(tab.getDbName()+"."+k);
-
-      // set up WriteEntity for replication
-      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_SHARED));
-
-      // add WriteEntity for each matching partition
-      if (tab.isPartitioned()) {
-        List<String> cols = new ArrayList<String>();
-        if (qbp.getAnalyzeRewrite() != null) {
-          List<FieldSchema> partitionCols = tab.getPartCols();
-          for (FieldSchema fs : partitionCols) {
-            cols.add(fs.getName());
-          }
-          tsDesc.setPartColumns(cols);
-          return;
-        }
-        TableSpec tblSpec = qbp.getTableSpec(alias);
-        Map<String, String> partSpec = tblSpec.getPartSpec();
-        if (partSpec != null) {
-          cols.addAll(partSpec.keySet());
-          tsDesc.setPartColumns(cols);
-        } else {
-          throw new SemanticException(ErrorMsg.NEED_PARTITION_SPECIFICATION.getMsg());
-        }
-        List<Partition> partitions = qbp.getTableSpec().partitions;
-        if (partitions != null) {
-          for (Partition partn : partitions) {
-            // inputs.add(new ReadEntity(partn)); // is this needed at all?
-            outputs.add(new WriteEntity(partn, WriteEntity.WriteType.DDL_NO_LOCK));
-          }
+      TableSpec tblSpec = qbp.getTableSpec(alias);
+      Map<String, String> partSpec = tblSpec.getPartSpec();
+      if (partSpec != null) {
+        cols.addAll(partSpec.keySet());
+        tsDesc.setPartColumns(cols);
+      } else {
+        throw new SemanticException(ErrorMsg.NEED_PARTITION_SPECIFICATION.getMsg());
+      }
+      List<Partition> partitions = qbp.getTableSpec().partitions;
+      if (partitions != null) {
+        for (Partition partn : partitions) {
+          // inputs.add(new ReadEntity(partn)); // is this needed at all?
+          WriteEntity pwe = new WriteEntity(partn, WriteEntity.WriteType.DDL_NO_LOCK);
+          pwe.setTxnAnalyze(true);
+          outputs.add(pwe);
         }
       }
     }
@@ -11284,12 +11756,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return null;
   }
 
-  public Operator genPlan(QB qb) throws SemanticException {
+  Operator genPlan(QB qb) throws SemanticException {
     return genPlan(qb, false);
   }
 
   @SuppressWarnings("nls")
-  public Operator genPlan(QB qb, boolean skipAmbiguityCheck)
+  private Operator genPlan(QB qb, boolean skipAmbiguityCheck)
       throws SemanticException {
 
     // First generate all the opInfos for the elements in the from clause
@@ -11346,7 +11818,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       //After processing subqueries and source tables, process
       // partitioned table functions
 
-      HashMap<ASTNode, PTFInvocationSpec> ptfNodeToSpec = qb.getPTFNodeToSpec();
+      Map<ASTNode, PTFInvocationSpec> ptfNodeToSpec = qb.getPTFNodeToSpec();
       if ( ptfNodeToSpec != null ) {
         for(Entry<ASTNode, PTFInvocationSpec> entry : ptfNodeToSpec.entrySet()) {
           ASTNode ast = entry.getKey();
@@ -11495,15 +11967,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @throws SemanticException
    */
 
-  void genLateralViewPlans(Map<String, Operator> aliasToOpInfo, QB qb)
+  private void genLateralViewPlans(Map<String, Operator> aliasToOpInfo, QB qb)
       throws SemanticException {
-    Map<String, ArrayList<ASTNode>> aliasToLateralViews = qb.getParseInfo()
-        .getAliasToLateralViews();
+    Map<String, List<ASTNode>> aliasToLateralViews = qb.getParseInfo().getAliasToLateralViews();
     for (Entry<String, Operator> e : aliasToOpInfo.entrySet()) {
       String alias = e.getKey();
       // See if the alias has a lateral view. If so, chain the lateral view
       // operator on
-      ArrayList<ASTNode> lateralViews = aliasToLateralViews.get(alias);
+      List<ASTNode> lateralViews = aliasToLateralViews.get(alias);
       if (lateralViews != null) {
         Operator op = e.getValue();
 
@@ -11586,7 +12057,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // names have to be changed to avoid conflicts
 
     RowResolver lateralViewRR = new RowResolver();
-    ArrayList<String> outputInternalColNames = new ArrayList<String>();
+    List<String> outputInternalColNames = new ArrayList<String>();
 
 
     // For PPD, we need a column to expression map so that during the walk,
@@ -11623,7 +12094,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    *          the same order as in the dest row resolver
    */
   private void LVmergeRowResolvers(RowResolver source, RowResolver dest,
-                                   Map<String, ExprNodeDesc> colExprMap, ArrayList<String> outputInternalColNames) {
+                                   Map<String, ExprNodeDesc> colExprMap, List<String> outputInternalColNames) {
     for (ColumnInfo c : source.getColumnInfos()) {
       String internalName = getColumnInternalName(outputInternalColNames.size());
       outputInternalColNames.add(internalName);
@@ -11638,7 +12109,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @SuppressWarnings("nls")
-  public Phase1Ctx initPhase1Ctx() {
+  Phase1Ctx initPhase1Ctx() {
 
     Phase1Ctx ctx_1 = new Phase1Ctx();
     ctx_1.nextNum = 0;
@@ -11655,19 +12126,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // init
     QB qb = new QB(null, null, false);
     this.qb = qb;
-  }
-
-  boolean analyzeCreateTable(ASTNode child) throws SemanticException {
-    if (ast.getToken().getType() == HiveParser.TOK_CREATETABLE) {
-      // if it is not CTAS, we don't need to go further and just return
-      if ((child = analyzeCreateTable(ast, qb, null)) == null) {
-        return true;
-      }
-    } else {
-      queryState.setCommandType(HiveOperation.QUERY);
-    }
-
-    return false;
   }
 
   @Override
@@ -11689,13 +12147,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Planner specific stuff goes in here.
    */
   static class PlannerContext {
-    protected ASTNode   child;
-    protected Phase1Ctx ctx_1;
-
-    void setParseTreeAttr(ASTNode child, Phase1Ctx ctx_1) {
-      this.child = child;
-      this.ctx_1 = ctx_1;
-    }
 
     void setCTASToken(ASTNode child) {
     }
@@ -11730,7 +12181,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private static void walkASTAndQualifyNames(ASTNode ast,
-      Set<String> cteAlias, Context ctx, Hive db, Set<Integer> ignoredTokens, UnparseTranslator unparseTranslator) {
+      Set<String> cteAlias, Context ctx, Hive db, Set<Integer> ignoredTokens, UnparseTranslator unparseTranslator)
+      throws SemanticException {
     Queue<Node> queue = new LinkedList<>();
     queue.add(ast);
     while (!queue.isEmpty()) {
@@ -11755,7 +12207,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   // Walk through the AST.
   // Replace all TOK_TABREF with fully qualified table name, if it is not already fully qualified.
-  protected String rewriteQueryWithQualifiedNames(ASTNode ast, TokenRewriteStream tokenRewriteStream)
+  private String rewriteQueryWithQualifiedNames(ASTNode ast, TokenRewriteStream tokenRewriteStream)
       throws SemanticException {
     UnparseTranslator unparseTranslator = new UnparseTranslator(conf);
     unparseTranslator.enable();
@@ -11799,8 +12251,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return rewrittenQuery;
   }
 
-  private static void walkASTMarkTABREF(TableMask tableMask, ASTNode ast, Set<String> cteAlias,
-                                        Context ctx, Hive db, Map<String, Table> tabNameToTabObject, Set<Integer> ignoredTokens)
+  private void walkASTMarkTABREF(TableMask tableMask, ASTNode ast, Set<String> cteAlias,
+      Context ctx, Hive db, Map<String, Table> tabNameToTabObject, Set<Integer> ignoredTokens)
       throws SemanticException {
     Queue<Node> queue = new LinkedList<>();
     queue.add(ast);
@@ -11842,30 +12294,53 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           continue;
         }
 
-        String replacementText = null;
         Table table = null;
         try {
-          if (!tabNameToTabObject.containsKey(tabIdName)) {
-            table = db.getTable(tabIdName, true);
-            tabNameToTabObject.put(tabIdName, table);
-          } else {
-            table = tabNameToTabObject.get(tabIdName);
-          }
+          table = getTableObjectByName(tabIdName, false);
         } catch (HiveException e) {
+          // This should not happen.
+          throw new SemanticException("Got exception though getTableObjectByName method should ignore it");
+        }
+        if (table == null) {
           // Table may not be found when materialization of CTE is on.
           STATIC_LOG.debug("Table " + tabIdName + " is not found in walkASTMarkTABREF.");
           continue;
         }
 
-        List<String> colNames = new ArrayList<>();
-        List<String> colTypes = new ArrayList<>();
-        for (FieldSchema col : table.getAllCols()) {
-          colNames.add(col.getName());
-          colTypes.add(col.getType());
-        }
+        if (table.isMaterializedView()) {
+          // When we are querying a materialized view directly, we check whether the source tables
+          // do not apply any policies.
+          for (String qName : table.getCreationMetadata().getTablesUsed()) {
+            try {
+              table = getTableObjectByName(qName, true);
+            } catch (HiveException e) {
+              // This should not happen.
+              throw new SemanticException("Table " + qName + " not found when trying to obtain it to check masking/filtering " +
+                  "policies");
+            }
 
-        basicInfos.put(new HivePrivilegeObject(table.getDbName(), table.getTableName(), colNames),
-            new MaskAndFilterInfo(colTypes, additionalTabInfo.toString(), alias, astNode, table.isView(), table.isNonNative()));
+            List<String> colNames = new ArrayList<>();
+            extractColumnInfos(table, colNames, new ArrayList<>());
+
+            basicInfos.put(new HivePrivilegeObject(table.getDbName(), table.getTableName(), colNames), null);
+          }
+        } else {
+          List<String> colNames;
+          List<String> colTypes;
+          if (isCBOExecuted() && this.columnAccessInfo != null &&
+              (colNames = this.columnAccessInfo.getTableToColumnAllAccessMap().get(table.getCompleteName())) != null) {
+            Map<String, String> colNameToType = table.getAllCols().stream()
+                .collect(Collectors.toMap(FieldSchema::getName, FieldSchema::getType));
+            colTypes = colNames.stream().map(colNameToType::get).collect(Collectors.toList());
+          } else {
+            colNames = new ArrayList<>();
+            colTypes = new ArrayList<>();
+            extractColumnInfos(table, colNames, colTypes);
+          }
+
+          basicInfos.put(new HivePrivilegeObject(table.getDbName(), table.getTableName(), colNames),
+              new MaskAndFilterInfo(colTypes, additionalTabInfo.toString(), alias, astNode, table.isView(), table.isNonNative()));
+        }
       }
       if (astNode.getChildCount() > 0 && !ignoredTokens.contains(astNode.getToken().getType())) {
         for (Node child : astNode.getChildren()) {
@@ -11880,17 +12355,33 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (needRewritePrivObjs != null && !needRewritePrivObjs.isEmpty()) {
       for (HivePrivilegeObject privObj : needRewritePrivObjs) {
         MaskAndFilterInfo info = basicInfos.get(privObj);
-        String replacementText = tableMask.create(privObj, info);
-        if (replacementText != null) {
-          // We don't support masking/filtering against ACID query at the moment
-          if (ctx.getIsUpdateDeleteMerge()) {
-            throw new SemanticException(ErrorMsg.MASKING_FILTERING_ON_ACID_NOT_SUPPORTED,
+        // First we check whether entity actually needs masking or filtering
+        if (tableMask.needsMaskingOrFiltering(privObj)) {
+          if (info == null) {
+            // This is a table used by a materialized view
+            // Currently we do not support querying directly a materialized view
+            // when mask/filter should be applied on source tables
+            throw new SemanticException(ErrorMsg.MASKING_FILTERING_ON_MATERIALIZED_VIEWS_SOURCES,
                 privObj.getDbname(), privObj.getObjectName());
+          } else {
+            String replacementText = tableMask.create(privObj, info);
+            // We don't support masking/filtering against ACID query at the moment
+            if (ctx.getIsUpdateDeleteMerge()) {
+              throw new SemanticException(ErrorMsg.MASKING_FILTERING_ON_ACID_NOT_SUPPORTED,
+                  privObj.getDbname(), privObj.getObjectName());
+            }
+            tableMask.setNeedsRewrite(true);
+            tableMask.addTranslation(info.astNode, replacementText);
           }
-          tableMask.setNeedsRewrite(true);
-          tableMask.addTranslation(info.astNode, replacementText);
         }
       }
+    }
+  }
+
+  private static void extractColumnInfos(Table table, List<String> colNames, List<String> colTypes) {
+    for (FieldSchema col : table.getAllCols()) {
+      colNames.add(col.getName());
+      colTypes.add(col.getType());
     }
   }
 
@@ -11899,8 +12390,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   // the table needs to be masked or filtered.
   // For the replacement, we leverage the methods that are used for
   // unparseTranslator.
-  protected static ASTNode rewriteASTWithMaskAndFilter(TableMask tableMask, ASTNode ast, TokenRewriteStream tokenRewriteStream,
-                                                       Context ctx, Hive db, Map<String, Table> tabNameToTabObject, Set<Integer> ignoredTokens)
+  private ASTNode rewriteASTWithMaskAndFilter(TableMask tableMask, ASTNode ast, TokenRewriteStream tokenRewriteStream,
+      Context ctx, Hive db, Map<String, Table> tabNameToTabObject, Set<Integer> ignoredTokens)
       throws SemanticException {
     // 1. collect information about CTE if there is any.
     // The base table of CTE should be masked.
@@ -11941,6 +12432,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     // 2. rewrite the AST, replace TABREF with masking/filtering
     if (tableMask.needsRewrite()) {
+      quoteIdentifierTokens(tokenRewriteStream);
       tableMask.applyTranslations(tokenRewriteStream);
       String rewrittenQuery = tokenRewriteStream.toString(
           ast.getTokenStartIndex(), ast.getTokenStopIndex());
@@ -12009,10 +12501,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     case HiveParser.TOK_COMMIT:
     case HiveParser.TOK_ROLLBACK:
       if(!(conf.getBoolVar(ConfVars.HIVE_IN_TEST) || conf.getBoolVar(ConfVars.HIVE_IN_TEZ_TEST))) {
-        throw new IllegalStateException(SemanticAnalyzerFactory.getOperation(ast.getToken().getType()) +
+        throw new IllegalStateException(HiveOperation.operationForToken(ast.getToken().getType()) +
             " is not supported yet.");
       }
-      queryState.setCommandType(SemanticAnalyzerFactory.getOperation(ast.getToken().getType()));
+      queryState.setCommandType(HiveOperation.operationForToken(ast.getToken().getType()));
       return false;
     }
 
@@ -12033,12 +12525,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     getMetaData(qb, createVwDesc == null);
     LOG.info("Completed getting MetaData in Semantic Analysis");
 
-    plannerCtx.setParseTreeAttr(child, ctx_1);
-
     return true;
   }
 
-  public void getHintsFromQB(QB qb, List<ASTNode> hints) {
+  void getHintsFromQB(QB qb, List<ASTNode> hints) {
     if (qb.getParseInfo().getHints() != null) {
       hints.add(qb.getParseInfo().getHints());
     }
@@ -12050,7 +12540,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  public void getHintsFromQB(QBExpr qbExpr, List<ASTNode> hints) {
+  private void getHintsFromQB(QBExpr qbExpr, List<ASTNode> hints) {
     QBExpr qbExpr1 = qbExpr.getQBExpr1();
     QBExpr qbExpr2 = qbExpr.getQBExpr2();
     QB qb = qbExpr.getQB();
@@ -12133,6 +12623,17 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (HiveConf.getBoolVar(conf, ConfVars.HIVE_REMOVE_ORDERBY_IN_SUBQUERY)) {
       for (String alias : qb.getSubqAliases()) {
         removeOBInSubQuery(qb.getSubqForAlias(alias));
+      }
+    }
+
+    final String llapIOETLSkipFormat = HiveConf.getVar(conf, ConfVars.LLAP_IO_ETL_SKIP_FORMAT);
+    if (qb.getParseInfo().hasInsertTables() || qb.isCTAS()) {
+      if (llapIOETLSkipFormat.equalsIgnoreCase("encode")) {
+        conf.setBoolean(ConfVars.LLAP_IO_ENCODE_ENABLED.varname, false);
+        LOG.info("Disabling LLAP IO encode as ETL query is detected");
+      } else if (llapIOETLSkipFormat.equalsIgnoreCase("all")) {
+        conf.setBoolean(ConfVars.LLAP_IO_ENABLED.varname, false);
+        LOG.info("Disabling LLAP IO as ETL query is detected");
       }
     }
 
@@ -12220,7 +12721,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         globalLimitCtx, nameToSplitSample, inputs, rootTasks, opToPartToSkewedPruner,
         viewAliasToInput, reduceSinkOperatorsAddedByEnforceBucketingSorting,
         analyzeRewrite, tableDesc, createVwDesc, materializedViewUpdateDesc,
-        queryProperties, viewProjectToTableSchema, acidFileSinks);
+        queryProperties, viewProjectToTableSchema);
 
     // Set the semijoin hints in parse context
     pCtx.setSemiJoinHints(parseSemiJoinHint(getQB().getParseInfo().getHintList()));
@@ -12265,7 +12766,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         if (postExecHooks.contains("org.apache.hadoop.hive.ql.hooks.PostExecutePrinter")
             || postExecHooks.contains("org.apache.hadoop.hive.ql.hooks.LineageLogger")
             || postExecHooks.contains("org.apache.atlas.hive.hook.HiveHook")) {
-          ArrayList<Transform> transformations = new ArrayList<Transform>();
+          List<Transform> transformations = new ArrayList<Transform>();
           transformations.add(new HiveOpConverterPostProc());
           transformations.add(new Generator(postExecHooks));
           for (Transform t : transformations) {
@@ -12332,10 +12833,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       rootTasks.stream()
           .filter(task -> task.getWork() instanceof DDLWork)
           .map(task -> (DDLWork) task.getWork())
-          .filter(ddlWork -> ddlWork.getPreInsertTableDesc() != null)
-          .map(ddlWork -> ddlWork.getPreInsertTableDesc())
-          .map(ddlPreInsertTask -> new InsertCommitHookDesc(ddlPreInsertTask.getTable(),
-              ddlPreInsertTask.isOverwrite()))
+          .filter(ddlWork -> ddlWork.getDDLDesc() instanceof PreInsertTableDesc)
+          .map(ddlWork -> (PreInsertTableDesc)ddlWork.getDDLDesc())
+          .map(desc -> new InsertCommitHookDesc(desc.getTable(), desc.isOverwrite()))
           .forEach(insertCommitHookDesc -> tezTask.addDependentTask(
               TaskFactory.get(new DDLWork(getInputs(), getOutputs(), insertCommitHookDesc), conf)));
     }
@@ -12358,7 +12858,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  private void putAccessedColumnsToReadEntity(HashSet<ReadEntity> inputs, ColumnAccessInfo columnAccessInfo) {
+  private void putAccessedColumnsToReadEntity(Set<ReadEntity> inputs, ColumnAccessInfo columnAccessInfo) {
     Map<String, List<String>> tableToColumnAccessMap = columnAccessInfo.getTableToColumnAccessMap();
     if (tableToColumnAccessMap != null && !tableToColumnAccessMap.isEmpty()) {
       for(ReadEntity entity: inputs) {
@@ -12425,86 +12925,120 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     String expandedText = ctx.getTokenRewriteStream().toString(
         viewSelect.getTokenStartIndex(), viewSelect.getTokenStopIndex());
 
-    if (imposedSchema != null) {
-      // Merge the names from the imposed schema into the types
-      // from the derived schema.
-      StringBuilder sb = new StringBuilder();
-      sb.append("SELECT ");
-      int n = derivedSchema.size();
-      for (int i = 0; i < n; ++i) {
-        if (i > 0) {
-          sb.append(", ");
+    if (createVwDesc.isMaterialized()) {
+      if (createVwDesc.getPartColNames() != null) {
+        // If we are creating a materialized view and it has partition columns,
+        // we may need to reorder column projection in expanded query. The reason
+        // is that Hive assumes that in the partition columns are at the end of
+        // the MV schema, and if we do not do this, we will have a mismatch between
+        // the SQL query for the MV and the MV itself.
+        boolean first = true;
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT ");
+        for (int i = 0; i < derivedSchema.size(); ++i) {
+          FieldSchema fieldSchema = derivedSchema.get(i);
+          if (!createVwDesc.getPartColNames().contains(fieldSchema.getName())) {
+            if (first) {
+              first = false;
+            } else {
+              sb.append(", ");
+            }
+            sb.append(HiveUtils.unparseIdentifier(fieldSchema.getName(), conf));
+          }
         }
-        FieldSchema fieldSchema = derivedSchema.get(i);
-        // Modify a copy, not the original
-        fieldSchema = new FieldSchema(fieldSchema);
-        // TODO: there's a potential problem here if some table uses external schema like Avro,
-        //       with a very large type name. It seems like the view does not derive the SerDe from
-        //       the table, so it won't be able to just get the type from the deserializer like the
-        //       table does; we won't be able to properly store the type in the RDBMS metastore.
-        //       Not sure if these large cols could be in resultSchema. Ignore this for now 0_o
-        derivedSchema.set(i, fieldSchema);
-        sb.append(HiveUtils.unparseIdentifier(fieldSchema.getName(), conf));
-        sb.append(" AS ");
-        String imposedName = imposedSchema.get(i).getName();
-        sb.append(HiveUtils.unparseIdentifier(imposedName, conf));
-        fieldSchema.setName(imposedName);
-        // We don't currently allow imposition of a type
-        fieldSchema.setComment(imposedSchema.get(i).getComment());
+        for (String partColName : createVwDesc.getPartColNames()) {
+          sb.append(", ");
+          sb.append(HiveUtils.unparseIdentifier(partColName, conf));
+        }
+        sb.append(" FROM (");
+        sb.append(expandedText);
+        sb.append(") ");
+        sb.append(HiveUtils.unparseIdentifier(Utilities.getDbTableName(createVwDesc.getViewName())[1], conf));
+        expandedText = sb.toString();
       }
-      sb.append(" FROM (");
-      sb.append(expandedText);
-      sb.append(") ");
-      sb.append(HiveUtils.unparseIdentifier(createVwDesc.getViewName(), conf));
-      expandedText = sb.toString();
-    }
-
-    if (createVwDesc.getPartColNames() != null) {
-      // Make sure all partitioning columns referenced actually
-      // exist and are in the correct order at the end
-      // of the list of columns produced by the view. Also move the field
-      // schema descriptors from derivedSchema to the partitioning key
-      // descriptor.
-      List<String> partColNames = createVwDesc.getPartColNames();
-      if (partColNames.size() > derivedSchema.size()) {
-        throw new SemanticException(
-            ErrorMsg.VIEW_PARTITION_MISMATCH.getMsg());
+    } else {
+      if (imposedSchema != null) {
+        // Merge the names from the imposed schema into the types
+        // from the derived schema.
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT ");
+        int n = derivedSchema.size();
+        for (int i = 0; i < n; ++i) {
+          if (i > 0) {
+            sb.append(", ");
+          }
+          FieldSchema fieldSchema = derivedSchema.get(i);
+          // Modify a copy, not the original
+          fieldSchema = new FieldSchema(fieldSchema);
+          // TODO: there's a potential problem here if some table uses external schema like Avro,
+          //       with a very large type name. It seems like the view does not derive the SerDe from
+          //       the table, so it won't be able to just get the type from the deserializer like the
+          //       table does; we won't be able to properly store the type in the RDBMS metastore.
+          //       Not sure if these large cols could be in resultSchema. Ignore this for now 0_o
+          derivedSchema.set(i, fieldSchema);
+          sb.append(HiveUtils.unparseIdentifier(fieldSchema.getName(), conf));
+          sb.append(" AS ");
+          String imposedName = imposedSchema.get(i).getName();
+          sb.append(HiveUtils.unparseIdentifier(imposedName, conf));
+          fieldSchema.setName(imposedName);
+          // We don't currently allow imposition of a type
+          fieldSchema.setComment(imposedSchema.get(i).getComment());
+        }
+        sb.append(" FROM (");
+        sb.append(expandedText);
+        sb.append(") ");
+        sb.append(HiveUtils.unparseIdentifier(Utilities.getDbTableName(createVwDesc.getViewName())[1], conf));
+        expandedText = sb.toString();
       }
 
-      // Get the partition columns from the end of derivedSchema.
-      List<FieldSchema> partitionColumns = derivedSchema.subList(
-          derivedSchema.size() - partColNames.size(),
-          derivedSchema.size());
-
-      // Verify that the names match the PARTITIONED ON clause.
-      Iterator<String> colNameIter = partColNames.iterator();
-      Iterator<FieldSchema> schemaIter = partitionColumns.iterator();
-      while (colNameIter.hasNext()) {
-        String colName = colNameIter.next();
-        FieldSchema fieldSchema = schemaIter.next();
-        if (!fieldSchema.getName().equals(colName)) {
+      if (createVwDesc.getPartColNames() != null) {
+        // Make sure all partitioning columns referenced actually
+        // exist and are in the correct order at the end
+        // of the list of columns produced by the view. Also move the field
+        // schema descriptors from derivedSchema to the partitioning key
+        // descriptor.
+        List<String> partColNames = createVwDesc.getPartColNames();
+        if (partColNames.size() > derivedSchema.size()) {
           throw new SemanticException(
               ErrorMsg.VIEW_PARTITION_MISMATCH.getMsg());
         }
+
+        // Get the partition columns from the end of derivedSchema.
+        List<FieldSchema> partitionColumns = derivedSchema.subList(
+            derivedSchema.size() - partColNames.size(),
+            derivedSchema.size());
+
+        // Verify that the names match the PARTITIONED ON clause.
+        Iterator<String> colNameIter = partColNames.iterator();
+        Iterator<FieldSchema> schemaIter = partitionColumns.iterator();
+        while (colNameIter.hasNext()) {
+          String colName = colNameIter.next();
+          FieldSchema fieldSchema = schemaIter.next();
+          if (!fieldSchema.getName().equals(colName)) {
+            throw new SemanticException(
+                ErrorMsg.VIEW_PARTITION_MISMATCH.getMsg());
+          }
+        }
+
+        // Boundary case: require at least one non-partitioned column
+        // for consistency with tables.
+        if (partColNames.size() == derivedSchema.size()) {
+          throw new SemanticException(
+              ErrorMsg.VIEW_PARTITION_TOTAL.getMsg());
+        }
+
+        // Now make a copy.
+        createVwDesc.setPartCols(
+            new ArrayList<FieldSchema>(partitionColumns));
+
+        // Finally, remove the partition columns from the end of derivedSchema.
+        // (Clearing the subList writes through to the underlying
+        // derivedSchema ArrayList.)
+        partitionColumns.clear();
       }
-
-      // Boundary case: require at least one non-partitioned column
-      // for consistency with tables.
-      if (partColNames.size() == derivedSchema.size()) {
-        throw new SemanticException(
-            ErrorMsg.VIEW_PARTITION_TOTAL.getMsg());
-      }
-
-      // Now make a copy.
-      createVwDesc.setPartCols(
-          new ArrayList<FieldSchema>(partitionColumns));
-
-      // Finally, remove the partition columns from the end of derivedSchema.
-      // (Clearing the subList writes through to the underlying
-      // derivedSchema ArrayList.)
-      partitionColumns.clear();
     }
 
+    // Set schema and expanded text for the view
     createVwDesc.setSchema(derivedSchema);
     createVwDesc.setViewExpandedText(expandedText);
   }
@@ -12521,7 +13055,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return tablesUsed;
   }
 
-  static List<FieldSchema> convertRowSchemaToViewSchema(RowResolver rr) throws SemanticException {
+  private static List<FieldSchema> convertRowSchemaToViewSchema(RowResolver rr) throws SemanticException {
     List<FieldSchema> fieldSchema = convertRowSchemaToResultSetSchema(rr, false);
     ParseUtils.validateColumnNameUniqueness(fieldSchema);
     return fieldSchema;
@@ -12539,7 +13073,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
 
       qualifiedColName = rr.reverseLookup(colInfo.getInternalName());
-      if (useTabAliasIfAvailable && qualifiedColName[0] != null && !qualifiedColName[0].isEmpty()) {
+      // __u<n> is a UNION ALL placeholder name
+      if (useTabAliasIfAvailable && qualifiedColName[0] != null && (!qualifiedColName[0].isEmpty()) && (!qualifiedColName[0].startsWith("__u"))) {
         colName = qualifiedColName[0] + "." + qualifiedColName[1];
       } else {
         colName = qualifiedColName[1];
@@ -12559,7 +13094,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return genExprNodeDesc(expr, input, true, false);
   }
 
-  public ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input,
+  ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input,
                                       RowResolver outerRR, Map<ASTNode, RelNode> subqueryToRelNode,
                                       boolean useCaching) throws SemanticException {
 
@@ -12570,12 +13105,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
 
-  public ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input, boolean useCaching)
+  ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input, boolean useCaching)
       throws SemanticException {
     return genExprNodeDesc(expr, input, useCaching, false);
   }
 
-  public ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input, boolean useCaching,
+  private ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input, boolean useCaching,
                                       boolean foldExpr) throws SemanticException {
     TypeCheckCtx tcCtx = new TypeCheckCtx(input, useCaching, foldExpr);
     return genExprNodeDesc(expr, input, tcCtx);
@@ -12585,7 +13120,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Generates an expression node descriptors for the expression and children of it
    * with default TypeCheckCtx.
    */
-  public Map<ASTNode, ExprNodeDesc> genAllExprNodeDesc(ASTNode expr, RowResolver input)
+  Map<ASTNode, ExprNodeDesc> genAllExprNodeDesc(ASTNode expr, RowResolver input)
       throws SemanticException {
     TypeCheckCtx tcCtx = new TypeCheckCtx(input);
     return genAllExprNodeDesc(expr, input, tcCtx);
@@ -12595,7 +13130,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * Returns expression node descriptor for the expression.
    * If it's evaluated already in previous operator, it can be retrieved from cache.
    */
-  public ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input,
+  ExprNodeDesc genExprNodeDesc(ASTNode expr, RowResolver input,
                                       TypeCheckCtx tcCtx) throws SemanticException {
     // We recursively create the exprNodeDesc. Base cases: when we encounter
     // a column ref, we convert that into an exprNodeColumnDesc; when we
@@ -12649,7 +13184,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @throws SemanticException Failed to evaluate expression
    */
   @SuppressWarnings("nls")
-  public Map<ASTNode, ExprNodeDesc> genAllExprNodeDesc(ASTNode expr, RowResolver input,
+  Map<ASTNode, ExprNodeDesc> genAllExprNodeDesc(ASTNode expr, RowResolver input,
                                                        TypeCheckCtx tcCtx) throws SemanticException {
     // Create the walker and  the rules dispatcher.
     tcCtx.setUnparseTranslator(unparseTranslator);
@@ -12739,7 +13274,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @Override
   public void validate() throws SemanticException {
-    LOG.debug("validation start");
     boolean wasAcidChecked = false;
     // Validate inputs and outputs have right protectmode to execute the query
     for (ReadEntity readEntity : getInputs()) {
@@ -12839,6 +13373,25 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       validate(childTask, reworkMapredWork);
     }
   }
+
+  /**
+   * Update the default table properties with values fetch from the original table properties. The property names are
+   * defined in {@link SemanticAnalyzer#UPDATED_TBL_PROPS}.
+   * @param source properties of source table, must be not null.
+   * @param target properties of target table.
+   * @param skipped a list of properties which should be not overwritten. It can be null or empty.
+   */
+  private void updateDefaultTblProps(Map<String, String> source, Map<String, String> target, List<String> skipped) {
+    if (source == null || target == null) {
+      return;
+    }
+    for (String property : UPDATED_TBL_PROPS) {
+      if ((skipped == null || !skipped.contains(property)) && source.containsKey(property)) {
+        target.put(property, source.get(property));
+      }
+    }
+  }
+
   /**
    * Add default properties for table property. If a default parameter exists
    * in the tblProp, the value in tblProp will be kept.
@@ -12847,15 +13400,21 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    *          property map
    * @return Modified table property map
    */
-  private Map<String, String> addDefaultProperties(
+  private Map<String, String> validateAndAddDefaultProperties(
       Map<String, String> tblProp, boolean isExt, StorageFormat storageFormat,
       String qualifiedTableName, List<Order> sortCols, boolean isMaterialization,
-      boolean isTemporaryTable) {
+      boolean isTemporaryTable, boolean isTransactional) throws SemanticException {
     Map<String, String> retValue;
     if (tblProp == null) {
       retValue = new HashMap<String, String>();
     } else {
       retValue = tblProp;
+    }
+    if (!retValue.containsKey(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL)
+      && retValue.containsKey(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES)) {
+      throw new SemanticException("Cannot specify "
+        + hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES
+        + " without " + hive_metastoreConstants.TABLE_IS_TRANSACTIONAL);
     }
     String paraString = HiveConf.getVar(conf, ConfVars.NEWTABLEDEFAULTPARA);
     if (paraString != null && !paraString.isEmpty()) {
@@ -12869,47 +13428,59 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         }
       }
     }
-    boolean makeInsertOnly = !isTemporaryTable && HiveConf.getBoolVar(conf, ConfVars.HIVE_CREATE_TABLES_AS_INSERT_ONLY);
-    boolean makeAcid = !isTemporaryTable &&
-        MetastoreConf.getBoolVar(conf, MetastoreConf.ConfVars.CREATE_TABLES_AS_ACID) &&
-        HiveConf.getBoolVar(conf, ConfVars.HIVE_SUPPORT_CONCURRENCY) &&
-        DbTxnManager.class.getCanonicalName().equals(HiveConf.getVar(conf, ConfVars.HIVE_TXN_MANAGER));
-    if ((makeInsertOnly || makeAcid)
+
+    if (isExt && HiveConf.getBoolVar(conf, ConfVars.HIVE_EXTERNALTABLE_PURGE_DEFAULT)) {
+      if (retValue.get(MetaStoreUtils.EXTERNAL_TABLE_PURGE) == null) {
+        retValue.put(MetaStoreUtils.EXTERNAL_TABLE_PURGE, "true");
+      }
+    }
+
+    boolean makeInsertOnly = !isTemporaryTable && HiveConf.getBoolVar(
+        conf, ConfVars.HIVE_CREATE_TABLES_AS_INSERT_ONLY);
+    boolean makeAcid = !isTemporaryTable && makeAcid();
+    if ((makeInsertOnly || makeAcid || isTransactional)
         && !isExt  && !isMaterialization && StringUtils.isBlank(storageFormat.getStorageHandler())
         //don't overwrite user choice if transactional attribute is explicitly set
         && !retValue.containsKey(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL)) {
-      if (makeInsertOnly) {
+      if (makeInsertOnly || isTransactional) {
         retValue.put(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
         retValue.put(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES,
             TransactionalValidationListener.INSERTONLY_TRANSACTIONAL_PROPERTY);
       }
-      if (makeAcid) {
-        /*for CTAS, TransactionalValidationListener.makeAcid() runs to late to make table Acid
-         so the initial write ends up running as non-acid...*/
-        try {
-          Class inputFormatClass = storageFormat.getInputFormat() == null ? null :
-              Class.forName(storageFormat.getInputFormat());
-          Class outputFormatClass = storageFormat.getOutputFormat() == null ? null :
-              Class.forName(storageFormat.getOutputFormat());
-          if (inputFormatClass == null || outputFormatClass == null ||
-              !AcidInputFormat.class.isAssignableFrom(inputFormatClass) ||
-              !AcidOutputFormat.class.isAssignableFrom(outputFormatClass)) {
-            return retValue;
-          }
-        } catch (ClassNotFoundException e) {
-          LOG.warn("Could not verify InputFormat=" + storageFormat.getInputFormat() + " or OutputFormat=" +
-              storageFormat.getOutputFormat() + "  for " + qualifiedTableName);
-          return retValue;
-        }
-        if(sortCols != null && !sortCols.isEmpty()) {
-          return retValue;
-        }
-        retValue.put(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
-        retValue.put(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES,
-            TransactionalValidationListener.DEFAULT_TRANSACTIONAL_PROPERTY);
-        LOG.info("Automatically chose to make " + qualifiedTableName + " acid.");
+      if (makeAcid || isTransactional) {
+        retValue = convertToAcidByDefault(storageFormat, qualifiedTableName, sortCols, retValue);
       }
     }
+    return retValue;
+  }
+
+  private Map<String, String> convertToAcidByDefault(
+      StorageFormat storageFormat, String qualifiedTableName, List<Order> sortCols,
+      Map<String, String> retValue) {
+    /*for CTAS, TransactionalValidationListener.makeAcid() runs to late to make table Acid
+     so the initial write ends up running as non-acid...*/
+    try {
+      Class inputFormatClass = storageFormat.getInputFormat() == null ? null :
+          Class.forName(storageFormat.getInputFormat());
+      Class outputFormatClass = storageFormat.getOutputFormat() == null ? null :
+          Class.forName(storageFormat.getOutputFormat());
+      if (inputFormatClass == null || outputFormatClass == null ||
+          !AcidInputFormat.class.isAssignableFrom(inputFormatClass) ||
+          !AcidOutputFormat.class.isAssignableFrom(outputFormatClass)) {
+        return retValue;
+      }
+    } catch (ClassNotFoundException e) {
+      LOG.warn("Could not verify InputFormat=" + storageFormat.getInputFormat() + " or OutputFormat=" +
+          storageFormat.getOutputFormat() + "  for " + qualifiedTableName);
+      return retValue;
+    }
+    if(sortCols != null && !sortCols.isEmpty()) {
+      return retValue;
+    }
+    retValue.put(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
+    retValue.put(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES,
+        TransactionalValidationListener.DEFAULT_TRANSACTIONAL_PROPERTY);
+    LOG.info("Automatically chose to make " + qualifiedTableName + " acid.");
     return retValue;
   }
 
@@ -12922,7 +13493,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * @param checkConstraints CHECK constraints
    * @return true or false
    */
-  boolean hasConstraints(final List<FieldSchema> partCols, final List<SQLDefaultConstraint> defConstraints,
+  private boolean hasConstraints(final List<FieldSchema> partCols, final List<SQLDefaultConstraint> defConstraints,
                          final List<SQLNotNullConstraint> notNullConstraints,
                          final List<SQLCheckConstraint> checkConstraints) {
     for(FieldSchema partFS: partCols) {
@@ -12954,12 +13525,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    */
   ASTNode analyzeCreateTable(
       ASTNode ast, QB qb, PlannerContext plannerCtx) throws SemanticException {
-    String[] qualifiedTabName = getQualifiedTableName((ASTNode) ast.getChild(0));
-    String dbDotTab = getDotName(qualifiedTabName);
+    TableName qualifiedTabName = getQualifiedTableName((ASTNode) ast.getChild(0));
+    final String dbDotTab = qualifiedTabName.getNotEmptyDbTable();
 
     String likeTableName = null;
     List<FieldSchema> cols = new ArrayList<FieldSchema>();
     List<FieldSchema> partCols = new ArrayList<FieldSchema>();
+    List<String> partColNames = new ArrayList<>();
     List<String> bucketCols = new ArrayList<String>();
     List<SQLPrimaryKey> primaryKeys = new ArrayList<SQLPrimaryKey>();
     List<SQLForeignKey> foreignKeys = new ArrayList<SQLForeignKey>();
@@ -12976,10 +13548,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     boolean isExt = false;
     boolean isTemporary = false;
     boolean isMaterialization = false;
+    boolean isTransactional = false;
     ASTNode selectStmt = null;
     final int CREATE_TABLE = 0; // regular CREATE TABLE
     final int CTLT = 1; // CREATE TABLE LIKE ... (CTLT)
     final int CTAS = 2; // CREATE TABLE AS SELECT ... (CTAS)
+    final int ctt = 3; // CREATE TRANSACTIONAL TABLE
     int command_type = CREATE_TABLE;
     List<String> skewedColNames = new ArrayList<String>();
     List<List<String>> skewedValues = new ArrayList<List<String>>();
@@ -13016,6 +13590,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         isTemporary = true;
         isMaterialization = MATERIALIZATION_MARKER.equals(child.getText());
         break;
+      case HiveParser.KW_TRANSACTIONAL:
+        isTransactional = true;
+        command_type = ctt;
+        break;
       case HiveParser.TOK_LIKETABLE:
         if (child.getChildCount() > 0) {
           likeTableName = getUnescapedName((ASTNode) child.getChild(0));
@@ -13049,7 +13627,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             throw new SemanticException(ErrorMsg.CTAS_PARCOL_COEXISTENCE.getMsg());
           }
         }
-        if (isExt) {
+        if (!conf.getBoolVar(ConfVars.HIVE_CTAS_EXTERNAL_TABLES) && isExt) {
           throw new SemanticException(ErrorMsg.CTAS_EXTTBL_COEXISTENCE.getMsg());
         }
         command_type = CTAS;
@@ -13075,6 +13653,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                                                       "partition columns. "));
         }
         break;
+      case HiveParser.TOK_TABLEPARTCOLNAMES:
+        partColNames = getColumnNames(child);
+        break;
       case HiveParser.TOK_ALTERTABLE_BUCKETS:
         bucketCols = getColumnNames((ASTNode) child.getChild(0));
         if (child.getChildCount() == 2) {
@@ -13093,7 +13674,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         inputs.add(toReadEntity(location));
         break;
       case HiveParser.TOK_TABLEPROPERTIES:
-        tblProps = DDLSemanticAnalyzer.getProps((ASTNode) child.getChild(0));
+        tblProps = getProps((ASTNode) child.getChild(0));
+        addPropertyReadEntry(tblProps, inputs);
         break;
       case HiveParser.TOK_TABLESERIALIZER:
         child = (ASTNode) child.getChild(0);
@@ -13111,9 +13693,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         HiveConf hiveConf = SessionState.get().getConf();
 
         // skewed column names
-        skewedColNames = analyzeSkewedTablDDLColNames(skewedColNames, child);
+        skewedColNames = SkewedTableUtils.analyzeSkewedTableDDLColNames(child);
         // skewed value
-        analyzeDDLSkewedValues(skewedValues, child);
+        skewedValues = SkewedTableUtils.analyzeDDLSkewedValues(child);
         // stored as directories
         storedAsDirs = analyzeStoredAdDirs(child);
 
@@ -13123,7 +13705,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     }
 
-    if (command_type == CREATE_TABLE || command_type == CTLT) {
+    if (command_type == CREATE_TABLE || command_type == CTLT || command_type == ctt) {
       queryState.setCommandType(HiveOperation.CREATETABLE);
     } else if (command_type == CTAS) {
       queryState.setCommandType(HiveOperation.CREATETABLE_AS_SELECT);
@@ -13131,15 +13713,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException("Unrecognized command.");
     }
 
-    if(isExt && hasEnabledOrValidatedConstraints(notNullConstraints, defaultConstraints, checkConstraints)){
+    if (isExt && ConstraintsUtils.hasEnabledOrValidatedConstraints(notNullConstraints, defaultConstraints,
+        checkConstraints)) {
       throw new SemanticException(
           ErrorMsg.INVALID_CSTR_SYNTAX.getMsg("Constraints are disallowed with External tables. "
               + "Only RELY is allowed."));
     }
-    if(checkConstraints != null && !checkConstraints.isEmpty()) {
-      validateCheckConstraint(cols, checkConstraints, ctx.getConf());
+    if (checkConstraints != null && !checkConstraints.isEmpty()) {
+      ConstraintsUtils.validateCheckConstraint(cols, checkConstraints, ctx.getConf());
     }
-
 
     storageFormat.fillDefaultStorageFormat(isExt, false);
 
@@ -13157,10 +13739,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     if (isTemporary) {
-      if (partCols.size() > 0) {
-        throw new SemanticException("Partition columns are not supported on temporary tables");
-      }
-
       if (location == null) {
         // for temporary tables we set the location to something in the session's scratch dir
         // it has the same life cycle as the tmp table
@@ -13180,11 +13758,17 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     switch (command_type) {
 
     case CREATE_TABLE: // REGULAR CREATE TABLE DDL
-      tblProps = addDefaultProperties(
-          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary);
-      addDbAndTabToOutputs(qualifiedTabName, TableType.MANAGED_TABLE, tblProps);
+      if (!CollectionUtils.isEmpty(partColNames)) {
+        throw new SemanticException(
+            "Partition columns can only declared using their name and types in regular CREATE TABLE statements");
+      }
+      tblProps = validateAndAddDefaultProperties(
+          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary, isTransactional);
+      addDbAndTabToOutputs(new String[] {qualifiedTabName.getDb(), qualifiedTabName.getTable()},
+          TableType.MANAGED_TABLE, isTemporary, tblProps);
 
-      CreateTableDesc crtTblDesc = new CreateTableDesc(dbDotTab, isExt, isTemporary, cols, partCols,
+      CreateTableDesc crtTblDesc = new CreateTableDesc(qualifiedTabName,
+          isExt, isTemporary, cols, partCols,
           bucketCols, sortCols, numBuckets, rowFormatParams.fieldDelim,
           rowFormatParams.fieldEscape,
           rowFormatParams.collItemDelim, rowFormatParams.mapKeyDelim, rowFormatParams.lineDelim,
@@ -13199,45 +13783,71 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       crtTblDesc.validate(conf);
       // outputs is empty, which means this create table happens in the current
       // database.
-      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
-            crtTblDesc)));
+      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), crtTblDesc)));
+      break;
+    case ctt: // CREATE TRANSACTIONAL TABLE
+      if (isExt) {
+        throw new SemanticException(
+            qualifiedTabName.getTable() + " cannot be declared transactional because it's an external table");
+      }
+      tblProps = validateAndAddDefaultProperties(tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization,
+          isTemporary, isTransactional);
+      addDbAndTabToOutputs(new String[] {qualifiedTabName.getDb(), qualifiedTabName.getTable()},
+          TableType.MANAGED_TABLE, false, tblProps);
+
+      CreateTableDesc crtTranTblDesc =
+          new CreateTableDesc(qualifiedTabName, isExt, isTemporary, cols, partCols, bucketCols, sortCols, numBuckets,
+              rowFormatParams.fieldDelim, rowFormatParams.fieldEscape, rowFormatParams.collItemDelim,
+              rowFormatParams.mapKeyDelim, rowFormatParams.lineDelim, comment, storageFormat.getInputFormat(),
+              storageFormat.getOutputFormat(), location, storageFormat.getSerde(), storageFormat.getStorageHandler(),
+              storageFormat.getSerdeProps(), tblProps, ifNotExists, skewedColNames, skewedValues, primaryKeys,
+              foreignKeys, uniqueConstraints, notNullConstraints, defaultConstraints, checkConstraints);
+      crtTranTblDesc.setStoredAsSubDirectories(storedAsDirs);
+      crtTranTblDesc.setNullFormat(rowFormatParams.nullFormat);
+
+      crtTranTblDesc.validate(conf);
+      // outputs is empty, which means this create table happens in the current
+      // database.
+      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), crtTranTblDesc)));
       break;
 
     case CTLT: // create table like <tbl_name>
-      tblProps = addDefaultProperties(
-          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary);
-      addDbAndTabToOutputs(qualifiedTabName, TableType.MANAGED_TABLE, tblProps);
 
-      if (isTemporary) {
-        Table likeTable = getTable(likeTableName, false);
-        if (likeTable != null && likeTable.getPartCols().size() > 0) {
-          throw new SemanticException("Partition columns are not supported on temporary tables "
-              + "and source table in CREATE TABLE LIKE is partitioned.");
+      tblProps = validateAndAddDefaultProperties(
+          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary, isTransactional);
+      addDbAndTabToOutputs(new String[] {qualifiedTabName.getDb(), qualifiedTabName.getTable()},
+          TableType.MANAGED_TABLE, isTemporary, tblProps);
+
+      Table likeTable = getTable(likeTableName, false);
+      if (likeTable != null) {
+        if (isTemporary) {
+          updateDefaultTblProps(likeTable.getParameters(), tblProps,
+              new ArrayList<>(Arrays.asList(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL,
+                  hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES)));
+        } else {
+          updateDefaultTblProps(likeTable.getParameters(), tblProps, null);
         }
       }
       CreateTableLikeDesc crtTblLikeDesc = new CreateTableLikeDesc(dbDotTab, isExt, isTemporary,
           storageFormat.getInputFormat(), storageFormat.getOutputFormat(), location,
           storageFormat.getSerde(), storageFormat.getSerdeProps(), tblProps, ifNotExists,
           likeTableName, isUserStorageFormat);
-      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
-            crtTblLikeDesc)));
+      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), crtTblLikeDesc)));
       break;
 
     case CTAS: // create table as select
 
       if (isTemporary) {
         if (!ctx.isExplainSkipExecution() && !isMaterialization) {
-          String dbName = qualifiedTabName[0];
-          String tblName = qualifiedTabName[1];
           SessionState ss = SessionState.get();
           if (ss == null) {
             throw new SemanticException("No current SessionState, cannot create temporary table "
-                + dbName + "." + tblName);
+                + qualifiedTabName.getNotEmptyDbTable());
           }
           Map<String, Table> tables = SessionHiveMetaStoreClient.
-              getTempTablesForDatabase(dbName, tblName);
-          if (tables != null && tables.containsKey(tblName)) {
-            throw new SemanticException("Temporary table " + dbName + "." + tblName
+              getTempTablesForDatabase(qualifiedTabName.getDb(), qualifiedTabName.getTable());
+          if (tables != null && tables.containsKey(qualifiedTabName.getTable())) {
+            throw new SemanticException("Temporary table " + qualifiedTabName.getNotEmptyDbTable()
                 + " already exists");
           }
         }
@@ -13283,12 +13893,17 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
         }
       }
+      if (!CollectionUtils.isEmpty(partCols)) {
+        throw new SemanticException(
+            "Partition columns can only declared using their names in CTAS statements");
+      }
 
-      tblProps = addDefaultProperties(
-          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary);
-      addDbAndTabToOutputs(qualifiedTabName, TableType.MANAGED_TABLE, tblProps);
-      tableDesc = new CreateTableDesc(qualifiedTabName[0], dbDotTab, isExt, isTemporary, cols,
-          partCols, bucketCols, sortCols, numBuckets, rowFormatParams.fieldDelim,
+      tblProps = validateAndAddDefaultProperties(
+          tblProps, isExt, storageFormat, dbDotTab, sortCols, isMaterialization, isTemporary, isTransactional);
+      addDbAndTabToOutputs(new String[] {qualifiedTabName.getDb(), qualifiedTabName.getTable()},
+          TableType.MANAGED_TABLE, isTemporary, tblProps);
+      tableDesc = new CreateTableDesc(qualifiedTabName, isExt, isTemporary, cols,
+          partColNames, bucketCols, sortCols, numBuckets, rowFormatParams.fieldDelim,
           rowFormatParams.fieldEscape, rowFormatParams.collItemDelim, rowFormatParams.mapKeyDelim,
           rowFormatParams.lineDelim, comment, storageFormat.getInputFormat(),
           storageFormat.getOutputFormat(), location, storageFormat.getSerde(),
@@ -13310,19 +13925,20 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   /** Adds entities for create table/create view. */
   private void addDbAndTabToOutputs(String[] qualifiedTabName, TableType type,
-      Map<String, String> tblProps) throws SemanticException {
+      boolean isTemporary, Map<String, String> tblProps) throws SemanticException {
     Database database  = getDatabase(qualifiedTabName[0]);
     outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_SHARED));
 
     Table t = new Table(qualifiedTabName[0], qualifiedTabName[1]);
     t.setParameters(tblProps);
     t.setTableType(type);
+    t.setTemporary(isTemporary);
     outputs.add(new WriteEntity(t, WriteEntity.WriteType.DDL_NO_LOCK));
   }
 
   protected ASTNode analyzeCreateView(ASTNode ast, QB qb, PlannerContext plannerCtx) throws SemanticException {
-    String[] qualTabName = getQualifiedTableName((ASTNode) ast.getChild(0));
-    String dbDotTable = getDotName(qualTabName);
+    TableName qualTabName = getQualifiedTableName((ASTNode) ast.getChild(0));
+    final String dbDotTable = qualTabName.getNotEmptyDbTable();
     List<FieldSchema> cols = null;
     boolean ifNotExists = false;
     boolean rewriteEnabled = true;
@@ -13332,6 +13948,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     ASTNode selectStmt = null;
     Map<String, String> tblProps = null;
     List<String> partColNames = null;
+    List<String> sortColNames = null;
+    List<String> distributeColNames = null;
     boolean isMaterialized = ast.getToken().getType() == HiveParser.TOK_CREATE_MATERIALIZED_VIEW;
     boolean isRebuild = false;
     String location = null;
@@ -13370,10 +13988,23 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         comment = unescapeSQLString(child.getChild(0).getText());
         break;
       case HiveParser.TOK_TABLEPROPERTIES:
-        tblProps = DDLSemanticAnalyzer.getProps((ASTNode) child.getChild(0));
+        tblProps = getProps((ASTNode) child.getChild(0));
         break;
       case HiveParser.TOK_VIEWPARTCOLS:
         partColNames = getColumnNames((ASTNode) child.getChild(0));
+        break;
+      case HiveParser.TOK_VIEWCLUSTERCOLS:
+        assert distributeColNames == null && sortColNames == null;
+        distributeColNames = getColumnNames((ASTNode) child.getChild(0));
+        sortColNames = new ArrayList<>(distributeColNames);
+        break;
+      case HiveParser.TOK_VIEWDISTRIBUTECOLS:
+        assert distributeColNames == null;
+        distributeColNames = getColumnNames((ASTNode) child.getChild(0));
+        break;
+      case HiveParser.TOK_VIEWSORTCOLS:
+        assert sortColNames == null;
+        sortColNames = getColumnNames((ASTNode) child.getChild(0));
         break;
       case HiveParser.TOK_TABLEROWFORMAT:
         rowFormatParams.analyzeRowFormat(child);
@@ -13398,8 +14029,43 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     storageFormat.fillDefaultStorageFormat(false, isMaterialized);
 
-    if (ifNotExists && orReplace){
+    if (ifNotExists && orReplace) {
       throw new SemanticException("Can't combine IF NOT EXISTS and OR REPLACE.");
+    }
+
+    if (isMaterialized) {
+      if (!ifNotExists) {
+        // Verify that the table does not already exist
+        // dumpTable is only used to check the conflict for non-temporary tables
+        try {
+          Table dumpTable = db.newTable(dbDotTable);
+          if (null != db.getTable(dumpTable.getDbName(), dumpTable.getTableName(), false) && !ctx.isExplainSkipExecution()) {
+            throw new SemanticException(ErrorMsg.TABLE_ALREADY_EXISTS.getMsg(dbDotTable));
+          }
+        } catch (HiveException e) {
+          throw new SemanticException(e);
+        }
+      }
+      if (partColNames != null && (distributeColNames != null || sortColNames != null)) {
+        // Verify that partition columns and data organization columns are not overlapping
+        Set<String> partColNamesSet = new HashSet<>(partColNames);
+        if (distributeColNames != null) {
+          for (String colName : distributeColNames) {
+            if (partColNamesSet.contains(colName)) {
+              throw new SemanticException("Same column cannot be present in partition and cluster/distribute clause. "
+                  + "Column name: " + colName);
+            }
+          }
+        }
+        if (sortColNames != null) {
+          for (String colName : sortColNames) {
+            if (partColNamesSet.contains(colName)) {
+              throw new SemanticException("Same column cannot be present in partition and cluster/sort clause. "
+                  + "Column name: " + colName);
+            }
+          }
+        }
+      }
     }
 
     if (ast.getToken().getType() == HiveParser.TOK_ALTERVIEW &&
@@ -13411,22 +14077,30 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     unparseTranslator.enable();
 
     if (isMaterialized) {
+      if (makeAcid()) {
+        if (tblProps == null) {
+          tblProps = new HashMap<>();
+        }
+        tblProps = convertToAcidByDefault(storageFormat, dbDotTable, null, tblProps);
+      }
+
       createVwDesc = new CreateViewDesc(
-          dbDotTable, cols, comment, tblProps, partColNames,
+          dbDotTable, cols, comment, tblProps, partColNames, sortColNames, distributeColNames,
           ifNotExists, isRebuild, rewriteEnabled, isAlterViewAs,
           storageFormat.getInputFormat(), storageFormat.getOutputFormat(),
           location, storageFormat.getSerde(), storageFormat.getStorageHandler(),
           storageFormat.getSerdeProps());
-      addDbAndTabToOutputs(qualTabName, TableType.MATERIALIZED_VIEW, tblProps);
+      addDbAndTabToOutputs(new String[] {qualTabName.getDb(), qualTabName.getTable()}, TableType.MATERIALIZED_VIEW,
+          false, tblProps);
       queryState.setCommandType(HiveOperation.CREATE_MATERIALIZED_VIEW);
     } else {
       createVwDesc = new CreateViewDesc(
           dbDotTable, cols, comment, tblProps, partColNames,
           ifNotExists, orReplace, isAlterViewAs, storageFormat.getInputFormat(),
           storageFormat.getOutputFormat(), storageFormat.getSerde());
-      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
-          createVwDesc)));
-      addDbAndTabToOutputs(qualTabName, TableType.VIRTUAL_VIEW, tblProps);
+      rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), createVwDesc)));
+      addDbAndTabToOutputs(new String[] {qualTabName.getDb(), qualTabName.getTable()},
+          TableType.VIRTUAL_VIEW, false, tblProps);
       queryState.setCommandType(HiveOperation.CREATEVIEW);
     }
     qb.setViewDesc(createVwDesc);
@@ -13434,8 +14108,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return selectStmt;
   }
 
-  CreateViewDesc getCreateViewDesc() {
-    return this.createVwDesc;
+  private boolean makeAcid() {
+    return MetastoreConf.getBoolVar(conf, MetastoreConf.ConfVars.CREATE_TABLES_AS_ACID) &&
+            HiveConf.getBoolVar(conf, ConfVars.HIVE_SUPPORT_CONCURRENCY) &&
+            DbTxnManager.class.getCanonicalName().equals(HiveConf.getVar(conf, ConfVars.HIVE_TXN_MANAGER));
   }
 
   // validate the (materialized) view statement
@@ -13452,7 +14128,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           if (DUMMY_TABLE.equals(alias)) {
             continue;
           }
-          Table table = this.getTableObjectByName(qb.getTabNameForAlias(alias));
+          Table table = getTableObjectByName(qb.getTabNameForAlias(alias));
           if (table.isTemporary()) {
             throw new SemanticException("View definition references temporary table " + alias);
           }
@@ -13528,7 +14204,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   // Process the position alias in GROUPBY and ORDERBY
-  public void processPositionAlias(ASTNode ast) throws SemanticException {
+  void processPositionAlias(ASTNode ast) throws SemanticException {
     boolean isBothByPos = HiveConf.getBoolVar(conf, ConfVars.HIVE_GROUPBY_ORDERBY_POSITION_ALIAS);
     boolean isGbyByPos = isBothByPos
         || HiveConf.getBoolVar(conf, ConfVars.HIVE_GROUPBY_POSITION_ALIAS);
@@ -13668,7 +14344,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     String tableName = getUnescapedName((ASTNode) tree.getChild(0).getChild(0));
     Table tbl;
     try {
-      tbl = this.getTableObjectByName(tableName);
+      tbl = getTableObjectByName(tableName);
     } catch (InvalidTableException e) {
       throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tableName), e);
     }
@@ -14112,10 +14788,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private static class AggregationExprCheck implements ContextVisitor {
-    HashMap<String, ASTNode> destAggrExprs;
+    Map<String, ASTNode> destAggrExprs;
     boolean isAggr = false;
 
-    public AggregationExprCheck(HashMap<String, ASTNode> destAggrExprs) {
+    public AggregationExprCheck(Map<String, ASTNode> destAggrExprs) {
       super();
       this.destAggrExprs = destAggrExprs;
     }
@@ -14190,8 +14866,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return ptfDesc;
   }
 
-  Operator genPTFPlan(PTFInvocationSpec ptfQSpec, Operator input) throws SemanticException {
-    ArrayList<PTFInvocationSpec> componentQueries = PTFTranslator.componentize(ptfQSpec);
+  private Operator genPTFPlan(PTFInvocationSpec ptfQSpec, Operator input) throws SemanticException {
+    List<PTFInvocationSpec> componentQueries = PTFTranslator.componentize(ptfQSpec);
     for (PTFInvocationSpec ptfSpec : componentQueries) {
       input = genPTFPlanForComponentQuery(ptfSpec, input);
     }
@@ -14209,10 +14885,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    *
    * @throws SemanticException
    */
-  void buildPTFReduceSinkDetails(PartitionedTableFunctionDef tabDef,
+  private void buildPTFReduceSinkDetails(PartitionedTableFunctionDef tabDef,
                                  RowResolver inputRR,
-                                 ArrayList<ExprNodeDesc> partCols,
-                                 ArrayList<ExprNodeDesc> orderCols,
+                                 List<ExprNodeDesc> partCols,
+                                 List<ExprNodeDesc> orderCols,
                                  StringBuilder orderString,
                                  StringBuilder nullOrderString) throws SemanticException {
 
@@ -14288,8 +14964,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
        * b. Build Reduce Sink Details (keyCols, valueCols, outColNames etc.) for this ptfDesc.
        */
 
-      ArrayList<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
-      ArrayList<ExprNodeDesc> orderCols = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
+      List<ExprNodeDesc> orderCols = new ArrayList<ExprNodeDesc>();
       StringBuilder orderString = new StringBuilder();
       StringBuilder nullOrderString = new StringBuilder();
 
@@ -14332,7 +15008,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
 //--------------------------- Windowing handling: PTFInvocationSpec to PTFDesc --------------------
 
-  Operator genWindowingPlan(QB qb, WindowingSpec wSpec, Operator input) throws SemanticException {
+  private Operator genWindowingPlan(QB qb, WindowingSpec wSpec, Operator input) throws SemanticException {
     wSpec.validateAndMakeEffective();
 
     if (!isCBOExecuted() && !qb.getParseInfo().getDestToGroupBy().isEmpty()) {
@@ -14371,8 +15047,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private Operator genReduceSinkPlanForWindowing(WindowingSpec spec,
                                                  RowResolver inputRR, Operator input) throws SemanticException{
 
-    ArrayList<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
-    ArrayList<ExprNodeDesc> orderCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> partCols = new ArrayList<ExprNodeDesc>();
+    List<ExprNodeDesc> orderCols = new ArrayList<ExprNodeDesc>();
     StringBuilder order = new StringBuilder();
     StringBuilder nullOrder = new StringBuilder();
 
@@ -14407,7 +15083,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         -1, Operation.NOT_ACID);
   }
 
-  public static ArrayList<WindowExpressionSpec> parseSelect(String selectExprStr)
+  public static List<WindowExpressionSpec> parseSelect(String selectExprStr)
       throws SemanticException
   {
     ASTNode selNode = null;
@@ -14418,7 +15094,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException(pe);
     }
 
-    ArrayList<WindowExpressionSpec> selSpec = new ArrayList<WindowExpressionSpec>();
+    List<WindowExpressionSpec> selSpec = new ArrayList<WindowExpressionSpec>();
     int childCount = selNode.getChildCount();
     for (int i = 0; i < childCount; i++) {
       ASTNode selExpr = (ASTNode) selNode.getChild(i);
@@ -14520,7 +15196,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             AcidUtils.Operation.INSERT);
   }
 
-  private AcidUtils.Operation getAcidType(Class<? extends OutputFormat> of, String dest) {
+  private AcidUtils.Operation getAcidType(Class<? extends OutputFormat> of, String dest,
+      boolean isMM) {
+
+    // no need for any checks in the case of insert-only
+    if (isMM) {
+      return getAcidType(dest);
+    }
+
     if (SessionState.get() == null || !getTxnMgr().supportsAcid()) {
       return AcidUtils.Operation.NOT_ACID;
     } else if (isAcidOutputFormat(of)) {
@@ -14530,25 +15213,25 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  protected boolean updating(String destination) {
+  private boolean updating(String destination) {
     return destination.startsWith(Context.DestClausePrefix.UPDATE.toString());
   }
 
-  protected boolean deleting(String destination) {
+  private boolean deleting(String destination) {
     return destination.startsWith(Context.DestClausePrefix.DELETE.toString());
   }
 
   // Make sure the proper transaction manager that supports ACID is being used
-  protected void checkAcidTxnManager(Table table) throws SemanticException {
+  private void checkAcidTxnManager(Table table) throws SemanticException {
     if (SessionState.get() != null && !getTxnMgr().supportsAcid()
         && !HiveConf.getBoolVar(conf, ConfVars.HIVE_IN_TEST_REPL)) {
       throw new SemanticException(ErrorMsg.TXNMGR_NOT_ACID, table.getDbName(), table.getTableName());
     }
   }
 
-  public static ASTNode genSelectDIAST(RowResolver rr) {
-    LinkedHashMap<String, LinkedHashMap<String, ColumnInfo>> map = rr.getRslvMap();
-    ASTNode selectDI = new ASTNode(new CommonToken(HiveParser.TOK_SELECTDI, "TOK_SELECTDI"));
+  static ASTNode genSelectDIAST(RowResolver rr) {
+    Map<String, Map<String, ColumnInfo>> map = rr.getRslvMap();
+    ASTNode selectDI = new ASTNode(SELECTDI_TOKEN);
     // Note: this will determine the order of columns in the result. For now, the columns for each
     //       table will be together; the order of the tables, as well as the columns within each
     //       table, is deterministic, but undefined - RR stores them in the order of addition.
@@ -14560,10 +15243,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return selectDI;
   }
   private static ASTNode buildSelExprSubTree(String tableAlias, String col) {
-    ASTNode selexpr = new ASTNode(new CommonToken(HiveParser.TOK_SELEXPR, "TOK_SELEXPR"));
-    ASTNode tableOrCol = new ASTNode(new CommonToken(HiveParser.TOK_TABLE_OR_COL,
-        "TOK_TABLE_OR_COL"));
-    ASTNode dot = new ASTNode(new CommonToken(HiveParser.DOT, "."));
+    tableAlias = StringInternUtils.internIfNotNull(tableAlias);
+    col = StringInternUtils.internIfNotNull(col);
+    ASTNode selexpr = new ASTNode(SELEXPR_TOKEN);
+    ASTNode tableOrCol = new ASTNode(TABLEORCOL_TOKEN);
+    ASTNode dot = new ASTNode(DOT_TOKEN);
     tableOrCol.addChild(new ASTNode(new CommonToken(HiveParser.Identifier, tableAlias)));
     dot.addChild(tableOrCol);
     dot.addChild(new ASTNode(new CommonToken(HiveParser.Identifier, col)));
@@ -14578,6 +15262,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       queryProperties.setNoScanAnalyzeCommand(qb.getParseInfo().isNoScanAnalyzeCommand());
       queryProperties.setAnalyzeRewrite(qb.isAnalyzeRewrite());
       queryProperties.setCTAS(qb.getTableDesc() != null);
+      queryProperties.setInsert(qb.getParseInfo().hasInsertTables());
+      queryProperties.setETL(qb.isCTAS() || qb.getParseInfo().hasInsertTables());
       queryProperties.setHasOuterOrderBy(!qb.getParseInfo().getIsSubQ() &&
           !qb.getParseInfo().getDestToOrderBy().isEmpty());
       queryProperties.setOuterQueryLimit(qb.getParseInfo().getOuterQueryLimit());
@@ -14625,6 +15311,23 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return sb.toString();
   }
 
+  private void quoteIdentifierTokens(TokenRewriteStream tokenRewriteStream) {
+    if (conf.getVar(ConfVars.HIVE_QUOTEDID_SUPPORT).equals("none")) {
+      return;
+    }
+
+    for (int idx = tokenRewriteStream.MIN_TOKEN_INDEX; idx <= tokenRewriteStream.size()-1; idx++) {
+      Token curTok = tokenRewriteStream.get(idx);
+      if (curTok.getType() == HiveLexer.Identifier) {
+        // The Tokens have no distinction between Identifiers and QuotedIdentifiers.
+        // Ugly solution is just to surround all identifiers with quotes.
+        // Re-escape any backtick (`) characters in the identifier.
+        String escapedTokenText = curTok.getText().replaceAll("`", "``");
+        tokenRewriteStream.replace(curTok, "`" + escapedTokenText + "`");
+      }
+    }
+  }
+
   /**
    * Generate the query string for this query (with fully resolved table references).
    * @return The query string with resolved references. NULL if an error occurred.
@@ -14648,37 +15351,36 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  private QueryResultsCache.LookupInfo createLookupInfoForQuery(ASTNode astNode) {
+  private ValidTxnWriteIdList getQueryValidTxnWriteIdList() throws SemanticException {
+    // TODO: Once HIVE-18948 is in, should be able to retrieve writeIdList from the conf.
+    //cachedWriteIdList = AcidUtils.getValidTxnWriteIdList(conf);
+    //
+    List<String> transactionalTables = tablesFromReadEntities(inputs)
+            .stream()
+            .filter(table -> AcidUtils.isTransactionalTable(table))
+            .map(table -> table.getFullyQualifiedName())
+            .collect(Collectors.toList());
+    if (transactionalTables.size() > 0) {
+      try {
+        String txnString = conf.get(ValidTxnList.VALID_TXNS_KEY);
+        return getTxnMgr().getValidWriteIds(transactionalTables, txnString);
+      } catch (Exception err) {
+        String msg = "Error while getting the txnWriteIdList for tables " + transactionalTables
+                + " and validTxnList " + conf.get(ValidTxnList.VALID_TXNS_KEY);
+        throw new SemanticException(msg, err);
+      }
+    }
+
+    // No transactional tables.
+    return null;
+  }
+
+  private QueryResultsCache.LookupInfo createLookupInfoForQuery(ASTNode astNode) throws SemanticException {
     QueryResultsCache.LookupInfo lookupInfo = null;
     String queryString = getQueryStringForCache(astNode);
     if (queryString != null) {
-      lookupInfo = new QueryResultsCache.LookupInfo(queryString,
-          new Supplier<ValidTxnWriteIdList>() {
-            ValidTxnWriteIdList cachedWriteIdList = null;
-            @Override
-            public ValidTxnWriteIdList get() {
-              if (cachedWriteIdList == null) {
-                // TODO: Once HIVE-18948 is in, should be able to retrieve writeIdList from the conf.
-                //cachedWriteIdList = AcidUtils.getValidTxnWriteIdList(conf);
-                //
-                List<String> transactionalTables = tablesFromReadEntities(inputs)
-                    .stream()
-                    .filter(table -> AcidUtils.isTransactionalTable(table))
-                    .map(table -> table.getFullyQualifiedName())
-                    .collect(Collectors.toList());
-                try {
-                  String txnString = conf.get(ValidTxnList.VALID_TXNS_KEY);
-                  cachedWriteIdList =
-                      getTxnMgr().getValidWriteIds(transactionalTables, txnString);
-                } catch (Exception err) {
-                  String msg = "Error while getting the txnWriteIdList for tables " + transactionalTables
-                      + " and validTxnList " + conf.get(ValidTxnList.VALID_TXNS_KEY);
-                  throw new RuntimeException(msg, err);
-                }
-              }
-              return cachedWriteIdList;
-            }
-          });
+      ValidTxnWriteIdList writeIdList = getQueryValidTxnWriteIdList();
+      lookupInfo = new QueryResultsCache.LookupInfo(queryString, () -> { return writeIdList; });
     }
     return lookupInfo;
   }
@@ -14903,15 +15605,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    */
   protected String getFullTableNameForSQL(ASTNode n) throws SemanticException {
     switch (n.getType()) {
-      case HiveParser.TOK_TABNAME:
-        String[] tableName = getQualifiedTableName(n);
-        return getDotName(new String[] {
-            HiveUtils.unparseIdentifier(tableName[0], this.conf),
-            HiveUtils.unparseIdentifier(tableName[1], this.conf) });
-      case HiveParser.TOK_TABREF:
-        return getFullTableNameForSQL((ASTNode) n.getChild(0));
-      default:
-        throw raiseWrongType("TOK_TABNAME", n);
+    case HiveParser.TOK_TABNAME:
+      TableName tableName = getQualifiedTableName(n);
+      return HiveTableName.ofNullable(HiveUtils.unparseIdentifier(tableName.getTable(), this.conf),
+          HiveUtils.unparseIdentifier(tableName.getDb(), this.conf)).getNotEmptyDbTable();
+    case HiveParser.TOK_TABREF:
+      return getFullTableNameForSQL((ASTNode) n.getChild(0));
+    default:
+      throw raiseWrongType("TOK_TABNAME", n);
     }
   }
 
@@ -14947,7 +15648,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           first = false;
         else
           rewrittenQueryStr.append(", ");
-
         // Would be nice if there was a way to determine if quotes are needed
         rewrittenQueryStr.append(HiveUtils.unparseIdentifier(fschema.getName(), this.conf));
         String partVal = (partSpec != null) ? partSpec.get(fschema.getName()) : null;
@@ -14958,4 +15658,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       rewrittenQueryStr.append(")");
     }
   }
+
+  @Override
+  public WriteEntity getAcidAnalyzeTable() {
+    return acidAnalyzeTable;
+  }
+
+  @Override
+  protected void executeUnparseTranlations() {
+    unparseTranslator.applyTranslations(ctx.getTokenRewriteStream());
+  }
+  
 }

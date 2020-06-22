@@ -66,8 +66,18 @@ PREHOOK: Input: default@p
 POSTHOOK: query: desc formatted p partition (c=1) a
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@p
-# col_name            	data_type           	comment             	 	 	 	 	 	 	 	 	 
-a                   	int                 	from deserializer   	 	 	 	 	 	 	 	 	 
+col_name            	a                   
+data_type           	int                 
+min                 	                    
+max                 	                    
+num_nulls           	                    
+distinct_count      	                    
+avg_col_len         	                    
+max_col_len         	                    
+num_trues           	                    
+num_falses          	                    
+bit_vector          	                    
+comment             	from deserializer   
 PREHOOK: query: desc formatted p partition (c=1)
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: default@p
@@ -125,6 +135,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: p
+            filterExpr: (c = 1) (type: boolean)
             Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: a (type: int)
@@ -132,10 +143,12 @@ STAGE PLANS:
               Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: max(a)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: int)
@@ -269,6 +282,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: p
+            filterExpr: (c = 4) (type: boolean)
             Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: a (type: int)
@@ -276,10 +290,12 @@ STAGE PLANS:
               Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: max(a)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: int)
@@ -368,6 +384,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: p
+            filterExpr: (c = 100) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Select Operator
               expressions: a (type: int)
@@ -375,10 +392,12 @@ STAGE PLANS:
               Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
               Group By Operator
                 aggregations: max(a)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 4 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 4 Basic stats: PARTIAL Column stats: NONE
                   value expressions: _col0 (type: int)
@@ -437,6 +456,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: p
+            filterExpr: (c = 100) (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Select Operator
               expressions: a (type: int)
@@ -444,10 +464,12 @@ STAGE PLANS:
               Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
               Group By Operator
                 aggregations: max(a)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 4 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 4 Basic stats: PARTIAL Column stats: NONE
                   value expressions: _col0 (type: int)

@@ -63,13 +63,12 @@ import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
-import org.apache.hadoop.hive.ql.udf.UDFType;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF.DeferredJavaObject;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBaseCompare;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFCase;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFNvl;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFCoalesce;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqual;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNot;
@@ -82,6 +81,7 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToUnixTimeStamp;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUnixTimeStamp;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFWhen;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.avro.AvroSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
@@ -192,9 +192,9 @@ public final class ConstantPropagateProcFactory {
     // We shouldn't cast strings to other types because that can break original data in cases of
     // leading zeros or zeros trailing after decimal point.
     // Example: "000126" => 126 => "126"
-    boolean brokenDataTypesCombination = unsafeConversionTypes.contains(
-        priti.getPrimitiveCategory()) && !unsafeConversionTypes.contains(
-            descti.getPrimitiveCategory());
+    boolean brokenDataTypesCombination = unsafeConversionTypes.contains(priti.getPrimitiveCategory())
+        && !unsafeConversionTypes.contains(descti.getPrimitiveCategory())
+        || priti.getPrimitiveCategory() == PrimitiveCategory.TIMESTAMP && descti.getPrimitiveCategory() == PrimitiveCategory.DATE;
     if (performSafeTypeCast && brokenDataTypesCombination) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unsupported cast " + priti + "; " + descti);
@@ -471,7 +471,7 @@ public final class ConstantPropagateProcFactory {
   private static boolean isConstantFoldableUdf(GenericUDF udf,  List<ExprNodeDesc> children) {
     // Runtime constants + deterministic functions can be folded.
     if (!FunctionRegistry.isConsistentWithinQuery(udf)) {
-      if (udf.getClass().equals(GenericUDFUnixTimeStamp.class) 
+      if (udf.getClass().equals(GenericUDFUnixTimeStamp.class)
           && children != null && children.size() > 0) {
         // unix_timestamp is polymorphic (ignore class annotations)
         return true;
@@ -531,12 +531,15 @@ public final class ConstantPropagateProcFactory {
         return;
       }
       // If both sides are constants, there is nothing to propagate
-      ExprNodeColumnDesc c = ExprNodeDescUtils.getColumnExpr(lOperand);
-      if (null == c) {
-        c = ExprNodeDescUtils.getColumnExpr(rOperand);
-      }
-      if (null == c) {
-        // we need a column expression on other side.
+      ExprNodeColumnDesc c;
+      if (lOperand instanceof ExprNodeColumnDesc) {
+        c = (ExprNodeColumnDesc)lOperand;
+      } else if (rOperand instanceof ExprNodeColumnDesc) {
+        c = (ExprNodeColumnDesc)rOperand;
+      } else {
+        // we need a column expression on other side
+        // NOTE: we also cannot rely on column expressions wrapped inside casts as casting might
+        // truncate information
         return;
       }
       ColumnInfo ci = resolveColumn(rs, c);
@@ -589,7 +592,7 @@ public final class ConstantPropagateProcFactory {
        return null;
      }
      GenericUDF childUDF = caseOrWhenexpr.getGenericUDF();
-     List<ExprNodeDesc> children = caseOrWhenexpr.getChildren();
+      List<ExprNodeDesc> children = new ArrayList(caseOrWhenexpr.getChildren());
      int i;
      if (childUDF instanceof GenericUDFWhen) {
        for (i = 1; i < children.size(); i+=2) {
@@ -640,8 +643,10 @@ public final class ConstantPropagateProcFactory {
             // if true, prune it
             positionsToRemove.set(i);
           } else {
-            // if false, return false
-            return childExpr;
+            if (Boolean.FALSE.equals(c.getValue())) {
+              // if false, return false
+              return childExpr;
+            }
           }
         } else if (childExpr instanceof ExprNodeGenericFuncDesc &&
                 ((ExprNodeGenericFuncDesc)childExpr).getGenericUDF() instanceof GenericUDFOPNotNull &&
@@ -762,7 +767,7 @@ public final class ConstantPropagateProcFactory {
           List<ExprNodeDesc> children = new ArrayList<>();
           children.add(whenExpr);
           children.add(new ExprNodeConstantDesc(false));
-          ExprNodeGenericFuncDesc func = ExprNodeGenericFuncDesc.newInstance(new GenericUDFNvl(),
+          ExprNodeGenericFuncDesc func = ExprNodeGenericFuncDesc.newInstance(new GenericUDFCoalesce(),
               children);
           if (Boolean.TRUE.equals(thenVal)) {
             return func;
@@ -815,7 +820,7 @@ public final class ConstantPropagateProcFactory {
           List<ExprNodeDesc> children = new ArrayList<>();
           children.add(equal);
           children.add(new ExprNodeConstantDesc(false));
-          ExprNodeGenericFuncDesc func = ExprNodeGenericFuncDesc.newInstance(new GenericUDFNvl(),
+          ExprNodeGenericFuncDesc func = ExprNodeGenericFuncDesc.newInstance(new GenericUDFCoalesce(),
               children);
           if (Boolean.TRUE.equals(thenVal)) {
             return func;
@@ -1119,7 +1124,7 @@ public final class ConstantPropagateProcFactory {
       }
 
       GroupByDesc conf = op.getConf();
-      ArrayList<ExprNodeDesc> keys = conf.getKeys();
+      List<ExprNodeDesc> keys = conf.getKeys();
       for (int i = 0; i < keys.size(); i++) {
         ExprNodeDesc key = keys.get(i);
         ExprNodeDesc newkey = foldExpr(key, colToConstants, cppCtx, op, 0, false);
@@ -1204,11 +1209,17 @@ public final class ConstantPropagateProcFactory {
             if (HiveConf.getPositionFromInternalName(colName) == -1) {
               // if its not an internal name, this is what we want.
               ((ExprNodeConstantDesc)newCol).setFoldedFromCol(colName);
+              // See if we can set the tabAlias this was folded from as well.
+              ExprNodeDesc colExpr = colList.get(i);
+              if (colExpr instanceof ExprNodeColumnDesc) {
+                ((ExprNodeConstantDesc)newCol).setFoldedFromTab(((ExprNodeColumnDesc) colExpr).getTabAlias());
+              }
             } else {
               // If it was internal column, lets try to get name from columnExprMap
               ExprNodeDesc desc = columnExprMap.get(colName);
               if (desc instanceof ExprNodeConstantDesc) {
                 ((ExprNodeConstantDesc)newCol).setFoldedFromCol(((ExprNodeConstantDesc)desc).getFoldedFromCol());
+                ((ExprNodeConstantDesc)newCol).setFoldedFromTab(((ExprNodeConstantDesc)desc).getFoldedFromTab());
               }
             }
           }
@@ -1257,8 +1268,11 @@ public final class ConstantPropagateProcFactory {
       }
       FileSinkDesc fsdesc = op.getConf();
       DynamicPartitionCtx dpCtx = fsdesc.getDynPartCtx();
-      if (dpCtx != null) {
 
+      // HIVE-22595: For Avro tables with external schema URL, Utilities.getDPColOffset() gives
+      // wrong results unless AvroSerDe.initialize() is called to update the table properties.
+      // To be safe just disable this check for Avro tables.
+      if (dpCtx != null && fsdesc.getTableInfo().getSerdeClassName().equals(AvroSerDe.class.getName())) {
         // Assume only 1 parent for FS operator
         Operator<? extends Serializable> parent = op.getParentOperators().get(0);
         Map<ColumnInfo, ExprNodeDesc> parentConstants = cppCtx.getPropagatedConstants(parent);
@@ -1369,7 +1383,7 @@ public final class ConstantPropagateProcFactory {
       for (ExprNodeDesc desc : rsDesc.getKeyCols()) {
         ExprNodeDesc newDesc = foldExpr(desc, constants, cppCtx, op, 0, false);
         if (newDesc != desc && desc instanceof ExprNodeColumnDesc && newDesc instanceof ExprNodeConstantDesc) {
-          ((ExprNodeConstantDesc)newDesc).setFoldedFromCol(((ExprNodeColumnDesc)desc).getColumn());
+          ((ExprNodeConstantDesc)newDesc).setFoldedTabCol((ExprNodeColumnDesc)desc);
         }
         newKeyEpxrs.add(newDesc);
       }
@@ -1381,7 +1395,7 @@ public final class ConstantPropagateProcFactory {
         ExprNodeDesc expr = foldExpr(desc, constants, cppCtx, op, 0, false);
         if (expr != desc && desc instanceof ExprNodeColumnDesc
             && expr instanceof ExprNodeConstantDesc) {
-          ((ExprNodeConstantDesc) expr).setFoldedFromCol(((ExprNodeColumnDesc) desc).getColumn());
+          ((ExprNodeConstantDesc) expr).setFoldedTabCol((ExprNodeColumnDesc) desc);
         }
         newPartExprs.add(expr);
       }
@@ -1438,11 +1452,16 @@ public final class ConstantPropagateProcFactory {
       // Note: the following code (removing folded constants in exprs) is deeply coupled with
       //    ColumnPruner optimizer.
       // Assuming ColumnPrunner will remove constant columns so we don't deal with output columns.
-      //    Except one case that the join operator is followed by a redistribution (RS operator).
-      if (op.getChildOperators().size() == 1
-          && op.getChildOperators().get(0) instanceof ReduceSinkOperator) {
-        LOG.debug("Skip JOIN-RS structure.");
-        return null;
+      //    Except one case that the join operator is followed by a redistribution (RS operator) -- skipping filter ops
+      if (op.getChildOperators().size() == 1) {
+        Node ndRecursive = op;
+        while (ndRecursive.getChildren().size() == 1 && ndRecursive.getChildren().get(0) instanceof FilterOperator) {
+          ndRecursive = ndRecursive.getChildren().get(0);
+        }
+        if (ndRecursive.getChildren().get(0) instanceof ReduceSinkOperator) {
+          LOG.debug("Skip JOIN-FIL(*)-RS structure.");
+          return null;
+        }
       }
       if (LOG.isInfoEnabled()) {
         LOG.info("Old exprs " + conf.getExprs());

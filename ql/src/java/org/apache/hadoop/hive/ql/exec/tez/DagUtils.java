@@ -18,12 +18,13 @@
 package org.apache.hadoop.hive.ql.exec.tez;
 
 import java.util.Collection;
-
 import java.util.concurrent.ConcurrentHashMap;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+
 import javax.security.auth.login.LoginException;
 
 import java.io.File;
@@ -37,10 +38,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipOutputStream;
@@ -59,12 +63,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.QueryPlan;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapper;
@@ -79,15 +85,28 @@ import org.apache.hadoop.hive.ql.io.HiveOutputFormatImpl;
 import org.apache.hadoop.hive.ql.io.merge.MergeFileMapper;
 import org.apache.hadoop.hive.ql.io.merge.MergeFileOutputFormat;
 import org.apache.hadoop.hive.ql.io.merge.MergeFileWork;
+import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
+import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
+import org.apache.hadoop.hive.ql.lib.Dispatcher;
+import org.apache.hadoop.hive.ql.lib.GraphWalker;
+import org.apache.hadoop.hive.ql.lib.Node;
+import org.apache.hadoop.hive.ql.lib.NodeProcessor;
+import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
+import org.apache.hadoop.hive.ql.lib.Rule;
+import org.apache.hadoop.hive.ql.lib.RuleRegExp;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
+import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MergeJoinWork;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty.EdgeType;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.TezWork.VertexType;
+import org.apache.hadoop.hive.ql.plan.UnionWork;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.stats.StatsCollectionContext;
 import org.apache.hadoop.hive.ql.stats.StatsFactory;
@@ -169,30 +188,126 @@ public class DagUtils {
    */
   private final ConcurrentHashMap<String, Object> copyNotifiers = new ConcurrentHashMap<>();
 
-  private void addCredentials(MapWork mapWork, DAG dag) {
-    Set<Path> paths = mapWork.getPathToAliases().keySet();
-    if (!paths.isEmpty()) {
-      Iterator<URI> pathIterator = Iterators.transform(paths.iterator(), new Function<Path, URI>() {
-        @Override
-        public URI apply(Path path) {
-          return path.toUri();
-        }
-      });
+  class CollectFileSinkUrisNodeProcessor implements NodeProcessor {
 
-      Set<URI> uris = new HashSet<URI>();
-      Iterators.addAll(uris, pathIterator);
+    private final Set<URI> uris;
 
-      if (LOG.isDebugEnabled()) {
-        for (URI uri: uris) {
-          LOG.debug("Marking URI as needing credentials: "+uri);
+    public CollectFileSinkUrisNodeProcessor(Set<URI> uris) {
+      this.uris = uris;
+    }
+
+    @Override
+    public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
+        Object... nodeOutputs) throws SemanticException {
+      for (Node n : stack) {
+        Operator<? extends OperatorDesc> op = (Operator<? extends OperatorDesc>) n;
+        OperatorDesc desc = op.getConf();
+        if (desc instanceof FileSinkDesc) {
+          FileSinkDesc fileSinkDesc = (FileSinkDesc) desc;
+          Path dirName = fileSinkDesc.getDirName();
+          if (dirName != null) {
+            uris.add(dirName.toUri());
+          }
+          Path destPath = fileSinkDesc.getDestPath();
+          if (destPath != null) {
+            uris.add(destPath.toUri());
+          }
         }
       }
-      dag.addURIsForCredentials(uris);
+      return null;
     }
   }
 
-  private void addCredentials(ReduceWork reduceWork, DAG dag) {
-    // nothing at the moment
+  private void addCollectFileSinkUrisRules(Map<Rule, NodeProcessor> opRules, NodeProcessor np) {
+    opRules.put(new RuleRegExp("R1", FileSinkOperator.getOperatorName() + ".*"), np);
+  }
+
+  private void collectFileSinkUris(List<Node> topNodes, Set<URI> uris) {
+
+    CollectFileSinkUrisNodeProcessor np = new CollectFileSinkUrisNodeProcessor(uris);
+
+    Map<Rule, NodeProcessor> opRules = new LinkedHashMap<Rule, NodeProcessor>();
+    addCollectFileSinkUrisRules(opRules, np);
+
+    Dispatcher disp = new DefaultRuleDispatcher(np, opRules, null);
+    GraphWalker ogw = new DefaultGraphWalker(disp);
+
+    try {
+      ogw.startWalking(topNodes, null);
+    } catch (SemanticException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+
+  /**
+   * Set up credentials for the base work on secure clusters
+   */
+  public void addCredentials(BaseWork work, DAG dag) {
+    if (work instanceof MapWork){
+      Set<Path> paths = ((MapWork)work).getPathToAliases().keySet();
+      if (!paths.isEmpty()) {
+        Iterator<URI> pathIterator = Iterators.transform(paths.iterator(), new Function<Path, URI>() {
+          @Override
+          public URI apply(Path path) {
+            return path.toUri();
+          }
+        });
+
+        Set<URI> uris = new HashSet<URI>();
+        Iterators.addAll(uris, pathIterator);
+
+        if (LOG.isDebugEnabled()) {
+          for (URI uri: uris) {
+            LOG.debug("Marking MapWork input URI as needing credentials: " + uri);
+          }
+        }
+        dag.addURIsForCredentials(uris);
+      }
+    }
+
+    getCredentialsForFileSinks(work, dag);
+  }
+
+  private void getCredentialsForFileSinks(BaseWork baseWork, DAG dag) {
+    Set<URI> fileSinkUris = new HashSet<URI>();
+
+    List<Node> topNodes = getTopNodes(baseWork);
+
+    LOG.debug("Collecting file sink uris for {} topnodes: {}", baseWork.getClass(), topNodes);
+    collectFileSinkUris(topNodes, fileSinkUris);
+
+    if (LOG.isDebugEnabled()) {
+      for (URI fileSinkUri : fileSinkUris) {
+        LOG.debug("Marking {} output URI as needing credentials (filesink): {}",
+            baseWork.getClass(), fileSinkUri);
+      }
+    }
+    dag.addURIsForCredentials(fileSinkUris);
+  }
+
+  private List<Node> getTopNodes(BaseWork work) {
+    List<Node> topNodes = new ArrayList<Node>();
+
+    if (work instanceof MapWork) {
+      Map<String, Operator<? extends OperatorDesc>> aliasToWork = ((MapWork) work).getAliasToWork();
+      for (Operator<? extends OperatorDesc> operator : aliasToWork.values()) {
+        topNodes.add(operator);
+      }
+    } else if (work instanceof ReduceWork) {
+      topNodes.add(((ReduceWork) work).getReducer());
+    } else if (work instanceof MergeJoinWork) {
+      for (Operator<? extends OperatorDesc> operator : ((MergeJoinWork) work)
+          .getAllRootOperators()) {
+        topNodes.add(operator);
+      }
+    } else if (work instanceof UnionWork) {
+      for (Operator<? extends OperatorDesc> operator : ((UnionWork) work).getAllRootOperators()) {
+        topNodes.add(operator);
+      }
+    }
+
+    return topNodes;
   }
 
   /*
@@ -415,13 +530,17 @@ public class DagUtils {
     case CUSTOM_SIMPLE_EDGE:
       assert partitionerClassName != null;
       partitionerConf = createPartitionerConf(partitionerClassName, conf);
-      UnorderedPartitionedKVEdgeConfig et3Conf = UnorderedPartitionedKVEdgeConfig
+      UnorderedPartitionedKVEdgeConfig.Builder et3Conf = UnorderedPartitionedKVEdgeConfig
           .newBuilder(keyClass, valClass, MRPartitioner.class.getName(), partitionerConf)
           .setFromConfiguration(conf)
           .setKeySerializationClass(TezBytesWritableSerialization.class.getName(), null)
-          .setValueSerializationClass(TezBytesWritableSerialization.class.getName(), null)
-          .build();
-      return et3Conf.createDefaultEdgeProperty();
+          .setValueSerializationClass(TezBytesWritableSerialization.class.getName(), null);
+      if (edgeProp.getBufferSize() != null) {
+        et3Conf.setAdditionalConfiguration(
+            TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB,
+            edgeProp.getBufferSize().toString());
+      }
+      return et3Conf.build().createDefaultEdgeProperty();
     case ONE_TO_ONE_EDGE:
       UnorderedKVEdgeConfig et4Conf = UnorderedKVEdgeConfig
           .newBuilder(keyClass, valClass)
@@ -443,7 +562,9 @@ public class DagUtils {
       edgeManagerDescriptor.setUserPayload(cpConfig.toUserPayload(new TezConfiguration(conf)));
       UnorderedPartitionedKVEdgeConfig cpEdgeConf =
         UnorderedPartitionedKVEdgeConfig.newBuilder(keyClass, valClass,
-          ValueHashPartitioner.class.getName()).build();
+          ValueHashPartitioner.class.getName())
+            .setFromConfiguration(conf)
+            .build();
       return cpEdgeConf.createDefaultCustomEdgeProperty(edgeManagerDescriptor);
     case SIMPLE_EDGE:
       // fallthrough
@@ -928,14 +1049,22 @@ public class DagUtils {
       // reference HDFS based resource directly, to use distribute cache efficiently.
       addHdfsResource(conf, tmpResources, LocalResourceType.FILE, getHdfsTempFilesFromConf(conf));
       // local resources are session based.
-      addTempResources(conf, tmpResources, hdfsDirPathStr, LocalResourceType.FILE, getLocalTempFilesFromConf(conf), null);
+      tmpResources.addAll(
+          addTempResources(conf, hdfsDirPathStr, LocalResourceType.FILE,
+              getLocalTempFilesFromConf(conf), null).values()
+      );
     } else {
       // all resources including HDFS are session based.
-      addTempResources(conf, tmpResources, hdfsDirPathStr, LocalResourceType.FILE, getTempFilesFromConf(conf), null);
+      tmpResources.addAll(
+          addTempResources(conf, hdfsDirPathStr, LocalResourceType.FILE,
+              getTempFilesFromConf(conf), null).values()
+      );
     }
 
-    addTempResources(conf, tmpResources, hdfsDirPathStr, LocalResourceType.ARCHIVE,
-        getTempArchivesFromConf(conf), null);
+    tmpResources.addAll(
+        addTempResources(conf, hdfsDirPathStr, LocalResourceType.ARCHIVE,
+            getTempArchivesFromConf(conf), null).values()
+    );
     return tmpResources;
   }
 
@@ -1001,26 +1130,22 @@ public class DagUtils {
    * @param hdfsDirPathStr Destination directory in HDFS.
    * @param conf Configuration.
    * @param inputOutputJars The file names to localize.
-   * @return List<LocalResource> local resources to add to execution
+   * @return Map&lt;String, LocalResource&gt; (srcPath, local resources) to add to execution
    * @throws IOException when hdfs operation fails.
    * @throws LoginException when getDefaultDestDir fails with the same exception
    */
-  public List<LocalResource> localizeTempFiles(String hdfsDirPathStr, Configuration conf,
-      String[] inputOutputJars, String[] skipJars) throws IOException, LoginException {
+  public Map<String, LocalResource> localizeTempFiles(String hdfsDirPathStr, Configuration conf,
+      String[] inputOutputJars, String[] skipJars) throws IOException {
     if (inputOutputJars == null) {
       return null;
     }
-    List<LocalResource> tmpResources = new ArrayList<LocalResource>();
-    addTempResources(conf, tmpResources, hdfsDirPathStr,
-        LocalResourceType.FILE, inputOutputJars, skipJars);
-    return tmpResources;
+    return addTempResources(conf, hdfsDirPathStr, LocalResourceType.FILE, inputOutputJars, skipJars);
   }
 
-  private void addTempResources(Configuration conf,
-      List<LocalResource> tmpResources, String hdfsDirPathStr,
-      LocalResourceType type,
-      String[] files, String[] skipFiles) throws IOException {
+  private Map<String, LocalResource> addTempResources(Configuration conf, String hdfsDirPathStr,
+      LocalResourceType type, String[] files, String[] skipFiles) throws IOException {
     HashSet<Path> skipFileSet = null;
+    Map<String, LocalResource> tmpResourcesMap = new HashMap<>();
     if (skipFiles != null) {
       skipFileSet = new HashSet<>();
       for (String skipFile : skipFiles) {
@@ -1041,8 +1166,9 @@ public class DagUtils {
       Path hdfsFilePath = new Path(hdfsDirPathStr, getResourceBaseName(new Path(file)));
       LocalResource localResource = localizeResource(new Path(file),
           hdfsFilePath, type, conf);
-      tmpResources.add(localResource);
+      tmpResourcesMap.put(file, localResource);
     }
+    return tmpResourcesMap;
   }
 
   public FileStatus getHiveJarDirectory(Configuration conf) throws IOException, LoginException {
@@ -1168,7 +1294,12 @@ public class DagUtils {
         return createLocalResource(destFS, dest, type, LocalResourceVisibility.PRIVATE);
       }
       try {
-        destFS.copyFromLocalFile(false, false, src, dest);
+        if (src.toUri().getScheme()!=null) {
+          FileUtil.copy(src.getFileSystem(conf), src, destFS, dest, false, false, conf);
+        }
+        else {
+          destFS.copyFromLocalFile(false, false, src, dest);
+        }
         synchronized (notifier) {
           notifier.notifyAll(); // Notify if we have successfully copied the file.
         }
@@ -1239,9 +1370,27 @@ public class DagUtils {
    * @throws IOException
    */
   public JobConf createConfiguration(HiveConf hiveConf) throws IOException {
+    return createConfiguration(hiveConf, false);
+  }
+
+  /**
+   * Creates and initializes a JobConf object that can be used to execute
+   * the DAG. This can skip the configs which are already included in AM configs.
+   * @param hiveConf Current conf for the execution
+   * @param skipAMConf Skip the configs where are already set across all DAGs 
+   * @return JobConf base configuration for job execution
+   * @throws IOException
+   */
+  public JobConf createConfiguration(HiveConf hiveConf, boolean skipAMConf) throws IOException {
     hiveConf.setBoolean("mapred.mapper.new-api", false);
 
-    JobConf conf = new JobConf(new TezConfiguration(hiveConf));
+    Predicate<String> findDefaults =
+        (s) -> ((s != null) && (s.endsWith(".xml") || (s.endsWith(".java") && !"HiveConf.java".equals(s))));
+
+    // since this is an inclusion filter, negate the predicate
+    JobConf conf =
+        TezConfigurationFactory
+            .wrapWithJobConf(hiveConf, skipAMConf ? findDefaults.negate() : null);
 
     conf.set("mapred.output.committer.class", NullOutputCommitter.class.getName());
 
@@ -1259,6 +1408,7 @@ public class DagUtils {
     // Removing job credential entry/ cannot be set on the tasks
     conf.unset("mapreduce.job.credentials.binary");
 
+    // TODO: convert this to a predicate too
     hiveConf.stripHiddenConfigurations(conf);
     return conf;
   }
@@ -1370,18 +1520,6 @@ public class DagUtils {
   }
 
   /**
-   * Set up credentials for the base work on secure clusters
-   */
-  public void addCredentials(BaseWork work, DAG dag) throws IOException {
-    dag.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
-    if (work instanceof MapWork) {
-      addCredentials((MapWork) work, dag);
-    } else if (work instanceof ReduceWork) {
-      addCredentials((ReduceWork) work, dag);
-    }
-  }
-
-  /**
    * createTezDir creates a temporary directory in the scratchDir folder to
    * be used with Tez. Assumes scratchDir exists.
    */
@@ -1399,11 +1537,14 @@ public class DagUtils {
     scratchDir = new Path(scratchDir, userName);
 
     Path tezDir = getTezDir(scratchDir);
-    FileSystem fs = tezDir.getFileSystem(conf);
-    LOG.debug("TezDir path set " + tezDir + " for user: " + userName);
-    // since we are adding the user name to the scratch dir, we do not
-    // need to give more permissions here
-    fs.mkdirs(tezDir);
+    if (!HiveConf.getBoolVar(conf, ConfVars.HIVE_RPC_QUERY_PLAN)) {
+      FileSystem fs = tezDir.getFileSystem(conf);
+      LOG.debug("TezDir path set " + tezDir + " for user: " + userName);
+      // since we are adding the user name to the scratch dir, we do not
+      // need to give more permissions here
+      // Since we are doing RPC creating a dir is not necessary
+      fs.mkdirs(tezDir);
+    }
 
     return tezDir;
 

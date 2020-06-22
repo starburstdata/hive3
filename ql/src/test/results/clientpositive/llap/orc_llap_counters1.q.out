@@ -230,14 +230,14 @@ Retention:          	0
 #### A masked pattern was here ####
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
-	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\"}
+	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"b\":\"true\",\"bin\":\"true\",\"bo\":\"true\",\"c\":\"true\",\"d\":\"true\",\"da\":\"true\",\"dec\":\"true\",\"f\":\"true\",\"i\":\"true\",\"s\":\"true\",\"si\":\"true\",\"t\":\"true\",\"v\":\"true\"}}
 	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	2100                
 	orc.bloom.filter.columns	*                   
 	orc.row.index.stride	1000                
 	rawDataSize         	1139514             
-	totalSize           	55671               
+	totalSize           	55696               
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -255,9 +255,9 @@ PREHOOK: type: QUERY
 PREHOOK: Input: default@orc_ppd
 PREHOOK: Output: hdfs://### HDFS PATH ###
 Stage-1 FILE SYSTEM COUNTERS:
-   HDFS_BYTES_READ: 17729
+   HDFS_BYTES_READ: 17728
    HDFS_BYTES_WRITTEN: 104
-   HDFS_READ_OPS: 6
+   HDFS_READ_OPS: 8
    HDFS_LARGE_READ_OPS: 0
    HDFS_WRITE_OPS: 2
 Stage-1 HIVE COUNTERS:
@@ -274,11 +274,12 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_RS_10: 2094
    RECORDS_OUT_OPERATOR_SEL_9: 2094
    RECORDS_OUT_OPERATOR_TS_0: 2100
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
    ALLOCATED_BYTES: 1310720
-   ALLOCATED_USED_BYTES: 2758
+   ALLOCATED_USED_BYTES: 2757
    CACHE_HIT_BYTES: 0
-   CACHE_MISS_BYTES: 1079
+   CACHE_MISS_BYTES: 1071
    METADATA_CACHE_MISS: 2
    NUM_DECODED_BATCHES: 3
    NUM_VECTOR_BATCHES: 3
@@ -314,8 +315,9 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_RS_10: 2094
    RECORDS_OUT_OPERATOR_SEL_9: 2094
    RECORDS_OUT_OPERATOR_TS_0: 2100
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
-   CACHE_HIT_BYTES: 1079
+   CACHE_HIT_BYTES: 1071
    CACHE_MISS_BYTES: 0
    METADATA_CACHE_HIT: 2
    NUM_DECODED_BATCHES: 3

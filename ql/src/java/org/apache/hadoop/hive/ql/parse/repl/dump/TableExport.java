@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
@@ -72,9 +73,22 @@ public class TableExport {
         ? null
         : tableSpec;
     this.replicationSpec = replicationSpec;
-    if (conf.getBoolVar(HiveConf.ConfVars.REPL_DUMP_METADATA_ONLY) || (this.tableSpec != null
-        && this.tableSpec.tableHandle.isView())) {
-      this.replicationSpec.setIsMetadataOnly(true);
+    if (this.tableSpec != null && this.tableSpec.tableHandle!=null) {
+      //If table is view or if should dump metadata only flag used by DAS is set to true
+      //enable isMetadataOnly
+      if
+            (this.tableSpec.tableHandle.isView() ||
+                    Utils.shouldDumpMetaDataOnly(conf)) {
+        this.tableSpec.tableHandle.setStatsStateLikeNewTable();
+        this.replicationSpec.setIsMetadataOnly(true);
+      }
+      //If table is view or if should dump metadata only for external table flag is set to true
+      //enable isMetadataOnlyForExternalTable
+      if (this.tableSpec.tableHandle.isView()
+              || Utils.shouldDumpMetaDataOnlyForExternalTables(this.tableSpec.tableHandle, conf)) {
+        this.tableSpec.tableHandle.setStatsStateLikeNewTable();
+        this.replicationSpec.setMetadataOnlyForExternalTables(true);
+      }
     }
     this.db = db;
     this.distCpDoAsUser = distCpDoAsUser;
@@ -90,7 +104,8 @@ public class TableExport {
     } else if (shouldExport()) {
       PartitionIterable withPartitions = getPartitions();
       writeMetaData(withPartitions);
-      if (!replicationSpec.isMetadataOnly()) {
+      if (!replicationSpec.isMetadataOnly() && !(replicationSpec.isRepl()
+              && tableSpec.tableHandle.getTableType().equals(TableType.EXTERNAL_TABLE))) {
         writeData(withPartitions);
       }
       return true;
@@ -103,11 +118,12 @@ public class TableExport {
       if (tableSpec != null && tableSpec.tableHandle != null && tableSpec.tableHandle.isPartitioned()) {
         if (tableSpec.specType == TableSpec.SpecType.TABLE_ONLY) {
           // TABLE-ONLY, fetch partitions if regular export, don't if metadata-only
+          //For metadata only external tables, we still need the partition info
           if (replicationSpec.isMetadataOnly()) {
             return null;
           } else {
             return new PartitionIterable(db, tableSpec.tableHandle, null, conf.getIntVar(
-                HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_MAX));
+                HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_MAX), true);
           }
         } else {
           // PARTITIONS specified - partitions inside tableSpec
@@ -150,7 +166,7 @@ public class TableExport {
       if (tableSpec.tableHandle.isPartitioned()) {
         if (partitions == null) {
           throw new IllegalStateException("partitions cannot be null for partitionTable :"
-              + tableSpec.tableName);
+              + tableSpec.getTableName().getTable());
         }
         new PartitionExport(paths, partitions, distCpDoAsUser, conf, mmCtx).write(replicationSpec);
       } else {
@@ -167,7 +183,8 @@ public class TableExport {
   }
 
   private boolean shouldExport() {
-    return Utils.shouldReplicate(replicationSpec, tableSpec.tableHandle, conf);
+    return Utils.shouldReplicate(replicationSpec, tableSpec.tableHandle,
+            false, null, null, conf);
   }
 
   /**
@@ -305,7 +322,7 @@ public class TableExport {
     AuthEntities authEntities = new AuthEntities();
     try {
       // Return if metadata-only
-      if (replicationSpec.isMetadataOnly()) {
+      if (replicationSpec.isMetadataOnly() || replicationSpec.isMetadataOnlyForExternalTables()) {
         return authEntities;
       }
       PartitionIterable partitions = getPartitions();
@@ -313,7 +330,7 @@ public class TableExport {
         if (tableSpec.tableHandle.isPartitioned()) {
           if (partitions == null) {
             throw new IllegalStateException("partitions cannot be null for partitionTable :"
-                + tableSpec.tableName);
+                + tableSpec.getTableName().getTable());
           }
           for (Partition partition : partitions) {
             authEntities.inputs.add(new ReadEntity(partition));

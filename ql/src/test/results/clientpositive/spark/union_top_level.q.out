@@ -33,6 +33,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
@@ -45,6 +46,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -54,6 +56,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
@@ -66,6 +69,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -75,6 +79,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
@@ -87,6 +92,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -218,6 +224,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: s2
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: key is not null (type: boolean)
@@ -228,6 +235,7 @@ STAGE PLANS:
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -237,6 +245,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: s1
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: key is not null (type: boolean)
@@ -247,6 +256,7 @@ STAGE PLANS:
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -267,6 +277,7 @@ STAGE PLANS:
                   Statistics: Num rows: 550 Data size: 5843 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: string)
+                    null sort order: z
                     sort order: +
                     Statistics: Num rows: 550 Data size: 5843 Basic stats: COMPLETE Column stats: NONE
                     TopN Hash Memory Usage: 0.1
@@ -385,6 +396,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
@@ -397,6 +409,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -406,6 +419,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
@@ -418,6 +432,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -427,6 +442,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
@@ -439,6 +455,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -518,13 +535,12 @@ STAGE PLANS:
 #### A masked pattern was here ####
 
   Stage: Stage-3
-      Create Table Operator:
-        Create Table
-          columns: key string, value int
-          input format: org.apache.hadoop.mapred.TextInputFormat
-          output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
-          serde name: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          name: default.union_top
+    Create Table
+      columns: key string, value int
+      name: default.union_top
+      input format: org.apache.hadoop.mapred.TextInputFormat
+      output format: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
+      serde name: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-2
     Stats Work
@@ -613,6 +629,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
@@ -625,6 +642,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -634,6 +652,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
@@ -646,6 +665,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -655,6 +675,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
@@ -667,6 +688,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -828,6 +850,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 0.0D) (type: boolean)
@@ -840,6 +863,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -849,6 +873,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 1.0D) (type: boolean)
@@ -861,6 +886,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -870,6 +896,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src
+                  filterExpr: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((UDFToDouble(key) % 3.0D) = 2.0D) (type: boolean)
@@ -882,6 +909,7 @@ STAGE PLANS:
                         Number of rows: 3
                         Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                           TopN Hash Memory Usage: 0.1
@@ -1032,16 +1060,15 @@ STAGE DEPENDENCIES:
 
 STAGE PLANS:
   Stage: Stage-1
-      Create View Operator:
-        Create View
-          columns: key string, value int
-          expanded text: select `a`.`key`, `a`.`value` from (select `src`.`key`, 0 as `value` from `default`.`src` where `src`.`key` % 3 == 0 limit 3)`a`
+    Create View
+      columns: key string, value int
+      expanded text: select `a`.`key`, `a`.`value` from (select `src`.`key`, 0 as `value` from `default`.`src` where `src`.`key` % 3 == 0 limit 3)`a`
 union all
 select `b`.`key`, `b`.`value` from (select `src`.`key`, 1 as `value` from `default`.`src` where `src`.`key` % 3 == 1 limit 3)`b`
 union all
 select `c`.`key`, `c`.`value` from (select `src`.`key`, 2 as `value` from `default`.`src` where `src`.`key` % 3 == 2 limit 3)`c`
-          name: default.union_top_view
-          original text: select * from (select key, 0 as value from src where key % 3 == 0 limit 3)a
+      name: default.union_top_view
+      original text: select * from (select key, 0 as value from src where key % 3 == 0 limit 3)a
 union all
 select * from (select key, 1 as value from src where key % 3 == 1 limit 3)b
 union all

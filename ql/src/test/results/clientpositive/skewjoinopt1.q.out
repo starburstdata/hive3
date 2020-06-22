@@ -58,9 +58,10 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (((key = '2') or (key = '3')) and key is not null) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -68,15 +69,17 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (((key = '2') or (key = '3')) and key is not null) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -84,6 +87,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -135,7 +139,7 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((not ((key = '2') or (key = '3'))) and key is not null) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -143,6 +147,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -151,7 +156,7 @@ STAGE PLANS:
             alias: b
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((not ((key = '2') or (key = '3'))) and key is not null) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -159,6 +164,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -224,9 +230,10 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((key = '2') or (key = '3')) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -234,6 +241,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -250,6 +258,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -301,7 +310,7 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (not ((key = '2') or (key = '3'))) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), val (type: string)
@@ -309,6 +318,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -325,6 +335,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -360,14 +371,14 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1_n101
 POSTHOOK: Input: default@t2_n64
 #### A masked pattern was here ####
-NULL	NULL	4	14
-NULL	NULL	5	15
 2	12	2	22
 3	13	3	13
 8	18	8	18
 8	18	8	18
 8	28	8	18
 8	28	8	18
+NULL	NULL	4	14
+NULL	NULL	5	15
 PREHOOK: query: EXPLAIN
 SELECT count(1) FROM T1_n101 a JOIN T2_n64 b ON a.key = b.key
 PREHOOK: type: QUERY
@@ -392,9 +403,10 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (((key = '2') or (key = '3')) and key is not null) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -402,14 +414,16 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (((key = '2') or (key = '3')) and key is not null) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -417,6 +431,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -443,10 +458,12 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 660 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: count()
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: bigint)
@@ -455,10 +472,12 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 660 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: count()
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: bigint)
@@ -483,7 +502,7 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((not ((key = '2') or (key = '3'))) and key is not null) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -491,6 +510,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -498,7 +518,7 @@ STAGE PLANS:
             alias: b
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((not ((key = '2') or (key = '3'))) and key is not null) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -506,6 +526,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -562,9 +583,10 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: ((key = '2') or (key = '3')) (type: boolean)
+              predicate: (key is not null and ((key = '2') or (key = '3'))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -572,6 +594,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -587,6 +610,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -613,10 +637,12 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 660 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: count()
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: bigint)
@@ -625,10 +651,12 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 660 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: count()
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: bigint)
@@ -653,7 +681,7 @@ STAGE PLANS:
             alias: a
             Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (not ((key = '2') or (key = '3'))) (type: boolean)
+              predicate: (key is not null and (not ((key = '2') or (key = '3')))) (type: boolean)
               Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string)
@@ -661,6 +689,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
@@ -676,6 +705,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 300 Basic stats: COMPLETE Column stats: NONE

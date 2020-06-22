@@ -31,11 +31,13 @@ STAGE PLANS:
               Group By Operator
                 aggregations: sum(_col2), count(_col2)
                 keys: _col0 (type: string), _col1 (type: string), 0L (type: bigint)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4
                 Statistics: Num rows: 1500 Data size: 15936 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: bigint)
+                  null sort order: aaa
                   sort order: +++
                   Map-reduce partition columns: _col0 (type: string), _col1 (type: string), _col2 (type: bigint)
                   Statistics: Num rows: 1500 Data size: 15936 Basic stats: COMPLETE Column stats: NONE
@@ -66,6 +68,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col1 (type: string)
+              null sort order: zz
               sort order: ++
               Statistics: Num rows: 750 Data size: 7968 Basic stats: COMPLETE Column stats: NONE
               TopN Hash Memory Usage: 0.1
@@ -140,11 +143,10 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	with q1 as ( select key from src where key = '5')	 
+Original Query:     	with q1 as ( select key from src where key = '5')	 
 	                    	select * from q1    
-View Expanded Text: 	with q1 as ( select `src`.`key` from `default`.`src` where `src`.`key` = '5')	 
+Expanded Query:     	with q1 as ( select `src`.`key` from `default`.`src` where `src`.`key` = '5')	 
 	                    	select `q1`.`key` from q1
-View Rewrite Enabled:	No                  	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -210,7 +212,7 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select b.key, count(*) as c	 
+Original Query:     	select b.key, count(*) as c	 
 	                    	from src b          
 	                    	group by b.key      
 	                    	having exists       
@@ -218,7 +220,7 @@ View Original Text: 	select b.key, count(*) as c
 	                    	  from src a        
 	                    	  where a.key = b.key and a.value > 'val_9'
 	                    	  )                 
-View Expanded Text: 	select `b`.`key`, count(*) as `c`	 
+Expanded Query:     	select `b`.`key`, count(*) as `c`	 
 	                    	from `default`.`src` `b`
 	                    	group by `b`.`key`  
 	                    	having exists       
@@ -226,7 +228,6 @@ View Expanded Text: 	select `b`.`key`, count(*) as `c`
 	                    	  from `default`.`src` `a`
 	                    	  where `a`.`key` = b.key and `a`.`value` > 'val_9'
 	                    	  )                 
-View Rewrite Enabled:	No                  	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -290,21 +291,20 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select *            	 
+Original Query:     	select *            	 
 	                    	from src b          
 	                    	where not exists    
 	                    	  (select distinct a.key
 	                    	  from src a        
 	                    	  where b.value = a.value and a.value > 'val_2'
 	                    	  )                 
-View Expanded Text: 	select `b`.`key`, `b`.`value`	 
+Expanded Query:     	select `b`.`key`, `b`.`value`	 
 	                    	from `default`.`src` `b`
 	                    	where not exists    
 	                    	  (select distinct `a`.`key`
 	                    	  from `default`.`src` `a`
 	                    	  where `b`.`value` = `a`.`value` and `a`.`value` > 'val_2'
 	                    	  )                 
-View Rewrite Enabled:	No                  	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -352,9 +352,8 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select a.key from src a join src b on a.key=b.key	 
-View Expanded Text: 	select `a`.`key` from `default`.`src` `a` join `default`.`src` `b` on `a`.`key`=`b`.`key`	 
-View Rewrite Enabled:	No                  	 
+Original Query:     	select a.key from src a join src b on a.key=b.key	 
+Expanded Query:     	select `a`.`key` from `default`.`src` `a` join `default`.`src` `b` on `a`.`key`=`b`.`key`	 
 PREHOOK: query: CREATE VIEW view15_n0 AS
 SELECT key,COUNT(value) AS value_count
 FROM src
@@ -402,13 +401,12 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	SELECT key,COUNT(value) AS value_count	 
+Original Query:     	SELECT key,COUNT(value) AS value_count	 
 	                    	FROM src            
 	                    	GROUP BY key        
-View Expanded Text: 	SELECT `src`.`key`,COUNT(`src`.`value`) AS `value_count`	 
+Expanded Query:     	SELECT `src`.`key`,COUNT(`src`.`value`) AS `value_count`	 
 	                    	FROM `default`.`src`
 	                    	GROUP BY `src`.`key`
-View Rewrite Enabled:	No                  	 
 PREHOOK: query: CREATE VIEW view16_n0 AS
 SELECT DISTINCT value
 FROM src
@@ -452,11 +450,10 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	SELECT DISTINCT value	 
+Original Query:     	SELECT DISTINCT value	 
 	                    	FROM src            
-View Expanded Text: 	SELECT DISTINCT `src`.`value`	 
+Expanded Query:     	SELECT DISTINCT `src`.`value`	 
 	                    	FROM `default`.`src`
-View Rewrite Enabled:	No                  	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -504,9 +501,8 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select key from src 	 
-View Expanded Text: 	select `src`.`key` from `default`.`src`	 
-View Rewrite Enabled:	No                  	 
+Original Query:     	select key from src 	 
+Expanded Query:     	select `src`.`key` from `default`.`src`	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -556,9 +552,8 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select * from src   	 
-View Expanded Text: 	select `src`.`key`, `src`.`value` from `default`.`src`	 
-View Rewrite Enabled:	No                  	 
+Original Query:     	select * from src   	 
+Expanded Query:     	select `src`.`key`, `src`.`value` from `default`.`src`	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -608,9 +603,8 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select * from src intersect select * from src	 
-View Expanded Text: 	select `src`.`key`, `src`.`value` from `default`.`src` intersect select `src`.`key`, `src`.`value` from `default`.`src`	 
-View Rewrite Enabled:	No                  	 
+Original Query:     	select * from src intersect select * from src	 
+Expanded Query:     	select `src`.`key`, `src`.`value` from `default`.`src` intersect select `src`.`key`, `src`.`value` from `default`.`src`	 
 PREHOOK: query: drop view v_n13
 PREHOOK: type: DROPVIEW
 PREHOOK: Input: default@v_n13
@@ -660,9 +654,8 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 	 	 
 # View Information	 	 
-View Original Text: 	select * from src except select * from src	 
-View Expanded Text: 	select `src`.`key`, `src`.`value` from `default`.`src` except select `src`.`key`, `src`.`value` from `default`.`src`	 
-View Rewrite Enabled:	No                  	 
+Original Query:     	select * from src except select * from src	 
+Expanded Query:     	select `src`.`key`, `src`.`value` from `default`.`src` except select `src`.`key`, `src`.`value` from `default`.`src`	 
 PREHOOK: query: explain select * from v_n13
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -695,11 +688,13 @@ STAGE PLANS:
               Group By Operator
                 aggregations: count()
                 keys: key (type: string), value (type: string)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0, _col1, _col2
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string), _col1 (type: string)
+                  null sort order: aa
                   sort order: ++
                   Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -736,11 +731,13 @@ STAGE PLANS:
                 Group By Operator
                   aggregations: sum(_col2), sum(_col3)
                   keys: _col0 (type: string), _col1 (type: string)
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0, _col1, _col2, _col3
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: string), _col1 (type: string)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -755,11 +752,13 @@ STAGE PLANS:
                 Group By Operator
                   aggregations: sum(_col2), sum(_col3)
                   keys: _col0 (type: string), _col1 (type: string)
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0, _col1, _col2, _col3
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: string), _col1 (type: string)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -772,7 +771,7 @@ STAGE PLANS:
           outputColumnNames: _col0, _col1, _col2, _col3
           Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           Filter Operator
-            predicate: (((_col2 * 2) = _col3) and (_col2 > 0L)) (type: boolean)
+            predicate: ((_col2 > 0L) and ((_col2 * 2L) = _col3)) (type: boolean)
             Statistics: Num rows: 41 Data size: 435 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: _col0 (type: string), _col1 (type: string)
@@ -801,11 +800,13 @@ STAGE PLANS:
               Group By Operator
                 aggregations: count()
                 keys: key (type: string), value (type: string)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0, _col1, _col2
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string), _col1 (type: string)
+                  null sort order: aa
                   sort order: ++
                   Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE

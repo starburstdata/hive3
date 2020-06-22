@@ -18,12 +18,16 @@
 
 package org.apache.hadoop.hive.ql.exec.tez;
 
-import org.apache.hadoop.hive.ql.exec.tez.TezSessionState.HiveResources;
+import org.apache.hadoop.hive.ql.exec.tez.TezSession.HiveResources;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -52,7 +56,7 @@ import com.google.common.annotations.VisibleForTesting;
  * In case the user specifies a queue explicitly, a new session is created
  * on that queue and assigned to the session state.
  */
-public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTriggerValidator
+public class TezSessionPoolManager extends AbstractTriggerValidator
   implements Manager, SessionExpirationTracker.RestartImpl {
 
   private enum CustomQueueAllowed {
@@ -82,11 +86,13 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
   private static TezSessionPoolManager instance = null;
 
   /** This is used to close non-default sessions, and also all sessions when stopping. */
-  private final List<TezSessionState> openSessions = new LinkedList<>();
+  private final List<TezSession> openSessions = new LinkedList<>();
   private SessionTriggerProvider sessionTriggerProvider;
   private TriggerActionHandler<?> triggerActionHandler;
   private TriggerValidatorRunnable triggerValidatorRunnable;
   private YarnQueueHelper yarnQueueChecker;
+
+  private ExternalSessionsRegistry externalSessions = null;
 
   /** Note: this is not thread-safe. */
   public static TezSessionPoolManager getInstance() {
@@ -106,16 +112,16 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
       throw new AssertionError("setupPool or setupNonPool needs to be called first");
     }
     if (defaultSessionPool != null) {
-      defaultSessionPool.start();
+      defaultSessionPool.start(false);
     }
     if (expirationTracker != null) {
       expirationTracker.start();
     }
     initTriggers(conf);
     if (resourcePlan != null) {
-      updateTriggers(resourcePlan);
-      LOG.info("Updated tez session pool manager with active resource plan: {}",
-          resourcePlan.getPlan().getName());
+      Collection<String> appliedTriggers = updateTriggers(resourcePlan);
+      LOG.info("Updated tez session pool manager with triggers {} from active resource plan: {}",
+          appliedTriggers, resourcePlan.getPlan().getName());
     }
   }
 
@@ -132,16 +138,16 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     int numSessions = conf.getIntVar(ConfVars.HIVE_SERVER2_TEZ_SESSIONS_PER_DEFAULT_QUEUE);
     int numSessionsTotal = numSessions * (defaultQueueList.length - emptyNames);
     if (numSessionsTotal > 0) {
-      boolean enableAmRegistry = false;
-      defaultSessionPool = new TezSessionPool<>(initConf, numSessionsTotal, enableAmRegistry,
+      defaultSessionPool = new TezSessionPool<>(initConf, numSessionsTotal, null,
           new TezSessionPool.SessionObjectFactory<TezSessionPoolSession>() {
             int queueIx = 0;
 
             @Override
-            public TezSessionPoolSession create(TezSessionPoolSession oldSession) {
+            public TezSessionPoolSession create(
+                TezSessionPoolSession oldSession, String sessionId) {
               if (oldSession != null) {
-                return createAndInitSession(
-                    oldSession.getQueueName(), oldSession.isDefault(), oldSession.getConf());
+                return createAndInitSession(null, oldSession.getQueueName(),
+                    oldSession.isDefault(), oldSession.getConf());
               }
               // We never resize the pool, so assume this is initialization.
               // If that changes, we might have to make the factory interface more complicated.
@@ -161,7 +167,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
                 }
               }
               HiveConf sessionConf = new HiveConf(initConf);
-              return createAndInitSession(defaultQueueList[localQueueIx], true, sessionConf);
+              return createAndInitSession(null, defaultQueueList[localQueueIx], true, sessionConf);
           }
       });
     }
@@ -175,7 +181,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     this.hasInitialSessions = numSessionsTotal > 0;
   }
 
-  public void setupNonPool(HiveConf conf) {
+  public void setupNonPool(HiveConf conf) throws Exception {
     this.initConf = conf;
     numConcurrentLlapQueries = conf.getIntVar(ConfVars.HIVE_SERVER2_LLAP_CONCURRENT_QUERIES);
     llapQueue = new Semaphore(numConcurrentLlapQueries, true);
@@ -191,6 +197,10 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     if (customQueueAllowed == CustomQueueAllowed.TRUE
         && HiveConf.getBoolVar(conf, ConfVars.HIVE_SERVER2_TEZ_QUEUE_ACCESS_CHECK)) {
       this.yarnQueueChecker = new YarnQueueHelper(conf);
+    }
+
+    if (HiveConf.getBoolVar(conf, ConfVars.HIVE_SERVER2_TEZ_USE_EXTERNAL_SESSIONS)) {
+      externalSessions = ExternalSessionsRegistry.getClient(conf);
     }
 
     restrictedConfig = new RestrictedConfigChecker(conf);
@@ -210,8 +220,9 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
 
   // TODO Create and init session sets up queue, isDefault - but does not initialize the configuration
   private TezSessionPoolSession createAndInitSession(
-      String queue, boolean isDefault, HiveConf conf) {
-    TezSessionPoolSession sessionState = createSession(TezSessionState.makeSessionId(), conf);
+      String sessionId, String queue, boolean isDefault, HiveConf conf) {
+    TezSessionPoolSession sessionState = createSession(
+        sessionId != null ? sessionId : TezSessionState.makeSessionId(), conf);
     // TODO When will the queue ever be null.
     // Pass queue and default in as constructor parameters, and make them final.
     if (queue != null) {
@@ -225,7 +236,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     return sessionState;
   }
 
-  private TezSessionState getSession(HiveConf conf, boolean doOpen) throws Exception {
+  private TezSession getSession(HiveConf conf, boolean doOpen) throws Exception {
     // NOTE: this can be called outside of HS2, without calling setupPool. Basically it should be
     //       able to handle not being initialized. Perhaps we should get rid of the instance and
     //       move the setupPool code to ctor. For now, at least hasInitialSessions will be false.
@@ -298,9 +309,9 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
    * @return
    * @throws Exception
    */
-  private TezSessionState getNewSessionState(HiveConf conf,
+  private TezSession getNewSessionState(HiveConf conf,
       String queueName, boolean doOpen) throws Exception {
-    TezSessionPoolSession retTezSessionState = createAndInitSession(queueName, false, conf);
+    TezSessionPoolSession retTezSessionState = createAndInitSession(null, queueName, false, conf);
     if (queueName != null) {
       conf.set(TezConfiguration.TEZ_QUEUE_NAME, queueName);
     }
@@ -317,7 +328,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     returnSession(session);
   }
 
-  void returnSession(TezSessionState tezSessionState) throws Exception {
+  void returnSession(TezSession tezSessionState) throws Exception {
     // Ignore the interrupt status while returning the session, but set it back
     // on the thread in case anything else needs to deal with it.
     boolean isInterrupted = Thread.interrupted();
@@ -336,6 +347,14 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
             + " belongs to the pool. Put it back in");
         defaultSessionPool.returnSession((TezSessionPoolSession)tezSessionState);
       }
+
+      if (externalSessions != null) {
+        if (tezSessionState.getTezClient() != null && tezSessionState.getTezClient().getAppMasterApplicationId() != null) {
+          tezSessionState.close(false);
+        } else {
+          LOG.warn("Not returning session '{}' as tez client or app id is null", tezSessionState.getSessionId());
+        }
+      }
       // non default session nothing changes. The user can continue to use the existing
       // session in the SessionState
     } finally {
@@ -347,7 +366,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
   }
 
   public static void closeIfNotDefault(
-      TezSessionState tezSessionState, boolean keepTmpDir) throws Exception {
+      TezSession tezSessionState, boolean keepTmpDir) throws Exception {
     LOG.info("Closing tez session if not default: " + tezSessionState);
     if (!tezSessionState.isDefault()) {
       tezSessionState.close(keepTmpDir);
@@ -358,13 +377,13 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     if ((instance == null) || !this.hasInitialSessions) {
       return;
     }
-    List<TezSessionState> sessionsToClose = null;
+    List<TezSession> sessionsToClose = null;
     synchronized (openSessions) {
-      sessionsToClose = new ArrayList<TezSessionState>(openSessions);
+      sessionsToClose = new ArrayList<TezSession>(openSessions);
     }
 
     // we can just stop all the sessions
-    for (TezSessionState sessionState : sessionsToClose) {
+    for (TezSession sessionState : sessionsToClose) {
       if (sessionState.isDefault()) {
         sessionState.close(false);
       }
@@ -390,7 +409,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
    * @throws Exception
    */
   @Override
-  public void destroy(TezSessionState tezSessionState) throws Exception {
+  public void destroy(TezSession tezSessionState) throws Exception {
     LOG.warn("We are closing a " + (tezSessionState.isDefault() ? "default" : "non-default")
         + " session because of retry failure.");
     tezSessionState.close(false);
@@ -402,7 +421,13 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
   }
 
   protected TezSessionPoolSession createSession(String sessionId, HiveConf conf) {
-    return new TezSessionPoolSession(sessionId, this, expirationTracker, conf);
+    TezSessionState base = null;
+    if (externalSessions != null) {
+      base = new TezExternalSessionState(sessionId, conf, externalSessions);
+    } else {
+      base = new TezSessionState(sessionId, conf);
+    }
+    return new TezSessionPoolSession(this, expirationTracker, base);
   }
 
   /*
@@ -411,7 +436,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
    * sessions for e.g. when a CLI session is started. The CLI session could re-use the
    * same tez session eliminating the latencies of new AM and containers.
    */
-  private static boolean canWorkWithSameSession(TezSessionState session, HiveConf conf)
+  private static boolean canWorkWithSameSession(TezSession session, HiveConf conf)
        throws HiveException {
     if (session == null || conf == null || !session.isOpen()) {
       return false;
@@ -427,7 +452,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
 
       // Working in the assumption that the user here will be the hive user if doAs = false, we'll make it past this false check.
       LOG.info("The current user: " + userName + ", session user: " + session.getUser());
-      if (userName.equals(session.getUser()) == false) {
+      if (!userName.equals(session.getUser())) {
         LOG.info("Different users incoming: " + userName + " existing: " + session.getUser());
         return false;
       }
@@ -437,7 +462,8 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
 
     boolean doAsEnabled = conf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS);
     // either variables will never be null because a default value is returned in case of absence
-    if (doAsEnabled != session.getConf().getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS)) {
+    if (doAsEnabled != session.getConf().getBoolVar(
+        HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS)) {
       return false;
     }
 
@@ -445,20 +471,26 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
       String queueName = session.getQueueName();
       String confQueueName = conf.get(TezConfiguration.TEZ_QUEUE_NAME);
       LOG.info("Current queue name is " + queueName + " incoming queue name is " + confQueueName);
+
+      if (queueName != null && confQueueName == null) {
+        LOG.info("Incoming queue null is reset to current queue " + queueName);
+        confQueueName = queueName;
+      }
+
       return (queueName == null) ? confQueueName == null : queueName.equals(confQueueName);
     } else {
       // this session should never be a default session unless something has messed up.
-      throw new HiveException("The pool session " + session + " should have been returned to the pool"); 
+      throw new HiveException("The pool session " + session + " should have been returned to the pool");
     }
   }
 
-  public TezSessionState getSession(
-      TezSessionState session, HiveConf conf, boolean doOpen, boolean llap) throws Exception {
+  public TezSession getSession(
+      TezSession session, HiveConf conf, boolean doOpen, boolean llap) throws Exception {
     if (llap && (this.numConcurrentLlapQueries > 0)) {
       llapQueue.acquire(); // blocks if no more llap queries can be submitted.
     }
 
-    if (canWorkWithSameSession(session, conf)) {
+    if (externalSessions == null && canWorkWithSameSession(session, conf)) {
       session.setLegacyLlapMode(llap);
       return session;
     }
@@ -474,7 +506,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
 
   /** Reopens the session that was found to not be running. */
   @Override
-  public TezSessionState reopen(TezSessionState sessionState) throws Exception {
+  public TezSession reopen(TezSession sessionState) throws Exception {
     HiveConf sessionConf = sessionState.getConf();
     if (sessionState.getQueueName() != null
         && sessionConf.get(TezConfiguration.TEZ_QUEUE_NAME) == null) {
@@ -485,7 +517,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
   }
 
   static void reopenInternal(
-      TezSessionState sessionState) throws Exception {
+      TezSession sessionState) throws Exception {
     HiveResources resources = sessionState.extractHiveResources();
     // TODO: close basically resets the object to a bunch of nulls.
     //       We should ideally not reuse the object because it's pointless and error-prone.
@@ -496,11 +528,11 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
 
 
   public void closeNonDefaultSessions() throws Exception {
-    List<TezSessionState> sessionsToClose = null;
+    List<TezSession> sessionsToClose = null;
     synchronized (openSessions) {
-      sessionsToClose = new ArrayList<TezSessionState>(openSessions);
+      sessionsToClose = new ArrayList<TezSession>(openSessions);
     }
-    for (TezSessionState sessionState : sessionsToClose) {
+    for (TezSession sessionState : sessionsToClose) {
       System.err.println("Shutting down tez session.");
       closeIfNotDefault(sessionState, false);
     }
@@ -522,6 +554,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     synchronized (openSessions) {
       openSessions.add(session);
       updateSessions();
+      LOG.info("Registering session with pool manager. {} #OpenTezSessions: {}", session, openSessions.size());
     }
   }
 
@@ -531,7 +564,8 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     }
   }
 
-  public void updateTriggers(final WMFullResourcePlan appliedRp) {
+  public Collection<String> updateTriggers(final WMFullResourcePlan appliedRp) {
+    Set<String> triggerNames = new HashSet<>();
     if (sessionTriggerProvider != null) {
       List<WMTrigger> wmTriggers = appliedRp != null ? appliedRp.getTriggers() : null;
       List<Trigger> triggers = new ArrayList<>();
@@ -539,11 +573,14 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
         for (WMTrigger wmTrigger : wmTriggers) {
           if (wmTrigger.isSetIsInUnmanaged() && wmTrigger.isIsInUnmanaged()) {
             triggers.add(ExecutionTrigger.fromWMTrigger(wmTrigger));
+            triggerNames.add(wmTrigger.getTriggerName());
           }
         }
       }
       sessionTriggerProvider.setTriggers(Collections.unmodifiableList(triggers));
     }
+
+    return triggerNames;
   }
 
   /** Called by TezSessionPoolSession when closed. */
@@ -554,6 +591,7 @@ public class TezSessionPoolManager extends TezSessionPoolSession.AbstractTrigger
     }
     synchronized (openSessions) {
       openSessions.remove(session);
+      LOG.info("Unregistering session from pool manager. {} #OpenTezSessions: {}", session, openSessions.size());
       updateSessions();
     }
     if (defaultSessionPool != null) {

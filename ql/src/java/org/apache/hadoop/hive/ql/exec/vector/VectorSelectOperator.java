@@ -108,7 +108,7 @@ public class VectorSelectOperator extends Operator<SelectDesc>
     if (conf.isSelStarNoCompute()) {
       return;
     }
-    VectorExpression.doTransientInit(vExpressions);
+    VectorExpression.doTransientInit(vExpressions, hconf);
 
     List<ObjectInspector> objectInspectors = new ArrayList<ObjectInspector>();
 
@@ -136,7 +136,7 @@ public class VectorSelectOperator extends Operator<SelectDesc>
 
     // Just forward the row as is
     if (conf.isSelStarNoCompute()) {
-      forward(row, inputObjInspectors[tag], true);
+      vectorForward((VectorizedRowBatch) row);
       return;
     }
 
@@ -155,7 +155,7 @@ public class VectorSelectOperator extends Operator<SelectDesc>
     int originalProjectionSize = vrg.projectionSize;
     vrg.projectionSize = projectedOutputColumns.length;
     vrg.projectedColumns = this.projectedOutputColumns;
-    forward(vrg, outputObjInspector, true);
+    vectorForward((VectorizedRowBatch) row);
 
     // Revert the projected columns back, because vrg will be re-used.
     vrg.projectionSize = originalProjectionSize;

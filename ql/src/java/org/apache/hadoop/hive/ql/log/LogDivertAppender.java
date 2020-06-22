@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.common.LogUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.tez.TezTask;
 import org.apache.hadoop.hive.ql.session.OperationLog;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -80,8 +81,9 @@ public class LogDivertAppender {
      */
     private static final Pattern executionIncludeNamePattern = Pattern.compile(Joiner.on("|").
         join(new String[]{"org.apache.hadoop.mapreduce.JobSubmitter",
-            "org.apache.hadoop.mapreduce.Job", "SessionState", "ReplState", Task.class.getName(),
-            Driver.class.getName(), "org.apache.hadoop.hive.ql.exec.spark.status.SparkJobMonitor"}));
+          "org.apache.hadoop.mapreduce.Job", "SessionState", "ReplState", Task.class.getName(),
+          TezTask.class.getName(), Driver.class.getName(),
+          "org.apache.hadoop.hive.ql.exec.spark.status.SparkJobMonitor"}));
 
     /* Patterns that are included in performance logging level.
      * In performance mode, show execution and performance logger messages.
@@ -170,6 +172,10 @@ public class LogDivertAppender {
    * @param conf  the configuration for HiveServer2 instance
    */
   public static void registerRoutingAppender(org.apache.hadoop.conf.Configuration conf) {
+    if (!HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_SERVER2_LOGGING_OPERATION_ENABLED, false)) {
+      // spare some resources, do not register logger if it is not enabled .
+      return;
+    }
     String loggingLevel = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_SERVER2_LOGGING_OPERATION_LEVEL);
     OperationLog.LoggingLevel loggingMode = OperationLog.getLoggingLevel(loggingLevel);
     String layout = loggingMode == OperationLog.LoggingLevel.VERBOSE ? verboseLayout : nonVerboseLayout;

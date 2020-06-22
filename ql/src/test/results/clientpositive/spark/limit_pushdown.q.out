@@ -30,6 +30,7 @@ STAGE PLANS:
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: z
                       sort order: +
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       TopN Hash Memory Usage: 0.3
@@ -119,6 +120,7 @@ STAGE PLANS:
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: z
                       sort order: -
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       TopN Hash Memory Usage: 0.3
@@ -209,11 +211,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: sum(_col1)
                       keys: _col0 (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -307,11 +311,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: sum(_col1), count(_col1)
                       keys: _col0 (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -408,11 +414,13 @@ STAGE PLANS:
                     Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: cdouble (type: double)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0
                       Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: double)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: double)
                         Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
@@ -451,6 +459,7 @@ POSTHOOK: query: select distinct(cdouble) as dis from alltypesorc order by dis l
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc
 #### A masked pattern was here ####
+-16243.0
 -16269.0
 -16274.0
 -16277.0
@@ -470,7 +479,6 @@ POSTHOOK: Input: default@alltypesorc
 -16372.0
 -16373.0
 -16379.0
-NULL
 PREHOOK: query: explain
 select ctinyint, count(distinct(cdouble)) from alltypesorc group by ctinyint order by ctinyint limit 20
 PREHOOK: type: QUERY
@@ -503,11 +511,13 @@ STAGE PLANS:
                     Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: ctinyint (type: tinyint), cdouble (type: double)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: tinyint), _col1 (type: double)
+                        null sort order: za
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: tinyint)
                         Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
@@ -551,6 +561,7 @@ POSTHOOK: query: select ctinyint, count(distinct(cdouble)) from alltypesorc grou
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc
 #### A masked pattern was here ####
+-45	24
 -46	24
 -47	22
 -48	29
@@ -570,7 +581,6 @@ POSTHOOK: Input: default@alltypesorc
 -62	27
 -63	19
 -64	24
-NULL	2932
 PREHOOK: query: explain 
 select ctinyint, count(cdouble) from (select ctinyint, cdouble from alltypesorc group by ctinyint, cdouble) t1 group by ctinyint order by ctinyint limit 20
 PREHOOK: type: QUERY
@@ -603,11 +613,13 @@ STAGE PLANS:
                     Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: ctinyint (type: tinyint), cdouble (type: double)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: tinyint), _col1 (type: double)
+                        null sort order: za
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: tinyint)
                         Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
@@ -651,6 +663,7 @@ POSTHOOK: query: select ctinyint, count(cdouble) from (select ctinyint, cdouble 
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc
 #### A masked pattern was here ####
+-45	24
 -46	24
 -47	22
 -48	29
@@ -670,7 +683,6 @@ POSTHOOK: Input: default@alltypesorc
 -62	27
 -63	19
 -64	24
-NULL	2932
 PREHOOK: query: explain
 select ctinyint, count(distinct(cstring1)), count(distinct(cstring2)) from alltypesorc group by ctinyint order by ctinyint limit 20
 PREHOOK: type: QUERY
@@ -699,38 +711,49 @@ STAGE PLANS:
                   Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                   Select Operator
                     expressions: ctinyint (type: tinyint), cstring1 (type: string), cstring2 (type: string)
-                    outputColumnNames: ctinyint, cstring1, cstring2
+                    outputColumnNames: _col0, _col1, _col2
                     Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
-                      aggregations: count(DISTINCT cstring1), count(DISTINCT cstring2)
-                      keys: ctinyint (type: tinyint), cstring1 (type: string), cstring2 (type: string)
+                      keys: _col0 (type: tinyint), _col1 (type: string), _col2 (type: string), 0L (type: bigint)
+                      minReductionHashAggr: 0.99
                       mode: hash
-                      outputColumnNames: _col0, _col1, _col2, _col3, _col4
-                      Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
+                      outputColumnNames: _col0, _col1, _col2, _col3
+                      Statistics: Num rows: 24576 Data size: 5815988 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
-                        key expressions: _col0 (type: tinyint), _col1 (type: string), _col2 (type: string)
-                        sort order: +++
+                        key expressions: _col0 (type: tinyint), _col1 (type: string), _col2 (type: string), _col3 (type: bigint)
+                        null sort order: zaaa
+                        sort order: ++++
                         Map-reduce partition columns: _col0 (type: tinyint)
-                        Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
-                        TopN Hash Memory Usage: 0.3
+                        Statistics: Num rows: 24576 Data size: 5815988 Basic stats: COMPLETE Column stats: NONE
+            Execution mode: vectorized
         Reducer 2 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Group By Operator
-                aggregations: count(DISTINCT KEY._col1:0._col0), count(DISTINCT KEY._col1:1._col0)
-                keys: KEY._col0 (type: tinyint)
+                keys: KEY._col0 (type: tinyint), KEY._col1 (type: string), KEY._col2 (type: string), KEY._col3 (type: bigint)
                 mode: mergepartial
-                outputColumnNames: _col0, _col1, _col2
-                Statistics: Num rows: 6144 Data size: 1453997 Basic stats: COMPLETE Column stats: NONE
-                Limit
-                  Number of rows: 20
-                  Statistics: Num rows: 20 Data size: 4720 Basic stats: COMPLETE Column stats: NONE
-                  File Output Operator
-                    compressed: false
-                    Statistics: Num rows: 20 Data size: 4720 Basic stats: COMPLETE Column stats: NONE
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                outputColumnNames: _col0, _col1, _col2, _col3
+                Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
+                Select Operator
+                  expressions: CASE WHEN (((_col3 = 1L) and _col1 is not null)) THEN (1) ELSE (null) END (type: int), CASE WHEN (((_col3 = 2L) and _col2 is not null)) THEN (1) ELSE (null) END (type: int), _col0 (type: tinyint)
+                  outputColumnNames: _col0, _col1, _col2
+                  Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
+                  Group By Operator
+                    aggregations: count(_col0), count(_col1)
+                    keys: _col2 (type: tinyint)
+                    mode: complete
+                    outputColumnNames: _col0, _col1, _col2
+                    Statistics: Num rows: 6144 Data size: 1453997 Basic stats: COMPLETE Column stats: NONE
+                    Limit
+                      Number of rows: 20
+                      Statistics: Num rows: 20 Data size: 4720 Basic stats: COMPLETE Column stats: NONE
+                      File Output Operator
+                        compressed: false
+                        Statistics: Num rows: 20 Data size: 4720 Basic stats: COMPLETE Column stats: NONE
+                        table:
+                            input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                            output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
@@ -746,6 +769,7 @@ POSTHOOK: query: select ctinyint, count(distinct(cstring1)), count(distinct(cstr
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc
 #### A masked pattern was here ####
+-45	3	24
 -46	3	19
 -47	3	23
 -48	3	27
@@ -765,7 +789,6 @@ POSTHOOK: Input: default@alltypesorc
 -62	3	23
 -63	3	16
 -64	3	13
-NULL	3065	3
 PREHOOK: query: explain
 select key,value from src order by key limit 0
 PREHOOK: type: QUERY
@@ -828,11 +851,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: sum(key)
                       keys: value (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -848,6 +873,7 @@ STAGE PLANS:
                 Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col1 (type: double)
+                  null sort order: z
                   sort order: +
                   Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
                   TopN Hash Memory Usage: 0.3
@@ -948,11 +974,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: count()
                       keys: key (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -971,11 +999,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: count()
                       keys: key (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -999,6 +1029,7 @@ STAGE PLANS:
                     Statistics: Num rows: 2 Data size: 20 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2 Data size: 20 Basic stats: COMPLETE Column stats: NONE
@@ -1036,6 +1067,7 @@ STAGE PLANS:
                   Number of rows: 3
                   Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                     TopN Hash Memory Usage: 0.3
@@ -1055,6 +1087,7 @@ STAGE PLANS:
                     Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 3 Data size: 30 Basic stats: COMPLETE Column stats: NONE
@@ -1098,6 +1131,7 @@ STAGE PLANS:
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: value (type: string)
+                      null sort order: z
                       sort order: +
                       Map-reduce partition columns: value (type: string)
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -1189,6 +1223,7 @@ STAGE PLANS:
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: z
                       sort order: +
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                       TopN Hash Memory Usage: 2.0E-5
@@ -1359,6 +1394,7 @@ STAGE PLANS:
                     Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -1378,6 +1414,7 @@ STAGE PLANS:
                   Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: double)
+                    null sort order: z
                     sort order: +
                     Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
                     TopN Hash Memory Usage: 2.0E-5

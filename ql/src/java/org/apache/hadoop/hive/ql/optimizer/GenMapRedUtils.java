@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hive.common.BlobStorageUtils;
 import org.apache.hadoop.hive.common.StringInternUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
@@ -114,7 +116,6 @@ import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.session.LineageState;
 import org.apache.hadoop.hive.ql.session.SessionState;
-import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.mapred.InputFormat;
@@ -861,8 +862,7 @@ public final class GenMapRedUtils {
     } else if (task instanceof ExecDriver) {
       MapredWork work = (MapredWork) task.getWork();
       work.getMapWork().deriveExplainAttributes();
-      HashMap<String, Operator<? extends OperatorDesc>> opMap = work
-          .getMapWork().getAliasToWork();
+      Map<String, Operator<? extends OperatorDesc>> opMap = work.getMapWork().getAliasToWork();
       if (opMap != null && !opMap.isEmpty()) {
         for (Operator<? extends OperatorDesc> op : opMap.values()) {
           setKeyAndValueDesc(work.getReduceWork(), op);
@@ -981,7 +981,7 @@ public final class GenMapRedUtils {
         conf.getBoolVar(
             HiveConf.ConfVars.HIVE_MAPPER_CANNOT_SPAN_MULTIPLE_PARTITIONS);
     work.setMapperCannotSpanPartns(mapperCannotSpanPartns);
-    work.setPathToAliases(new LinkedHashMap<Path, ArrayList<String>>());
+    work.setPathToAliases(new LinkedHashMap<Path, List<String>>());
     work.setPathToPartitionInfo(new LinkedHashMap<Path, PartitionDesc>());
     work.setAliasToWork(new LinkedHashMap<String, Operator<? extends OperatorDesc>>());
     return mrWork;
@@ -1160,13 +1160,13 @@ public final class GenMapRedUtils {
    */
   public static void replaceMapWork(String sourceAlias, String targetAlias,
       MapWork source, MapWork target) {
-    Map<Path, ArrayList<String>> sourcePathToAliases = source.getPathToAliases();
+    Map<Path, List<String>> sourcePathToAliases = source.getPathToAliases();
     Map<Path, PartitionDesc> sourcePathToPartitionInfo = source.getPathToPartitionInfo();
     Map<String, Operator<? extends OperatorDesc>> sourceAliasToWork = source.getAliasToWork();
     Map<String, PartitionDesc> sourceAliasToPartnInfo = source.getAliasToPartnInfo();
 
-    LinkedHashMap<Path, ArrayList<String>> targetPathToAliases = target.getPathToAliases();
-    LinkedHashMap<Path, PartitionDesc> targetPathToPartitionInfo = target.getPathToPartitionInfo();
+    Map<Path, List<String>> targetPathToAliases = target.getPathToAliases();
+    Map<Path, PartitionDesc> targetPathToPartitionInfo = target.getPathToPartitionInfo();
     Map<String, Operator<? extends OperatorDesc>> targetAliasToWork = target.getAliasToWork();
     Map<String, PartitionDesc> targetAliasToPartnInfo = target.getAliasToPartnInfo();
 
@@ -1188,8 +1188,8 @@ public final class GenMapRedUtils {
     targetAliasToWork.remove(targetAlias);
     targetAliasToPartnInfo.remove(targetAlias);
     List<Path> pathsToRemove = new ArrayList<>();
-    for (Entry<Path, ArrayList<String>> entry: targetPathToAliases.entrySet()) {
-      ArrayList<String> aliases = entry.getValue();
+    for (Entry<Path, List<String>> entry: targetPathToAliases.entrySet()) {
+      List<String> aliases = entry.getValue();
       aliases.remove(targetAlias);
       if (aliases.isEmpty()) {
         pathsToRemove.add(entry.getKey());
@@ -1205,8 +1205,8 @@ public final class GenMapRedUtils {
     targetAliasToPartnInfo.putAll(sourceAliasToPartnInfo);
     targetPathToPartitionInfo.putAll(sourcePathToPartitionInfo);
     List<Path> pathsToAdd = new ArrayList<>();
-    for (Entry<Path, ArrayList<String>> entry: sourcePathToAliases.entrySet()) {
-      ArrayList<String> aliases = entry.getValue();
+    for (Entry<Path, List<String>> entry: sourcePathToAliases.entrySet()) {
+      List<String> aliases = entry.getValue();
       if (aliases.contains(sourceAlias)) {
         pathsToAdd.add(entry.getKey());
       }
@@ -1303,7 +1303,7 @@ public final class GenMapRedUtils {
     DynamicPartitionCtx dpCtx = fsInputDesc.getDynPartCtx();
     if (dpCtx != null && dpCtx.getNumDPCols() > 0) {
       // adding DP ColumnInfo to the RowSchema signature
-      ArrayList<ColumnInfo> signature = inputRS.getSignature();
+      List<ColumnInfo> signature = inputRS.getSignature();
       String tblAlias = fsInputDesc.getTableInfo().getTableName();
       for (String dpCol : dpCtx.getDPColNames()) {
         ColumnInfo colInfo = new ColumnInfo(dpCol,
@@ -1320,7 +1320,7 @@ public final class GenMapRedUtils {
       }
 
       // update the FileSinkOperator to include partition columns
-      usePartitionColumns(fsInputDesc.getTableInfo().getProperties(), dpCtx.getDPColNames());
+      usePartitionColumns(fsInputDesc.getTableInfo().getProperties(), fsInputDesc.getTable(), dpCtx.getDPColNames());
     } else {
       // non-partitioned table
       fsInputDesc.getTableInfo().getProperties().remove(
@@ -1380,7 +1380,7 @@ public final class GenMapRedUtils {
     Path fsopPath = srcMmWriteId != null ? fsInputDesc.getFinalDirName() : finalName;
 
     Task<MoveWork> mvTask = GenMapRedUtils.findMoveTaskForFsopOutput(
-        mvTasks, fsopPath, fsInputDesc.isMmTable());
+        mvTasks, fsopPath, fsInputDesc.isMmTable(), fsInputDesc.isDirectInsert());
     ConditionalTask cndTsk = GenMapRedUtils.createCondTask(conf, currTask, dummyMv, work,
         fsInputDesc.getMergeInputDirName(), finalName, mvTask, dependencyTask, lineageState);
 
@@ -1489,10 +1489,15 @@ public final class GenMapRedUtils {
     boolean truncate = false;
     if (mvWork.getLoadTableWork() != null) {
       statsWork = new BasicStatsWork(mvWork.getLoadTableWork());
-      String tableName = mvWork.getLoadTableWork().getTable().getTableName();
       truncate = mvWork.getLoadTableWork().getReplace();
+      String tableName = mvWork.getLoadTableWork().getTable().getTableName();
       try {
-        table = Hive.get().getTable(SessionState.get().getCurrentDatabase(), tableName);
+        // For partitioned CTAS, the table has not been created, but we can retrieve it
+        // from the loadTableWork. For rest of query types, we just retrieve it from
+        // metastore.
+        table = mvWork.getLoadTableWork().getMdTable() != null ?
+            mvWork.getLoadTableWork().getMdTable() :
+            Hive.get().getTable(SessionState.get().getCurrentDatabase(), tableName);
       } catch (HiveException e) {
         throw new RuntimeException("unexpected; table should be present already..: " + tableName, e);
       }
@@ -1644,7 +1649,7 @@ public final class GenMapRedUtils {
     // create the merge file work
     MergeFileWork work = new MergeFileWork(inputDirs, finalName,
         hasDynamicPartitions, tblDesc.getInputFileFormatClass().getName(), tblDesc);
-    LinkedHashMap<Path, ArrayList<String>> pathToAliases = new LinkedHashMap<>();
+    Map<Path, List<String>> pathToAliases = new LinkedHashMap<>();
     pathToAliases.put(inputDir, inputDirstr);
     work.setMapperCannotSpanPartns(true);
     work.setPathToAliases(pathToAliases);
@@ -1862,8 +1867,8 @@ public final class GenMapRedUtils {
         .isSkewedStoredAsDir();
   }
 
-  public static Task<MoveWork> findMoveTaskForFsopOutput(
-      List<Task<MoveWork>> mvTasks, Path fsopFinalDir, boolean isMmFsop) {
+  public static Task<MoveWork> findMoveTaskForFsopOutput(List<Task<MoveWork>> mvTasks, Path fsopFinalDir,
+      boolean isMmFsop, boolean isDirectInsert) {
     // find the move task
     for (Task<MoveWork> mvTsk : mvTasks) {
       MoveWork mvWork = mvTsk.getWork();
@@ -1872,7 +1877,7 @@ public final class GenMapRedUtils {
       if (mvWork.getLoadFileWork() != null) {
         srcDir = mvWork.getLoadFileWork().getSourcePath();
         isLfd = true;
-        if (isMmFsop) {
+        if (isMmFsop || isDirectInsert) {
           srcDir = srcDir.getParent();
         }
       } else if (mvWork.getLoadTableWork() != null) {
@@ -1903,16 +1908,16 @@ public final class GenMapRedUtils {
 
     // no need of merging if the move is to a local file system
     // We are looking based on the original FSOP, so use the original path as is.
-    MoveTask mvTask = (MoveTask) GenMapRedUtils.findMoveTaskForFsopOutput(
-        mvTasks, fsOp.getConf().getFinalDirName(), fsOp.getConf().isMmTable());
+    MoveTask mvTask = (MoveTask) GenMapRedUtils.findMoveTaskForFsopOutput(mvTasks, fsOp.getConf().getFinalDirName(),
+        fsOp.getConf().isMmTable(), fsOp.getConf().isDirectInsert());
 
     // TODO: wtf?!! why is this in this method? This has nothing to do with anything.
-    if (mvTask != null && isInsertTable && hconf.getBoolVar(ConfVars.HIVESTATSAUTOGATHER)
+    if (isInsertTable && hconf.getBoolVar(ConfVars.HIVESTATSAUTOGATHER)
         && !fsOp.getConf().isMaterialization()) {
       // mark the MapredWork and FileSinkOperator for gathering stats
       fsOp.getConf().setGatherStats(true);
       fsOp.getConf().setStatsReliable(hconf.getBoolVar(ConfVars.HIVE_STATS_RELIABLE));
-      if (!mvTask.hasFollowingStatsTask()) {
+      if (mvTask != null && !mvTask.hasFollowingStatsTask()) {
         GenMapRedUtils.addStatsTask(fsOp, mvTask, currTask, hconf);
       }
     }
@@ -1978,9 +1983,15 @@ public final class GenMapRedUtils {
 
     FileSinkDesc fileSinkDesc = fsOp.getConf();
     boolean isMmTable = fileSinkDesc.isMmTable();
+    boolean isDirectInsert = fileSinkDesc.isDirectInsert();
     if (chDir) {
       dest = fileSinkDesc.getMergeInputDirName();
-      if (!isMmTable) {
+      /**
+       * Skip temporary file generation for:
+       * 1. MM Tables
+       * 2. INSERT operation on full ACID table
+       */
+      if ((!isMmTable) && (!isDirectInsert)) {
         // generate the temporary file
         // it must be on the same file system as the current destination
         Context baseCtx = parseCtx.getContext();
@@ -2011,8 +2022,8 @@ public final class GenMapRedUtils {
     Task<MoveWork> mvTask = null;
 
     if (!chDir) {
-      mvTask = GenMapRedUtils.findMoveTaskForFsopOutput(
-          mvTasks, fsOp.getConf().getFinalDirName(), fsOp.getConf().isMmTable());
+      mvTask = GenMapRedUtils.findMoveTaskForFsopOutput(mvTasks, fsOp.getConf().getFinalDirName(), isMmTable,
+          isDirectInsert);
     }
 
     // Set the move task to be dependent on the current task
@@ -2081,6 +2092,23 @@ public final class GenMapRedUtils {
     }
     return null;
   }
+
+  static void usePartitionColumns(Properties properties, Table table, List<String> partColNames) {
+    if (properties.containsKey(org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_PARTITION_COLUMNS)) {
+      usePartitionColumns(properties, partColNames);
+    } else {
+      List<FieldSchema> partCols = table.getPartCols();
+      String partNames = partCols.stream().map(FieldSchema::getName).collect(Collectors.joining("/"));
+      String partTypes = partCols.stream().map(FieldSchema::getType).collect(Collectors.joining(":"));
+      properties.setProperty(
+        org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_PARTITION_COLUMNS,
+        partNames);
+      properties.setProperty(
+        org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_PARTITION_COLUMN_TYPES,
+        partTypes);
+    }
+  }
+
   /**
    * Uses only specified partition columns.
    * Provided properties should be pre-populated with partition column names and types.

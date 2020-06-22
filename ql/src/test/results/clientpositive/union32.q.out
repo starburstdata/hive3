@@ -152,21 +152,25 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), UDFToLong(key) (type: bigint)
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -177,6 +181,7 @@ STAGE PLANS:
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
@@ -187,10 +192,10 @@ STAGE PLANS:
           keys:
             0 _col0 (type: string)
             1 _col0 (type: string)
-          outputColumnNames: _col0
+          outputColumnNames: _col1
           Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions: UDFToDouble(UDFToLong(_col0)) (type: double)
+            expressions: UDFToDouble(_col1) (type: double)
             outputColumnNames: _col0
             Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
@@ -313,21 +318,25 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), UDFToLong(key) (type: bigint)
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -338,6 +347,7 @@ STAGE PLANS:
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
@@ -348,10 +358,10 @@ STAGE PLANS:
           keys:
             0 _col0 (type: string)
             1 _col0 (type: string)
-          outputColumnNames: _col0
+          outputColumnNames: _col1
           Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions: UDFToDouble(UDFToLong(_col0)) (type: double)
+            expressions: UDFToDouble(_col1) (type: double)
             outputColumnNames: _col0
             Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
@@ -474,34 +484,40 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), UDFToLong(key) (type: bigint)
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), CAST( key AS CHAR(20)) (type: char(20))
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: char(20))
       Reduce Operator Tree:
         Join Operator
           condition map:
@@ -509,10 +525,10 @@ STAGE PLANS:
           keys:
             0 _col0 (type: string)
             1 _col0 (type: string)
-          outputColumnNames: _col0, _col1
+          outputColumnNames: _col1, _col3
           Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions: UDFToDouble(UDFToLong(_col0)) (type: double), UDFToString(CAST( _col1 AS CHAR(20))) (type: string)
+            expressions: UDFToDouble(_col1) (type: double), CAST( _col3 AS STRING) (type: string)
             outputColumnNames: _col0, _col1
             Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
@@ -635,34 +651,40 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), UDFToLong(key) (type: bigint)
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions: key (type: string)
-                outputColumnNames: _col0
+                expressions: key (type: string), CAST( key AS CHAR(20)) (type: char(20))
+                outputColumnNames: _col0, _col1
                 Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 10 Data size: 70 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: char(20))
       Reduce Operator Tree:
         Join Operator
           condition map:
@@ -670,10 +692,10 @@ STAGE PLANS:
           keys:
             0 _col0 (type: string)
             1 _col0 (type: string)
-          outputColumnNames: _col0, _col1
+          outputColumnNames: _col1, _col3
           Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions: UDFToDouble(UDFToLong(_col0)) (type: double), UDFToString(CAST( _col1 AS CHAR(20))) (type: string)
+            expressions: UDFToDouble(_col1) (type: double), CAST( _col3 AS STRING) (type: string)
             outputColumnNames: _col0, _col1
             Statistics: Num rows: 11 Data size: 77 Basic stats: COMPLETE Column stats: NONE
             File Output Operator

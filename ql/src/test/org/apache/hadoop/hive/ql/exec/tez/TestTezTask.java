@@ -28,7 +28,6 @@ import org.apache.hive.common.util.Ref;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -133,14 +132,14 @@ public class TestTezTask {
 
     op = mock(Operator.class);
 
-    LinkedHashMap<String, Operator<? extends OperatorDesc>> map
+    Map<String, Operator<? extends OperatorDesc>> map
       = new LinkedHashMap<String,Operator<? extends OperatorDesc>>();
     map.put("foo", op);
     mws[0].setAliasToWork(map);
     mws[1].setAliasToWork(map);
 
-    LinkedHashMap<Path, ArrayList<String>> pathMap = new LinkedHashMap<>();
-    ArrayList<String> aliasList = new ArrayList<String>();
+    Map<Path, List<String>> pathMap = new LinkedHashMap<>();
+    List<String> aliasList = new ArrayList<String>();
     aliasList.add("foo");
     pathMap.put(new Path("foo"), aliasList);
 
@@ -172,7 +171,7 @@ public class TestTezTask {
     SessionState.start(hiveConf);
     session = mock(TezClient.class);
     sessionState = mock(TezSessionState.class);
-    when(sessionState.getSession()).thenReturn(session);
+    when(sessionState.getTezClient()).thenReturn(session);
     when(sessionState.reopen()).thenReturn(sessionState);
     when(session.submitDAG(any(DAG.class)))
       .thenThrow(new SessionNotRunning(""))
@@ -220,7 +219,7 @@ public class TestTezTask {
   @Test
   public void testSubmit() throws Exception {
     DAG dag = DAG.create("test");
-    task.submit(conf, dag, Ref.from(sessionState));
+    task.submit(dag, Ref.from(sessionState));
     // validate close/reopen
     verify(sessionState, times(1)).reopen();
     verify(session, times(2)).submitDAG(any(DAG.class));
@@ -234,9 +233,10 @@ public class TestTezTask {
 
   @Test
   public void testExistingSessionGetsStorageHandlerResources() throws Exception {
-    final String[] inputOutputJars = new String[] {"file:///tmp/foo.jar"};
+    final String jarFilePath = "file:///tmp/foo.jar";
+    final String[] inputOutputJars = new String[] {jarFilePath};
     LocalResource res = createResource(inputOutputJars[0]);
-    final List<LocalResource> resources = Collections.singletonList(res);
+    final Map<String, LocalResource> resources = Collections.singletonMap(jarFilePath, res);
 
     when(utils.localizeTempFiles(anyString(), any(Configuration.class), eq(inputOutputJars),
         any(String[].class))).thenReturn(resources);

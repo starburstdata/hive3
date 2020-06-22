@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.io.arrow;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
@@ -102,6 +103,7 @@ public class TestArrowColumnarBatchSerDe {
       {text(""), charW("", 10), varcharW("", 10)},
       {text("Hello"), charW("Hello", 10), varcharW("Hello", 10)},
       {text("world!"), charW("world!", 10), varcharW("world!", 10)},
+      {text("안녕?"), charW("안녕?", 10), varcharW("안녕?", 10)},
       {null, null, null},
   };
 
@@ -239,7 +241,6 @@ public class TestArrowColumnarBatchSerDe {
     if (serialized == null) {
       serialized = serDe.serialize(null, rowOI);
     }
-    String s = serialized.getVectorSchemaRoot().contentToTSVString();
     final Object[][] deserializedRows = (Object[][]) serDe.deserialize(serialized);
 
     for (int rowIndex = 0; rowIndex < Math.min(deserializedRows.length, rows.length); rowIndex++) {
@@ -516,6 +517,45 @@ public class TestArrowColumnarBatchSerDe {
     initAndSerializeAndDeserialize(schema, rows);
   }
 
+
+  @Test
+  public void testTimestampNanosPrecisionUpTo6Digits() throws SerDeException {
+    String[][] schema = {
+        {"timestamp1", "timestamp"},
+    };
+    //Nanos precise upto 6 digits
+    Object[][] tsRows = new Object[][]{
+        {new TimestampWritableV2(Timestamp.valueOf("1800-04-01 09:01:10.123999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("2050-04-01 09:01:10.999999"))},
+        null
+    };
+    initAndSerializeAndDeserialize(schema, tsRows);
+  }
+
+  @Test
+  public void testPositiveNegativeTSWithNanos() throws SerDeException {
+    String[][] schema = {
+        {"timestamp1", "timestamp"},
+    };
+
+    Object[][] tsRows = new Object[][]{
+        {new TimestampWritableV2(Timestamp.valueOf("1963-04-01 09:01:10.123"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1800-04-01 09:01:10.123999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1750-04-01 09:01:10.123999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1700-04-01 09:01:10.999999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("2050-04-01 09:01:10.999999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1991-06-05 09:01:10.999999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1992-11-04 09:01:10.999999"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1970-01-01 00:00:00"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1964-01-01 00:00:04.78"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1950-01-01 09:23:03.21"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1956-01-01 10:09:03.00"))},
+        {new TimestampWritableV2(Timestamp.valueOf("1947-08-27 10:25:36.26"))},
+        null
+    };
+    initAndSerializeAndDeserialize(schema, tsRows);
+  }
+
   @Test
   public void testPrimitiveDecimal() throws SerDeException {
     String[][] schema = {
@@ -523,6 +563,31 @@ public class TestArrowColumnarBatchSerDe {
     };
 
     initAndSerializeAndDeserialize(schema, DECIMAL_ROWS);
+  }
+
+  @Test
+  public void testRandomPrimitiveDecimal() throws SerDeException {
+    String[][] schema = {
+        {"decimal1", "decimal(38,10)"},
+    };
+
+    int size = 1000;
+    Object[][] randomDecimals = new Object[size][];
+    Random random = new Random();
+    for (int i = 0; i < size; i++) {
+      StringBuilder builder = new StringBuilder();
+      builder.append(random.nextBoolean() ? '+' : '-');
+      for (int j = 0; j < 28 ; j++) {
+        builder.append(random.nextInt(10));
+      }
+      builder.append('.');
+      for (int j = 0; j < 10; j++) {
+        builder.append(random.nextInt(10));
+      }
+      randomDecimals[i] = new Object[] {decimalW(HiveDecimal.create(builder.toString()))};
+    }
+
+    initAndSerializeAndDeserialize(schema, randomDecimals);
   }
 
   @Test
@@ -766,6 +831,32 @@ public class TestArrowColumnarBatchSerDe {
     };
 
     initAndSerializeAndDeserialize(schema, toMap(BINARY_ROWS));
+  }
+
+  @Test
+  public void testPrimitiveCharPadding() throws SerDeException {
+    String[][] schema = {
+        {"char1", "char(10)"},
+    };
+
+    HiveCharWritable[][] rows = new HiveCharWritable[][] {
+        {charW("Hello", 10)}, {charW("world!", 10)}};
+    ArrowColumnarBatchSerDe serDe = new ArrowColumnarBatchSerDe();
+    StructObjectInspector rowOI = initSerDe(serDe, schema);
+
+    ArrowWrapperWritable serialized = null;
+    for (Object[] row : rows) {
+      serialized = serDe.serialize(row, rowOI);
+    }
+    // Pass null to complete a batch
+    if (serialized == null) {
+      serialized = serDe.serialize(null, rowOI);
+    }
+
+    VarCharVector varCharVector = (VarCharVector) serialized.getVectorSchemaRoot().getFieldVectors().get(0);
+    for (int i = 0; i < rows.length; i++) {
+      assertEquals(rows[i][0].getPaddedValue().toString(), new String(varCharVector.get(i)));
+    }
   }
 
   public void testMapDecimal() throws SerDeException {

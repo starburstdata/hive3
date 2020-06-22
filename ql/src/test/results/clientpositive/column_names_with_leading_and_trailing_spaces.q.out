@@ -48,19 +48,19 @@ PREHOOK: Input: default@space
 POSTHOOK: query: desc formatted space ` left`
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@space
-col_name            	 left               	 	 	 	 	 	 	 	 	 	 
-data_type           	string              	 	 	 	 	 	 	 	 	 	 
-min                 	                    	 	 	 	 	 	 	 	 	 	 
-max                 	                    	 	 	 	 	 	 	 	 	 	 
-num_nulls           	                    	 	 	 	 	 	 	 	 	 	 
-distinct_count      	                    	 	 	 	 	 	 	 	 	 	 
-avg_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-max_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-num_trues           	                    	 	 	 	 	 	 	 	 	 	 
-num_falses          	                    	 	 	 	 	 	 	 	 	 	 
-bitVector           	                    	 	 	 	 	 	 	 	 	 	 
-comment             	from deserializer   	 	 	 	 	 	 	 	 	 	 
-COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\" left\":\"true\",\" middle \":\"true\",\"right \":\"true\"}}	 	 	 	 	 	 	 	 	 	 
+col_name            	 left               
+data_type           	string              
+min                 	                    
+max                 	                    
+num_nulls           	                    
+distinct_count      	                    
+avg_col_len         	                    
+max_col_len         	                    
+num_trues           	                    
+num_falses          	                    
+bit_vector          	                    
+comment             	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\" left\":\"true\",\" middle \":\"true\",\"right \":\"true\"}}
 PREHOOK: query: insert into space values ("1", "2", "3")
 PREHOOK: type: QUERY
 PREHOOK: Input: _dummy_database@_dummy_table
@@ -78,19 +78,19 @@ PREHOOK: Input: default@space
 POSTHOOK: query: desc formatted space ` left`
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@space
-col_name            	 left               	 	 	 	 	 	 	 	 	 	 
-data_type           	string              	 	 	 	 	 	 	 	 	 	 
-min                 	                    	 	 	 	 	 	 	 	 	 	 
-max                 	                    	 	 	 	 	 	 	 	 	 	 
-num_nulls           	0                   	 	 	 	 	 	 	 	 	 	 
-distinct_count      	1                   	 	 	 	 	 	 	 	 	 	 
-avg_col_len         	1.0                 	 	 	 	 	 	 	 	 	 	 
-max_col_len         	1                   	 	 	 	 	 	 	 	 	 	 
-num_trues           	                    	 	 	 	 	 	 	 	 	 	 
-num_falses          	                    	 	 	 	 	 	 	 	 	 	 
-bitVector           	HL                  	 	 	 	 	 	 	 	 	 	 
-comment             	from deserializer   	 	 	 	 	 	 	 	 	 	 
-COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\" left\":\"true\",\" middle \":\"true\",\"right \":\"true\"}}	 	 	 	 	 	 	 	 	 	 
+col_name            	 left               
+data_type           	string              
+min                 	                    
+max                 	                    
+num_nulls           	0                   
+distinct_count      	1                   
+avg_col_len         	1.0                 
+max_col_len         	1                   
+num_trues           	                    
+num_falses          	                    
+bit_vector          	HL                  
+comment             	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\" left\":\"true\",\" middle \":\"true\",\"right \":\"true\"}}
 PREHOOK: query: select * from space
 PREHOOK: type: QUERY
 PREHOOK: Input: default@space
@@ -119,5 +119,5 @@ POSTHOOK: query: select * from space order by ` left`
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@space
 #### A masked pattern was here ####
-NULL	2	NULL
 1	2	3
+NULL	2	NULL

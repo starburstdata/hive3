@@ -40,16 +40,6 @@ POSTHOOK: Lineage: cmv_basetable_n7.a SCRIPT []
 POSTHOOK: Lineage: cmv_basetable_n7.b SCRIPT []
 POSTHOOK: Lineage: cmv_basetable_n7.c SCRIPT []
 POSTHOOK: Lineage: cmv_basetable_n7.d SCRIPT []
-PREHOOK: query: analyze table cmv_basetable_n7 compute statistics for columns
-PREHOOK: type: ANALYZE_TABLE
-PREHOOK: Input: db1@cmv_basetable_n7
-PREHOOK: Output: db1@cmv_basetable_n7
-#### A masked pattern was here ####
-POSTHOOK: query: analyze table cmv_basetable_n7 compute statistics for columns
-POSTHOOK: type: ANALYZE_TABLE
-POSTHOOK: Input: db1@cmv_basetable_n7
-POSTHOOK: Output: db1@cmv_basetable_n7
-#### A masked pattern was here ####
 PREHOOK: query: create database db2
 PREHOOK: type: CREATEDATABASE
 PREHOOK: Output: database:db2
@@ -88,12 +78,13 @@ PREHOOK: query: show tblproperties cmv_mat_view_n7
 PREHOOK: type: SHOW_TBLPROPERTIES
 POSTHOOK: query: show tblproperties cmv_mat_view_n7
 POSTHOOK: type: SHOW_TBLPROPERTIES
-COLUMN_STATS_ACCURATE	{"BASIC_STATS":"true"}
+COLUMN_STATS_ACCURATE	{"BASIC_STATS":"true","COLUMN_STATS":{"a":"true","b":"true","c":"true"}}
 bucketing_version	2
 numFiles	1
+numFilesErasureCoded	0
 numRows	2
 rawDataSize	408
-totalSize	467
+totalSize	459
 #### A masked pattern was here ####
 PREHOOK: query: create materialized view if not exists cmv_mat_view2_n2
 as select a, c from db1.cmv_basetable_n7 where a = 3
@@ -121,12 +112,13 @@ PREHOOK: query: show tblproperties cmv_mat_view2_n2
 PREHOOK: type: SHOW_TBLPROPERTIES
 POSTHOOK: query: show tblproperties cmv_mat_view2_n2
 POSTHOOK: type: SHOW_TBLPROPERTIES
-COLUMN_STATS_ACCURATE	{"BASIC_STATS":"true"}
+COLUMN_STATS_ACCURATE	{"BASIC_STATS":"true","COLUMN_STATS":{"a":"true","c":"true"}}
 bucketing_version	2
 numFiles	1
+numFilesErasureCoded	0
 numRows	2
 rawDataSize	232
-totalSize	332
+totalSize	328
 #### A masked pattern was here ####
 PREHOOK: query: create database db3
 PREHOOK: type: CREATEDATABASE
@@ -163,7 +155,7 @@ STAGE PLANS:
         TableScan
           alias: db2.cmv_mat_view2_n2
           Select Operator
-            expressions: 3 (type: int), c (type: decimal(10,2))
+            expressions: a (type: int), c (type: decimal(10,2))
             outputColumnNames: _col0, _col1
             ListSink
 

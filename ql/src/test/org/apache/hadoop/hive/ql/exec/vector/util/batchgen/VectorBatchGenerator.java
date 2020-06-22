@@ -23,8 +23,11 @@ import java.util.Random;
 
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DateColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.exec.vector.util.batchgen.VectorBatchGenerator.GenerateType.GenerateCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
@@ -109,13 +112,23 @@ public class VectorBatchGenerator {
     }
 
     private GenerateCategory category;
+    private boolean allowNulls;
 
     public GenerateType(GenerateCategory category) {
       this.category = category;
     }
 
+    public GenerateType(GenerateCategory category, boolean allowNulls) {
+      this.category = category;
+      this.allowNulls = allowNulls;
+    }
+
     public GenerateCategory getCategory() {
       return category;
+    }
+
+    public boolean getAllowNulls() {
+      return allowNulls;
     }
 
     /*
@@ -183,22 +196,32 @@ public class VectorBatchGenerator {
       colVector = new LongColumnVector();
       break;
 
+    case DATE:
+      colVector = new DateColumnVector();
+      break;
+
     case FLOAT:
     case DOUBLE:
       colVector = new DoubleColumnVector();
       break;
 
     case STRING:
+    case CHAR:
+    case VARCHAR:
+    case BINARY:
       colVector = new BytesColumnVector();
       break;
 
-    // UNDONE
-    case DATE:
     case TIMESTAMP:
-    case BINARY:
+      colVector = new TimestampColumnVector();
+      break;
+
     case DECIMAL:
-    case VARCHAR:
-    case CHAR:
+      colVector = new DecimalColumnVector(38, 18);
+      break;
+
+    // UNDONE
+
     case LIST:
     case MAP:
     case STRUCT:

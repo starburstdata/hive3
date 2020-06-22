@@ -181,10 +181,12 @@ STAGE PLANS:
               Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: sum(c1)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
+                  null sort order: 
                   sort order: 
                   Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: decimal(25,2))
@@ -208,6 +210,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: 0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: 0 (type: int)
               Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: NONE
@@ -298,11 +301,13 @@ STAGE PLANS:
               Group By Operator
                 aggregations: sum(c1)
                 keys: c1 (type: decimal(15,2)), c2 (type: decimal(15,2))
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0, _col1, _col2
                 Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
+                  null sort order: aa
                   sort order: ++
                   Map-reduce partition columns: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
@@ -328,6 +333,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col1 (type: decimal(15,2)), _col0 (type: decimal(15,2))
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: _col1 (type: decimal(15,2))
               Statistics: Num rows: 2 Data size: 6 Basic stats: COMPLETE Column stats: NONE
@@ -347,7 +353,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col0 ASC NULLS FIRST
+                  order by: _col0 ASC NULLS LAST
                   partition by: _col1
                   raw input shape:
                   window functions:
@@ -424,6 +430,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: e011_01
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -434,12 +441,14 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: decimal(15,2))
           TableScan
             alias: e011_03
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -450,6 +459,7 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
@@ -465,6 +475,7 @@ STAGE PLANS:
           Group By Operator
             aggregations: sum(_col0)
             keys: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
+            minReductionHashAggr: 0.99
             mode: hash
             outputColumnNames: _col0, _col1, _col2
             Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -481,6 +492,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
+              null sort order: aa
               sort order: ++
               Map-reduce partition columns: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
               Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -506,6 +518,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col1 (type: decimal(15,2)), _col0 (type: decimal(15,2))
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: _col1 (type: decimal(15,2))
               Statistics: Num rows: 2 Data size: 6 Basic stats: COMPLETE Column stats: NONE
@@ -525,7 +538,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col0 ASC NULLS FIRST
+                  order by: _col0 ASC NULLS LAST
                   partition by: _col1
                   raw input shape:
                   window functions:
@@ -606,6 +619,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: e011_01
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -616,11 +630,13 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: e011_03
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -631,6 +647,7 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
@@ -647,6 +664,7 @@ STAGE PLANS:
           Group By Operator
             aggregations: sum(_col0)
             keys: _col1 (type: decimal(15,2)), _col2 (type: decimal(15,2))
+            minReductionHashAggr: 0.99
             mode: hash
             outputColumnNames: _col0, _col1, _col2
             Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -663,6 +681,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
+              null sort order: aa
               sort order: ++
               Map-reduce partition columns: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
               Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -688,6 +707,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col1 (type: decimal(15,2)), _col0 (type: decimal(15,2))
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: _col1 (type: decimal(15,2))
               Statistics: Num rows: 2 Data size: 6 Basic stats: COMPLETE Column stats: NONE
@@ -707,7 +727,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col0 ASC NULLS FIRST
+                  order by: _col0 ASC NULLS LAST
                   partition by: _col1
                   raw input shape:
                   window functions:
@@ -787,6 +807,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: e011_01
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -797,12 +818,14 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 12 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: decimal(15,2))
           TableScan
             alias: e011_03
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -813,6 +836,7 @@ STAGE PLANS:
                 Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: decimal(15,2))
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: decimal(15,2))
                   Statistics: Num rows: 4 Data size: 36 Basic stats: COMPLETE Column stats: NONE
@@ -829,6 +853,7 @@ STAGE PLANS:
           Group By Operator
             aggregations: corr(_col0, _col2)
             keys: _col1 (type: decimal(15,2)), _col3 (type: decimal(15,2))
+            minReductionHashAggr: 0.99
             mode: hash
             outputColumnNames: _col0, _col1, _col2
             Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -845,6 +870,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: decimal(15,2)), _col1 (type: decimal(15,2))
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: _col0 (type: decimal(15,2))
               Statistics: Num rows: 4 Data size: 13 Basic stats: COMPLETE Column stats: NONE
@@ -866,7 +892,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col1 ASC NULLS FIRST
+                  order by: _col1 ASC NULLS LAST
                   partition by: _col0
                   raw input shape:
                   window functions:

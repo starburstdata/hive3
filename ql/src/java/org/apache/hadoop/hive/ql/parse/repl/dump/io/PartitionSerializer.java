@@ -19,7 +19,7 @@ package org.apache.hadoop.hive.ql.parse.repl.dump.io;
 
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.ql.ErrorMsg;
-import org.apache.hadoop.hive.ql.exec.repl.ReplUtils;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
 import org.apache.hadoop.hive.ql.parse.ReplicationSpec;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.thrift.TException;
@@ -57,10 +57,6 @@ public class PartitionSerializer implements JsonWriter.Serializer {
           partition.putToParameters(
                   ReplicationSpec.KEY.CURR_STATE_ID.toString(),
                   additionalPropertiesProvider.getCurrentReplicationState());
-        }
-        if (isPartitionExternal()) {
-          // Replication destination will not be external
-          partition.putToParameters("EXTERNAL", "FALSE");
         }
       }
       writer.jsonGenerator.writeString(serializer.toString(partition, UTF_8));

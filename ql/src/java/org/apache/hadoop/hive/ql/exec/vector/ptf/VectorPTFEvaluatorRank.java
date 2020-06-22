@@ -42,16 +42,16 @@ public class VectorPTFEvaluatorRank extends VectorPTFEvaluatorBase {
   private int rank;
   private int groupCount;
 
-  public VectorPTFEvaluatorRank(WindowFrameDef windowFrameDef, VectorExpression inputVecExpr,
-      int outputColumnNum) {
-    super(windowFrameDef, inputVecExpr, outputColumnNum);
+  public VectorPTFEvaluatorRank(WindowFrameDef windowFrameDef, int outputColumnNum) {
+    super(windowFrameDef, outputColumnNum);
     resetEvaluator();
   }
 
-  public void evaluateGroupBatch(VectorizedRowBatch batch, boolean isLastGroupBatch)
+  @Override
+  public void evaluateGroupBatch(VectorizedRowBatch batch)
       throws HiveException {
 
-    evaluateInputExpr(batch);
+    // We don't evaluate input columns...
 
     /*
      * Do careful maintenance of the outputColVector.noNulls flag.
@@ -62,13 +62,15 @@ public class VectorPTFEvaluatorRank extends VectorPTFEvaluatorBase {
     longColVector.isNull[0] = false;
     longColVector.vector[0] = rank;
     groupCount += batch.size;
-
-    if (isLastGroupBatch) {
-      rank += groupCount;
-      groupCount = 0;
-    }
   }
 
+  @Override
+  public void doLastBatchWork() {
+    rank += groupCount;
+    groupCount = 0;
+  }
+
+  @Override
   public boolean streamsResult() {
     // No group value.
     return true;

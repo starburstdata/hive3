@@ -32,6 +32,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: (key is not null and hr is not null) (type: boolean)
                   Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: key is not null (type: boolean)
@@ -42,6 +43,7 @@ STAGE PLANS:
                       Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: aa
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
@@ -50,6 +52,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: b
+                  filterExpr: (key is not null and hr is not null) (type: boolean)
                   Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: key is not null (type: boolean)
@@ -60,6 +63,7 @@ STAGE PLANS:
                       Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: aa
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
@@ -68,6 +72,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
+                  filterExpr: (key is not null and hr is not null) (type: boolean)
                   Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: key is not null (type: boolean)
@@ -78,6 +83,7 @@ STAGE PLANS:
                       Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: aa
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
@@ -95,10 +101,12 @@ STAGE PLANS:
                 Statistics: Num rows: 4400 Data size: 46745 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: count()
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col0 (type: bigint)

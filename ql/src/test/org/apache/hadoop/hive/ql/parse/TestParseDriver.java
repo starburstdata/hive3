@@ -272,7 +272,7 @@ public class TestParseDriver {
     }
   }
 
-  @Test(timeout = 10000)
+  @Test(timeout = 20000)
   public void testExoticSJSSubQuery() throws Exception {
     ExoticQueryBuilder eqb = new ExoticQueryBuilder();
     eqb.recursiveSJS(10);
@@ -302,6 +302,27 @@ public class TestParseDriver {
     ASTNode root = parseDriver.parse(q);
     System.out.println(root.dump());
 
+  }
+
+  @Test
+  public void testParseCreateScheduledQuery() throws Exception {
+    parseDriver.parse("create scheduled query asd cron '123' as select 1");
+    parseDriver.parse("create scheduled query asd cron '123' executed as 'x' as select 1");
+    parseDriver.parse("create scheduled query asd cron '123' executed as 'x' defined as select 1");
+    parseDriver.parse("create scheduled query asd cron '123' executed as 'x' disabled defined as select 1");
+  }
+
+  @Test
+  public void testParseAlterScheduledQuery() throws Exception {
+    parseDriver.parse("alter scheduled query asd cron '123'");
+    parseDriver.parse("alter scheduled query asd disabled");
+    parseDriver.parse("alter scheduled query asd defined as select 22");
+    parseDriver.parse("alter scheduled query asd executed as 'joe'");
+  }
+
+  @Test
+  public void testParseDropScheduledQuery() throws Exception {
+    parseDriver.parse("drop scheduled query asd");
   }
 
 }

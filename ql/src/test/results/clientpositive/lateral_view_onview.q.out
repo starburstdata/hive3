@@ -69,6 +69,7 @@ STAGE PLANS:
                     Statistics: Num rows: 1000 Data size: 17000 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string), _col4 (type: int)
+                      null sort order: zz
                       sort order: ++
                       Statistics: Num rows: 1000 Data size: 17000 Basic stats: COMPLETE Column stats: NONE
                       TopN Hash Memory Usage: 0.1
@@ -85,6 +86,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1000 Data size: 17000 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col4 (type: int)
+                        null sort order: zz
                         sort order: ++
                         Statistics: Num rows: 1000 Data size: 17000 Basic stats: COMPLETE Column stats: NONE
                         TopN Hash Memory Usage: 0.1
@@ -110,6 +112,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col4 (type: int)
+              null sort order: zz
               sort order: ++
               Statistics: Num rows: 1 Data size: 17 Basic stats: COMPLETE Column stats: NONE
               TopN Hash Memory Usage: 0.1
@@ -708,24 +711,28 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: lv_table1_n0
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 28000 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
               Statistics: Num rows: 500 Data size: 28000 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: c1 (type: string)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: c1 (type: string)
                 Statistics: Num rows: 500 Data size: 28000 Basic stats: COMPLETE Column stats: NONE
                 value expressions: c3 (type: int), c4 (type: char(1)), c5 (type: string), c6 (type: string), c7 (type: string), c8 (type: string), c9 (type: string), c10 (type: string), c11 (type: string), c12 (type: string), c13 (type: string)
           TableScan
             alias: lv_table2
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5500 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
               Statistics: Num rows: 500 Data size: 5500 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: c1 (type: string)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: c1 (type: string)
                 Statistics: Num rows: 500 Data size: 5500 Basic stats: COMPLETE Column stats: NONE
@@ -781,6 +788,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col13 (type: int)
+              null sort order: zz
               sort order: ++
               Statistics: Num rows: 1100 Data size: 61600 Basic stats: COMPLETE Column stats: NONE
               TopN Hash Memory Usage: 0.1
@@ -807,6 +815,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col13 (type: int)
+              null sort order: zz
               sort order: ++
               Statistics: Num rows: 1 Data size: 56 Basic stats: COMPLETE Column stats: NONE
               TopN Hash Memory Usage: 0.1

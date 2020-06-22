@@ -10,6 +10,7 @@ set hive.auto.convert.sortmerge.join=false;
 set hive.optimize.bucketmapjoin = true;
 set hive.optimize.bucketmapjoin.sortedmerge = true;
 
+set hive.default.nulls.last=false;
 -- SORT_QUERY_RESULTS
 
 CREATE TABLE stage_bucket_big_n17
@@ -17,7 +18,8 @@ CREATE TABLE stage_bucket_big_n17
 key BIGINT,
 value STRING
 )
-PARTITIONED BY (file_tag STRING);
+PARTITIONED BY (file_tag STRING)
+TBLPROPERTIES('bucketing_version'='1');
 
 CREATE TABLE bucket_big_n17
 (
@@ -33,7 +35,8 @@ CREATE TABLE stage_bucket_small_n17
 key BIGINT,
 value string
 )
-PARTITIONED BY (file_tag STRING);
+PARTITIONED BY (file_tag STRING)
+TBLPROPERTIES('bucketing_version'='1');
 
 CREATE TABLE bucket_small_n17
 (

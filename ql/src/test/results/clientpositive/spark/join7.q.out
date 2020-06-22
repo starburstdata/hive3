@@ -59,16 +59,17 @@ STAGE PLANS:
   Stage: Stage-1
     Spark
       Edges:
-        Reducer 2 <- Map 1 (PARTITION-LEVEL SORT, 2), Map 3 (PARTITION-LEVEL SORT, 2), Map 4 (PARTITION-LEVEL SORT, 2)
+        Reducer 2 <- Map 1 (PARTITION-LEVEL SORT, 8), Map 3 (PARTITION-LEVEL SORT, 8), Map 4 (PARTITION-LEVEL SORT, 8)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: ((UDFToDouble(key) > 10.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((UDFToDouble(key) < 20.0D) and (UDFToDouble(key) > 10.0D)) (type: boolean)
+                    predicate: ((UDFToDouble(key) > 10.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
                       expressions: key (type: string), value (type: string)
@@ -76,6 +77,7 @@ STAGE PLANS:
                       Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
@@ -85,9 +87,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 25.0D)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((UDFToDouble(key) < 25.0D) and (UDFToDouble(key) > 15.0D)) (type: boolean)
+                    predicate: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 25.0D)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
                       expressions: key (type: string), value (type: string)
@@ -95,6 +98,7 @@ STAGE PLANS:
                       Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
@@ -104,9 +108,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: ((UDFToDouble(key) > 20.0D) and (UDFToDouble(key) < 25.0D)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((UDFToDouble(key) < 25.0D) and (UDFToDouble(key) > 20.0D)) (type: boolean)
+                    predicate: ((UDFToDouble(key) > 20.0D) and (UDFToDouble(key) < 25.0D)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
                       expressions: key (type: string), value (type: string)
@@ -114,6 +119,7 @@ STAGE PLANS:
                       Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
@@ -123,7 +129,7 @@ STAGE PLANS:
             Reduce Operator Tree:
               Join Operator
                 condition map:
-                     Outer Join 0 to 1
+                     Full Outer Join 0 to 1
                      Left Outer Join 0 to 2
                 keys:
                   0 _col0 (type: string)

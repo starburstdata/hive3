@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.stats.StatsUtils;
@@ -82,6 +83,8 @@ public class TestHive extends TestCase {
     // enable trash so it can be tested
     hiveConf.setFloat("fs.trash.checkpoint.interval", 30);  // FS_TRASH_CHECKPOINT_INTERVAL_KEY (hadoop-2)
     hiveConf.setFloat("fs.trash.interval", 30);             // FS_TRASH_INTERVAL_KEY (hadoop-2)
+    hiveConf.setBoolVar(ConfVars.HIVE_IN_TEST, true);
+    MetastoreConf.setBoolVar(hiveConf, MetastoreConf.ConfVars.HIVE_IN_TEST, true);
     SessionState.start(hiveConf);
     try {
       hm = Hive.get(hiveConf);
@@ -307,6 +310,9 @@ public class TestHive extends TestCase {
       tbl.getTTable().setPrivilegesIsSet(false);
 
       ft = hm.getTable(Warehouse.DEFAULT_DATABASE_NAME, tableName);
+      Assert.assertTrue(ft.getTTable().isSetId());
+      ft.getTTable().unsetId();
+
       assertNotNull("Unable to fetch table", ft);
       ft.checkValidity(hiveConf);
       assertEquals("Table names didn't match for table: " + tableName, tbl
@@ -324,6 +330,19 @@ public class TestHive extends TestCase {
       tbl.setCreateTime(ft.getTTable().getCreateTime());
       tbl.getParameters().put(hive_metastoreConstants.DDL_TIME,
           ft.getParameters().get(hive_metastoreConstants.DDL_TIME));
+      // Txn stuff set by metastore
+      if (tbl.getTTable().isSetWriteId() != ft.getTTable().isSetWriteId()) {
+        // No need to compare this field.
+        ft.getTTable().setWriteId(0);
+        tbl.getTTable().setWriteId(0);
+      }
+      // accessType set by HMS Transformer
+      if (tbl.getTTable().isSetAccessType() != ft.getTTable().isSetAccessType()) {
+        // No need to compare this field.
+        tbl.getTTable().setAccessType(ft.getTTable().getAccessType());
+      }
+
+      tbl.getTTable().unsetId();
       assertTrue("Tables  doesn't match: " + tableName + " (" + ft.getTTable()
           + "; " + tbl.getTTable() + ")", ft.getTTable().equals(tbl.getTTable()));
       assertEquals("SerializationLib is not set correctly", tbl
@@ -593,7 +612,7 @@ public class TestHive extends TestCase {
 
       Table table = createPartitionedTable(dbName, tableName);
       table.getParameters().put("auto.purge", "true");
-      hm.alterTable(tableName, table, null);
+      hm.alterTable(tableName, table, false, null, true);
 
       Map<String, String> partitionSpec =  new ImmutableMap.Builder<String, String>()
           .put("ds", "20141216")

@@ -33,6 +33,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: srcpart
+            filterExpr: ds is not null (type: boolean)
             Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: key (type: string), value (type: string), ds (type: string), hr (type: string)
@@ -110,6 +111,7 @@ Retention:          	0
 #### A masked pattern was here ####
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
+	bucketing_version   	2                   
 	numFiles            	4                   
 	numPartitions       	4                   
 	numRows             	0                   
@@ -161,7 +163,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: analyze_t1
-            Statistics: Num rows: 392 Data size: 232480 Basic stats: COMPLETE Column stats: NONE
+            Statistics: Num rows: 392 Data size: 232480 Basic stats: PARTIAL Column stats: NONE
 
   Stage: Stage-1
     Stats Work
@@ -214,6 +216,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\"}
+	bucketing_version   	2                   
 	numFiles            	4                   
 	numPartitions       	4                   
 	numRows             	2000                

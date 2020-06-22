@@ -34,7 +34,7 @@ POSTHOOK: Input: default@unique_timestamps
 POSTHOOK: Output: default@interval_arithmetic_1
 POSTHOOK: Lineage: interval_arithmetic_1.dateval EXPRESSION [(unique_timestamps)unique_timestamps.FieldSchema(name:tsval, type:timestamp, comment:null), ]
 POSTHOOK: Lineage: interval_arithmetic_1.tsval SIMPLE [(unique_timestamps)unique_timestamps.FieldSchema(name:tsval, type:timestamp, comment:null), ]
-tsval	tsval
+tsval	tsval_1
 PREHOOK: query: explain vectorization expression
 select
   dateval,
@@ -92,6 +92,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: date)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -261,6 +262,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: date)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -430,6 +432,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: timestamp)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -706,6 +709,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: date)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -877,6 +881,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: date)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -1048,6 +1053,7 @@ STAGE PLANS:
               Statistics: Num rows: 50 Data size: 4800 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: timestamp)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator

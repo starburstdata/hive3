@@ -1,31 +1,43 @@
-PREHOOK: query: create table A_n18 as
-select * from src
-PREHOOK: type: CREATETABLE_AS_SELECT
-PREHOOK: Input: default@src
+PREHOOK: query: create table A_n18 (key string, value string)
+PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@A_n18
-POSTHOOK: query: create table A_n18 as
-select * from src
-POSTHOOK: type: CREATETABLE_AS_SELECT
-POSTHOOK: Input: default@src
+POSTHOOK: query: create table A_n18 (key string, value string)
+POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@A_n18
+PREHOOK: query: insert into A_n18
+select * from src
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+PREHOOK: Output: default@a_n18
+POSTHOOK: query: insert into A_n18
+select * from src
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+POSTHOOK: Output: default@a_n18
 POSTHOOK: Lineage: a_n18.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: a_n18.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: create table B_n14 as
-select * from src order by key
-limit 10
-PREHOOK: type: CREATETABLE_AS_SELECT
-PREHOOK: Input: default@src
+PREHOOK: query: create table B_n14 (key string, value string)
+PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@B_n14
-POSTHOOK: query: create table B_n14 as
-select * from src order by key
-limit 10
-POSTHOOK: type: CREATETABLE_AS_SELECT
-POSTHOOK: Input: default@src
+POSTHOOK: query: create table B_n14 (key string, value string)
+POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@B_n14
+PREHOOK: query: insert into B_n14
+select * from src order by key
+limit 10
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+PREHOOK: Output: default@b_n14
+POSTHOOK: query: insert into B_n14
+select * from src order by key
+limit 10
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+POSTHOOK: Output: default@b_n14
 POSTHOOK: Lineage: b_n14.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: b_n14.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 Warning: Map Join MAPJOIN[8][bigTable=?] in task 'Stage-3:MAPRED' is a cross product
@@ -142,6 +154,7 @@ STAGE PLANS:
         d1 
           TableScan
             alias: d1
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -160,6 +173,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: d2
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -236,6 +250,7 @@ STAGE PLANS:
         od1:d1 
           TableScan
             alias: od1:d1
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -254,6 +269,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: od1:d2
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -276,11 +292,13 @@ STAGE PLANS:
                     Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: key (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0
                       Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE
@@ -411,11 +429,13 @@ STAGE PLANS:
                   Statistics: Num rows: 100 Data size: 1460 Basic stats: COMPLETE Column stats: NONE
                   Group By Operator
                     keys: key (type: string)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 100 Data size: 1460 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 100 Data size: 1460 Basic stats: COMPLETE Column stats: NONE
@@ -526,11 +546,13 @@ STAGE PLANS:
               Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 keys: key (type: string)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -630,11 +652,13 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             Reduce Output Operator
+              null sort order: 
               sort order: 
               Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
               value expressions: key (type: string)
           TableScan
             Reduce Output Operator
+              null sort order: 
               sort order: 
               Statistics: Num rows: 5 Data size: 47 Basic stats: COMPLETE Column stats: NONE
               value expressions: key (type: string)
@@ -665,6 +689,7 @@ STAGE PLANS:
         od1:d1 
           TableScan
             alias: od1:d1
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -683,6 +708,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: od1:d2
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 10 Data size: 96 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -705,11 +731,13 @@ STAGE PLANS:
                     Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: key (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0
                       Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 11 Data size: 105 Basic stats: COMPLETE Column stats: NONE

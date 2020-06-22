@@ -20,6 +20,9 @@ where m = 1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT `key`, COUNT(`key`) AS `c`, 1 AS `m`
+FROM `default`.`src`
+GROUP BY `key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -39,6 +42,7 @@ STAGE PLANS:
               Group By Operator
                 aggregations: count(key)
                 keys: key (type: string)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0, _col1
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE

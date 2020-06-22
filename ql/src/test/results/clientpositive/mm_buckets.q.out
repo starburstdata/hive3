@@ -102,8 +102,8 @@ POSTHOOK: query: select * from bucket0_mm tablesample (bucket 2 out of 2) s
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@bucket0_mm
 #### A masked pattern was here ####
-100	100
 0	0
+100	100
 103	103
 PREHOOK: query: insert into table bucket0_mm select key, key from intermediate_n2
 PREHOOK: type: QUERY
@@ -163,10 +163,10 @@ POSTHOOK: query: select * from bucket0_mm tablesample (bucket 2 out of 2) s
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@bucket0_mm
 #### A masked pattern was here ####
-100	100
 0	0
 100	100
 0	0
+100	100
 103	103
 103	103
 PREHOOK: query: drop table bucket0_mm
@@ -397,8 +397,8 @@ POSTHOOK: Input: default@intermediate_n2@p=455
 POSTHOOK: Input: default@intermediate_n2@p=456
 POSTHOOK: Input: default@intermediate_n2@p=457
 POSTHOOK: Output: default@bucket2_mm
-POSTHOOK: Lineage: bucket2_mm.id SIMPLE [(intermediate_n2)intermediate_n2.FieldSchema(name:key, type:int, comment:null), ]
-POSTHOOK: Lineage: bucket2_mm.key SIMPLE [(intermediate_n2)intermediate_n2.FieldSchema(name:key, type:int, comment:null), ]
+POSTHOOK: Lineage: bucket2_mm.id SIMPLE []
+POSTHOOK: Lineage: bucket2_mm.key SIMPLE []
 PREHOOK: query: select * from bucket2_mm order by key, id
 PREHOOK: type: QUERY
 PREHOOK: Input: default@bucket2_mm

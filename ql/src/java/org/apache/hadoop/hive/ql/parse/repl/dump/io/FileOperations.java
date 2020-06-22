@@ -18,6 +18,7 @@
 package org.apache.hadoop.hive.ql.parse.repl.dump.io;
 
 import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
@@ -28,8 +29,8 @@ import javax.security.auth.login.LoginException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.ReplChangeManager;
 import org.apache.hadoop.hive.ql.ErrorMsg;
@@ -46,6 +47,8 @@ import org.apache.hadoop.hive.shims.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hive.ql.ErrorMsg.FILE_NOT_FOUND;
+
 //TODO: this object is created once to call one method and then immediately destroyed.
 //So it's basically just a roundabout way to pass arguments to a static method. Simplify?
 public class FileOperations {
@@ -54,8 +57,8 @@ public class FileOperations {
   private final Path exportRootDataDir;
   private final String distCpDoAsUser;
   private HiveConf hiveConf;
+  private FileSystem exportFileSystem, dataFileSystem;
   private final MmContext mmCtx;
-  private FileSystem dataFileSystem, exportFileSystem;
 
   public FileOperations(List<Path> dataPathList, Path exportRootDataDir, String distCpDoAsUser,
       HiveConf hiveConf, MmContext mmCtx) throws IOException {
@@ -100,7 +103,7 @@ public class FileOperations {
       srcPaths.add(fileStatus.getPath());
     }
 
-    new CopyUtils(distCpDoAsUser, hiveConf).doCopy(toPath, srcPaths);
+    new CopyUtils(distCpDoAsUser, hiveConf, toPath.getFileSystem(hiveConf)).doCopy(toPath, srcPaths);
   }
 
   private void copyMmPath() throws LoginException, IOException {
@@ -132,12 +135,11 @@ public class FileOperations {
         }
         Utilities.FILE_OP_LOGGER.debug("Exporting originals from {} to {}",
             dirWithOriginals, exportRootDataDir);
-        new CopyUtils(distCpDoAsUser, hiveConf).doCopy(exportRootDataDir, srcPaths);
+        new CopyUtils(distCpDoAsUser, hiveConf, exportRootDataDir.getFileSystem(hiveConf)).
+                doCopy(exportRootDataDir, srcPaths);
       }
     }
   }
-
-
 
   /**
    * This needs the root data directory to which the data needs to be exported to.
@@ -158,6 +160,10 @@ public class FileOperations {
         }
         done = true;
       } catch (IOException e) {
+        if (e instanceof FileNotFoundException) {
+          logger.error("exporting data files in dir : " + dataPathList + " to " + exportRootDataDir + " failed");
+          throw new FileNotFoundException(FILE_NOT_FOUND.format(e.getMessage()));
+        }
         repeat++;
         logger.info("writeFilesList failed", e);
         if (repeat >= FileUtils.MAX_IO_ERROR_RETRY) {

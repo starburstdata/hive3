@@ -22,6 +22,7 @@ STAGE PLANS:
         $hdt$_1:src 
           TableScan
             alias: src
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -32,6 +33,7 @@ STAGE PLANS:
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   keys: _col0 (type: string)
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -45,6 +47,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)

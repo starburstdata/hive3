@@ -150,13 +150,13 @@ STAGE PLANS:
                     Statistics: Num rows: 27 Data size: 2684 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: decimal(10,5)), _col1 (type: int)
+                      null sort order: zz
                       sort order: ++
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkObjectHashOperator
-                          keyColumnNums: [0, 1]
+                          keyColumns: 0:decimal(10,5), 1:int
                           native: true
                           nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          valueColumnNums: []
                       Statistics: Num rows: 27 Data size: 2684 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -180,7 +180,7 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                reduceColumnNullOrder: aa
+                reduceColumnNullOrder: zz
                 reduceColumnSortOrder: ++
                 allNative: false
                 usesVectorUDFAdaptor: false
@@ -224,11 +224,6 @@ POSTHOOK: query: SELECT * FROM DECIMAL_6_1 ORDER BY key, value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_6_1
 #### A masked pattern was here ####
-NULL	-1234567890
-NULL	0
-NULL	3
-NULL	4
-NULL	1234567890
 -4400.00000	4400
 -1255.49000	-1255
 -1.12200	-11
@@ -251,6 +246,11 @@ NULL	1234567890
 124.00000	124
 125.20000	125
 23232.23435	2
+NULL	-1234567890
+NULL	0
+NULL	3
+NULL	4
+NULL	1234567890
 PREHOOK: query: EXPLAIN VECTORIZATION DETAIL
 SELECT * FROM DECIMAL_6_2 ORDER BY key, value
 PREHOOK: type: QUERY
@@ -295,13 +295,13 @@ STAGE PLANS:
                     Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: decimal(17,4)), _col1 (type: int)
+                      null sort order: zz
                       sort order: ++
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkObjectHashOperator
-                          keyColumnNums: [0, 1]
+                          keyColumns: 0:decimal(17,4), 1:int
                           native: true
                           nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          valueColumnNums: []
                       Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -325,7 +325,7 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                reduceColumnNullOrder: aa
+                reduceColumnNullOrder: zz
                 reduceColumnSortOrder: ++
                 allNative: false
                 usesVectorUDFAdaptor: false
@@ -369,7 +369,6 @@ POSTHOOK: query: SELECT * FROM DECIMAL_6_2 ORDER BY key, value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_6_2
 #### A masked pattern was here ####
-NULL	0
 -1234567890.1235	-1234567890
 -4400.0000	4400
 -1255.4900	-1255
@@ -396,6 +395,7 @@ NULL	0
 2389432.2375	3
 2389432.2375	4
 1234567890.1235	1234567890
+NULL	0
 PREHOOK: query: EXPLAIN VECTORIZATION DETAIL
 SELECT T.key from (
   SELECT key, value from DECIMAL_6_1
@@ -453,13 +453,13 @@ STAGE PLANS:
                     Statistics: Num rows: 27 Data size: 2576 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: decimal(18,5))
+                      null sort order: z
                       sort order: +
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkObjectHashOperator
-                          keyColumnNums: [3]
+                          keyColumns: 3:decimal(18,5)
                           native: true
                           nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          valueColumnNums: []
                       Statistics: Num rows: 54 Data size: 5600 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -497,13 +497,13 @@ STAGE PLANS:
                     Statistics: Num rows: 27 Data size: 3024 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: decimal(18,5))
+                      null sort order: z
                       sort order: +
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkObjectHashOperator
-                          keyColumnNums: [3]
+                          keyColumns: 3:decimal(18,5)
                           native: true
                           nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          valueColumnNums: []
                       Statistics: Num rows: 54 Data size: 5600 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -527,7 +527,7 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                reduceColumnNullOrder: a
+                reduceColumnNullOrder: z
                 reduceColumnSortOrder: +
                 allNative: false
                 usesVectorUDFAdaptor: false
@@ -583,60 +583,60 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_6_1
 POSTHOOK: Input: default@decimal_6_2
 #### A masked pattern was here ####
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
--123456789.01235
+-1234567890.12350
+-4400.00000
 -4400.00000
 -1255.49000
--440.00000
--125.54900
+-1255.49000
+-1.12200
 -1.12200
 -1.12000
+-1.12000
+-0.33300
 -0.33300
 -0.30000
--0.11220
--0.11200
--0.03330
--0.03000
+-0.30000
 0.00000
 0.00000
 0.00000
 0.00000
-0.03330
-0.10000
-0.10000
-0.11200
-0.11220
-0.20000
-0.31400
-0.31400
-0.31400
+0.33300
 0.33300
 1.00000
 1.00000
 1.00000
-1.07343
+1.00000
+1.12000
 1.12000
 1.12200
+1.12200
+2.00000
 2.00000
 3.14000
 3.14000
 3.14000
+3.14000
+3.14000
+3.14000
 10.00000
+10.00000
+10.73430
 10.73433
-12.40000
-12.52000
+124.00000
 124.00000
 125.20000
-2323.22344
+125.20000
 23232.23435
-238943.22375
-238943.22375
-123456789.01235
+23232.23440
+2389432.23750
+2389432.23750
+1234567890.12350
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
 PREHOOK: query: EXPLAIN VECTORIZATION DETAIL
 CREATE TABLE DECIMAL_6_3 STORED AS ORC AS SELECT key + 5.5 AS k, value * 11 AS v from DECIMAL_6_1 ORDER BY v
 PREHOOK: type: CREATETABLE_AS_SELECT
@@ -656,7 +656,7 @@ PLAN VECTORIZATION:
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-4 depends on stages: Stage-2, Stage-0
+  Stage-4 depends on stages: Stage-0, Stage-2
   Stage-3 depends on stages: Stage-4
   Stage-0 depends on stages: Stage-1
 
@@ -687,13 +687,14 @@ STAGE PLANS:
                     Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col1 (type: int)
+                      null sort order: z
                       sort order: +
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkObjectHashOperator
-                          keyColumnNums: [4]
+                          keyColumns: 4:int
                           native: true
                           nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          valueColumnNums: [3]
+                          valueColumns: 3:decimal(11,5)
                       Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col0 (type: decimal(11,5))
             Execution mode: vectorized, llap
@@ -714,56 +715,64 @@ STAGE PLANS:
                     partitionColumnCount: 0
                     scratchColumnTypeNames: [decimal(11,5)/DECIMAL_64, bigint]
         Reducer 2 
-            Execution mode: vectorized, llap
+            Execution mode: llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                reduceColumnNullOrder: a
-                reduceColumnSortOrder: +
-                allNative: false
-                usesVectorUDFAdaptor: false
-                vectorized: true
-                rowBatchContext:
-                    dataColumnCount: 2
-                    dataColumns: KEY.reducesinkkey0:int, VALUE._col0:decimal(11,5)
-                    partitionColumnCount: 0
-                    scratchColumnTypeNames: []
+                notVectorizedReason: Aggregation Function expression for GROUPBY operator: UDF compute_stats not supported
+                vectorized: false
             Reduce Operator Tree:
               Select Operator
                 expressions: VALUE._col0 (type: decimal(11,5)), KEY.reducesinkkey0 (type: int)
                 outputColumnNames: _col0, _col1
-                Select Vectorization:
-                    className: VectorSelectOperator
-                    native: true
-                    projectedOutputColumnNums: [1, 0]
                 Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
                 File Output Operator
                   compressed: false
-                  File Sink Vectorization:
-                      className: VectorFileSinkOperator
-                      native: false
                   Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
                   table:
                       input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
                       output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
                       serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
                       name: default.DECIMAL_6_3
+                Select Operator
+                  expressions: _col0 (type: decimal(11,5)), _col1 (type: int)
+                  outputColumnNames: col1, col2
+                  Statistics: Num rows: 27 Data size: 3132 Basic stats: COMPLETE Column stats: COMPLETE
+                  Group By Operator
+                    aggregations: compute_stats(col1, 'hll'), compute_stats(col2, 'hll')
+                    mode: complete
+                    outputColumnNames: _col0, _col1
+                    Statistics: Num rows: 1 Data size: 1056 Basic stats: COMPLETE Column stats: COMPLETE
+                    Select Operator
+                      expressions: _col0 (type: struct<columntype:string,min:decimal(11,5),max:decimal(11,5),countnulls:bigint,numdistinctvalues:bigint,ndvbitvector:binary>), _col1 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,numdistinctvalues:bigint,ndvbitvector:binary>)
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 1 Data size: 1056 Basic stats: COMPLETE Column stats: COMPLETE
+                      File Output Operator
+                        compressed: false
+                        Statistics: Num rows: 1 Data size: 1056 Basic stats: COMPLETE Column stats: COMPLETE
+                        table:
+                            input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                            output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-2
     Dependency Collection
 
   Stage: Stage-4
-      Create Table Operator:
-        Create Table
-          columns: k decimal(11,5), v int
-          input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-          output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
-          serde name: org.apache.hadoop.hive.ql.io.orc.OrcSerde
-          name: default.DECIMAL_6_3
+    Create Table
+      columns: k decimal(11,5), v int
+      name: default.DECIMAL_6_3
+      input format: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
+      output format: org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat
+      serde name: org.apache.hadoop.hive.ql.io.orc.OrcSerde
 
   Stage: Stage-3
     Stats Work
       Basic Stats Work:
+      Column Stats Desc:
+          Columns: k, v
+          Column Types: decimal(11,5), int
+          Table: default.DECIMAL_6_3
 
   Stage: Stage-0
     Move Operator
@@ -799,11 +808,6 @@ POSTHOOK: query: SELECT * FROM DECIMAL_6_3 ORDER BY k, v
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_6_3
 #### A masked pattern was here ####
-NULL	-695344902
-NULL	0
-NULL	33
-NULL	44
-NULL	695344902
 -4394.50000	48400
 -1249.99000	-13805
 4.37800	-121
@@ -826,3 +830,8 @@ NULL	695344902
 129.50000	1364
 130.70000	1375
 23237.73435	22
+NULL	-695344902
+NULL	0
+NULL	33
+NULL	44
+NULL	695344902

@@ -161,7 +161,7 @@ STAGE PLANS:
         Map 5 <- Union 2 (CONTAINS)
         Map 6 <- Union 2 (CONTAINS)
         Reducer 3 <- Union 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (ONE_TO_ONE_EDGE), Reducer 9 (ONE_TO_ONE_EDGE)
+        Reducer 4 <- Reducer 3 (SIMPLE_EDGE), Reducer 9 (SIMPLE_EDGE)
         Reducer 8 <- Map 10 (SIMPLE_EDGE), Map 7 (SIMPLE_EDGE)
         Reducer 9 <- Reducer 8 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -170,6 +170,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: x_n3
+                  filterExpr: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
                   Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                   Filter Operator
                     predicate: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
@@ -181,11 +182,13 @@ STAGE PLANS:
                       Group By Operator
                         aggregations: min(_col1)
                         keys: _col0 (type: bigint)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0, _col1
                         Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                         Reduce Output Operator
                           key expressions: _col0 (type: bigint)
+                          null sort order: a
                           sort order: +
                           Map-reduce partition columns: _col0 (type: bigint)
                           Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
@@ -196,12 +199,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: v_n15
+                  filterExpr: t is not null (type: boolean)
                   Statistics: Num rows: 1 Data size: 368 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: t is not null (type: boolean)
                     Statistics: Num rows: 1 Data size: 368 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: t (type: string), st (type: string)
+                      null sort order: aa
                       sort order: ++
                       Map-reduce partition columns: t (type: string), st (type: string)
                       Statistics: Num rows: 1 Data size: 368 Basic stats: COMPLETE Column stats: NONE
@@ -211,6 +216,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: y_n1
+                  filterExpr: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
                   Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                   Filter Operator
                     predicate: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
@@ -222,11 +228,13 @@ STAGE PLANS:
                       Group By Operator
                         aggregations: min(_col1)
                         keys: _col0 (type: bigint)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0, _col1
                         Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                         Reduce Output Operator
                           key expressions: _col0 (type: bigint)
+                          null sort order: a
                           sort order: +
                           Map-reduce partition columns: _col0 (type: bigint)
                           Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
@@ -237,6 +245,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: z_n0
+                  filterExpr: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
                   Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                   Filter Operator
                     predicate: ((date < '2014-09-02') and (u <> 0L)) (type: boolean)
@@ -248,11 +257,13 @@ STAGE PLANS:
                       Group By Operator
                         aggregations: min(_col1)
                         keys: _col0 (type: bigint)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0, _col1
                         Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                         Reduce Output Operator
                           key expressions: _col0 (type: bigint)
+                          null sort order: a
                           sort order: +
                           Map-reduce partition columns: _col0 (type: bigint)
                           Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
@@ -263,12 +274,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: x_n3
+                  filterExpr: (t is not null and (date >= '2014-03-04') and (date < '2014-09-03') and (u <> 0L)) (type: boolean)
                   Statistics: Num rows: 1 Data size: 560 Basic stats: COMPLETE Column stats: PARTIAL
                   Filter Operator
-                    predicate: ((date < '2014-09-03') and (date >= '2014-03-04') and (u <> 0L) and t is not null) (type: boolean)
+                    predicate: (t is not null and (date >= '2014-03-04') and (date < '2014-09-03') and (u <> 0L)) (type: boolean)
                     Statistics: Num rows: 1 Data size: 560 Basic stats: COMPLETE Column stats: PARTIAL
                     Reduce Output Operator
                       key expressions: t (type: string), st (type: string)
+                      null sort order: aa
                       sort order: ++
                       Map-reduce partition columns: t (type: string), st (type: string)
                       Statistics: Num rows: 1 Data size: 560 Basic stats: COMPLETE Column stats: PARTIAL
@@ -293,6 +306,7 @@ STAGE PLANS:
                     Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
                     Reduce Output Operator
                       key expressions: _col0 (type: bigint)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: bigint)
                       Statistics: Num rows: 1 Data size: 192 Basic stats: COMPLETE Column stats: PARTIAL
@@ -332,11 +346,13 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 616 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   keys: _col0 (type: bigint)
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 616 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: bigint)
+                    null sort order: a
                     sort order: +
                     Map-reduce partition columns: _col0 (type: bigint)
                     Statistics: Num rows: 1 Data size: 616 Basic stats: COMPLETE Column stats: NONE
@@ -350,6 +366,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 616 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: bigint)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: bigint)
                   Statistics: Num rows: 1 Data size: 616 Basic stats: COMPLETE Column stats: NONE

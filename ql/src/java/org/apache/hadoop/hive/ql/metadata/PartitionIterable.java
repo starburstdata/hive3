@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-
 /**
  * PartitionIterable - effectively a lazy Iterable<Partition>
  *
@@ -93,14 +92,14 @@ public class PartitionIterable implements Iterable<Partition> {
       }
 
       private void getNextBatch() {
-        int batch_counter = 0;
+        int batchCounter = 0;
         List<String> nameBatch = new ArrayList<String>();
-        while (batch_counter < batch_size && partitionNamesIter.hasNext()){
+        while (batchCounter < batchSize && partitionNamesIter.hasNext()){
           nameBatch.add(partitionNamesIter.next());
-          batch_counter++;
+          batchCounter++;
         }
         try {
-          batchIter = db.getPartitionsByNames(table,nameBatch).iterator();
+          batchIter = db.getPartitionsByNames(table, nameBatch, getColStats).iterator();
         } catch (HiveException e) {
           throw new RuntimeException(e);
         }
@@ -129,7 +128,8 @@ public class PartitionIterable implements Iterable<Partition> {
   private Table table = null;
   private Map<String, String> partialPartitionSpec = null;
   private List<String> partitionNames = null;
-  private int batch_size;
+  private int batchSize;
+  private boolean getColStats = false;
 
   /**
    * Dummy constructor, which simply acts as an iterator on an already-present
@@ -146,12 +146,22 @@ public class PartitionIterable implements Iterable<Partition> {
    * a Hive object and a table object, and a partial partition spec.
    */
   public PartitionIterable(Hive db, Table table, Map<String, String> partialPartitionSpec,
-      int batch_size) throws HiveException {
+                           int batchSize) throws HiveException {
+    this(db, table, partialPartitionSpec, batchSize, false);
+  }
+
+  /**
+   * Primary constructor that fetches all partitions in a given table, given
+   * a Hive object and a table object, and a partial partition spec.
+   */
+  public PartitionIterable(Hive db, Table table, Map<String, String> partialPartitionSpec,
+                           int batchSize, boolean getColStats) throws HiveException {
     this.currType = Type.LAZY_FETCH_PARTITIONS;
     this.db = db;
     this.table = table;
     this.partialPartitionSpec = partialPartitionSpec;
-    this.batch_size = batch_size;
+    this.batchSize = batchSize;
+    this.getColStats = getColStats;
 
     if (this.partialPartitionSpec == null){
       partitionNames = db.getPartitionNames(

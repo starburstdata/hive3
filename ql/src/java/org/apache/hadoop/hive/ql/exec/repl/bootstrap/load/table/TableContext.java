@@ -17,33 +17,18 @@
  */
 package org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.table;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.TaskTracker;
-import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.plan.ImportTableDesc;
+import org.apache.hadoop.hive.ql.exec.repl.util.TaskTracker;
 
 public class TableContext {
   final String dbNameToLoadIn;
   private final TaskTracker parentTracker;
-  // this will only be available when we are doing table load only in replication not otherwise
-  private final String tableNameToLoadIn;
 
-  public TableContext(TaskTracker parentTracker, String dbNameToLoadIn,
-      String tableNameToLoadIn) {
+  public TableContext(TaskTracker parentTracker, String dbNameToLoadIn) {
     this.dbNameToLoadIn = dbNameToLoadIn;
     this.parentTracker = parentTracker;
-    this.tableNameToLoadIn = tableNameToLoadIn;
   }
 
   boolean waitOnPrecursor() {
     return parentTracker.hasTasks();
-  }
-
-  ImportTableDesc overrideProperties(ImportTableDesc importTableDesc)
-      throws SemanticException {
-    if (StringUtils.isNotBlank(tableNameToLoadIn)) {
-      importTableDesc.setTableName(tableNameToLoadIn);
-    }
-    return importTableDesc;
   }
 }

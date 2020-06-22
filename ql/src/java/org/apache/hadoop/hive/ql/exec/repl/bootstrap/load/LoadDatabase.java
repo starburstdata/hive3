@@ -20,19 +20,21 @@ package org.apache.hadoop.hive.ql.exec.repl.bootstrap.load;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.ql.ddl.DDLWork;
+import org.apache.hadoop.hive.ql.ddl.database.alter.owner.AlterDatabaseSetOwnerDesc;
+import org.apache.hadoop.hive.ql.ddl.database.alter.poperties.AlterDatabaseSetPropertiesDesc;
+import org.apache.hadoop.hive.ql.ddl.database.create.CreateDatabaseDesc;
+import org.apache.hadoop.hive.ql.ddl.privilege.PrincipalDesc;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.DatabaseEvent;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.util.Context;
+import org.apache.hadoop.hive.ql.exec.repl.util.TaskTracker;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ReplicationSpec;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.plan.AlterDatabaseDesc;
-import org.apache.hadoop.hive.ql.plan.CreateDatabaseDesc;
-import org.apache.hadoop.hive.ql.plan.DDLWork;
-import org.apache.hadoop.hive.ql.plan.PrincipalDesc;
-import org.apache.hadoop.hive.ql.exec.repl.ReplUtils;
-import org.apache.hadoop.hive.ql.exec.repl.ReplUtils.ReplLoadOpType;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils.ReplLoadOpType;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -48,38 +50,33 @@ public class LoadDatabase {
   private final DatabaseEvent event;
   private final String dbNameToLoadIn;
 
-  public LoadDatabase(Context context, DatabaseEvent event, String dbNameToLoadIn,
-      TaskTracker loadTaskTracker) {
+  public LoadDatabase(Context context, DatabaseEvent event, String dbNameToLoadIn, TaskTracker loadTaskTracker) {
     this.context = context;
     this.event = event;
     this.dbNameToLoadIn = dbNameToLoadIn;
     this.tracker = new TaskTracker(loadTaskTracker);
   }
 
-  public TaskTracker tasks() throws SemanticException {
-    try {
-      Database dbInMetadata = readDbMetadata();
-      String dbName = dbInMetadata.getName();
-      Task<? extends Serializable> dbRootTask = null;
-      ReplLoadOpType loadDbType = getLoadDbType(dbName);
-      switch (loadDbType) {
-        case LOAD_NEW:
-          dbRootTask = createDbTask(dbInMetadata);
-          break;
-        case LOAD_REPLACE:
-          dbRootTask = alterDbTask(dbInMetadata);
-          break;
-        default:
-          break;
-      }
-      if (dbRootTask != null) {
-        dbRootTask.addDependentTask(setOwnerInfoTask(dbInMetadata));
-        tracker.addTask(dbRootTask);
-      }
-      return tracker;
-    } catch (Exception e) {
-      throw new SemanticException(e);
+  public TaskTracker tasks() throws Exception {
+    Database dbInMetadata = readDbMetadata();
+    String dbName = dbInMetadata.getName();
+    Task<? extends Serializable> dbRootTask = null;
+    ReplLoadOpType loadDbType = getLoadDbType(dbName);
+    switch (loadDbType) {
+      case LOAD_NEW:
+        dbRootTask = createDbTask(dbInMetadata);
+        break;
+      case LOAD_REPLACE:
+        dbRootTask = alterDbTask(dbInMetadata);
+        break;
+      default:
+        break;
     }
+    if (dbRootTask != null) {
+      dbRootTask.addDependentTask(setOwnerInfoTask(dbInMetadata));
+      tracker.addTask(dbRootTask);
+    }
+    return tracker;
   }
 
   Database readDbMetadata() throws SemanticException {
@@ -119,13 +116,9 @@ public class LoadDatabase {
   }
 
   private Task<? extends Serializable> createDbTask(Database dbObj) {
-    CreateDatabaseDesc createDbDesc = new CreateDatabaseDesc();
-    createDbDesc.setName(dbObj.getName());
-    createDbDesc.setComment(dbObj.getDescription());
-    createDbDesc.setDatabaseProperties(updateDbProps(dbObj, context.dumpDirectory));
-
     // note that we do not set location - for repl load, we want that auto-created.
-    createDbDesc.setIfNotExists(false);
+    CreateDatabaseDesc createDbDesc = new CreateDatabaseDesc(dbObj.getName(), dbObj.getDescription(), null, false,
+        updateDbProps(dbObj, context.dumpDirectory));
     // If it exists, we want this to be an error condition. Repl Load is not intended to replace a
     // db.
     // TODO: we might revisit this in create-drop-recreate cases, needs some thinking on.
@@ -134,13 +127,13 @@ public class LoadDatabase {
   }
 
   private Task<? extends Serializable> alterDbTask(Database dbObj) {
-    return alterDbTask(dbObj.getName(), updateDbProps(dbObj, context.dumpDirectory), context.hiveConf);
+    return alterDbTask(dbObj.getName(), updateDbProps(dbObj, context.dumpDirectory),
+            context.hiveConf);
   }
 
   private Task<? extends Serializable> setOwnerInfoTask(Database dbObj) {
-    AlterDatabaseDesc alterDbDesc = new AlterDatabaseDesc(dbObj.getName(),
-            new PrincipalDesc(dbObj.getOwnerName(), dbObj.getOwnerType()),
-            null);
+    AlterDatabaseSetOwnerDesc alterDbDesc = new AlterDatabaseSetOwnerDesc(dbObj.getName(),
+        new PrincipalDesc(dbObj.getOwnerName(), dbObj.getOwnerType()), null);
     DDLWork work = new DDLWork(new HashSet<>(), new HashSet<>(), alterDbDesc);
     return TaskFactory.get(work, context.hiveConf);
   }
@@ -157,13 +150,19 @@ public class LoadDatabase {
     // Add the checkpoint key to the Database binding it to current dump directory.
     // So, if retry using same dump, we shall skip Database object update.
     parameters.put(ReplUtils.REPL_CHECKPOINT_KEY, dumpDirectory);
+
+    // This flag will be set to false after first incremental load is done. This flag is used by repl copy task to
+    // check if duplicate file check is required or not. This flag is used by compaction to check if compaction can be
+    // done for this database or not. If compaction is done before first incremental then duplicate check will fail as
+    // compaction may change the directory structure.
+    parameters.put(ReplUtils.REPL_FIRST_INC_PENDING_FLAG, "true");
+
     return parameters;
   }
 
   private static Task<? extends Serializable> alterDbTask(String dbName, Map<String, String> props,
                                                           HiveConf hiveConf) {
-    AlterDatabaseDesc alterDbDesc =
-            new AlterDatabaseDesc(dbName, props, null);
+    AlterDatabaseSetPropertiesDesc alterDbDesc = new AlterDatabaseSetPropertiesDesc(dbName, props, null);
     DDLWork work = new DDLWork(new HashSet<>(), new HashSet<>(), alterDbDesc);
     return TaskFactory.get(work, hiveConf);
   }

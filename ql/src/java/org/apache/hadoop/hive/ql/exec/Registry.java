@@ -269,7 +269,7 @@ public class Registry {
   }
 
   public FunctionInfo registerPermanentFunction(String functionName,
-      String className, boolean registerToSession, FunctionResource... resources) {
+      String className, boolean registerToSession, FunctionResource... resources) throws SemanticException {
     FunctionInfo function = new FunctionInfo(functionName, className, resources);
     // register to session first for backward compatibility
     if (registerToSession) {
@@ -525,8 +525,9 @@ public class Registry {
       FunctionInfo prev = mFunctions.get(functionName);
       if (prev != null) {
         if (isBuiltInFunc(prev.getFunctionClass())) {
-          throw new RuntimeException("Function " + functionName + " is hive builtin function, " +
-              "which cannot be overridden.");
+          String message = String.format("Function (%s / %s) is hive builtin function, which cannot be overridden.", functionName, prev.getFunctionClass());
+          LOG.debug(message);
+          throw new RuntimeException(message);
         }
         prev.discarded();
       }
@@ -652,7 +653,7 @@ public class Registry {
   }
 
   // should be called after session registry is checked
-  private FunctionInfo registerToSessionRegistry(String qualifiedName, FunctionInfo function) {
+  private FunctionInfo registerToSessionRegistry(String qualifiedName, FunctionInfo function) throws SemanticException {
     FunctionInfo ret = null;
     ClassLoader prev = Utilities.getSessionSpecifiedClassLoader();
     try {
@@ -660,7 +661,7 @@ public class Registry {
       // At this point we should add any relevant jars that would be needed for the UDf.
       FunctionResource[] resources = function.getResources();
       try {
-        FunctionTask.addFunctionResources(resources);
+        FunctionUtils.addFunctionResources(resources);
       } catch (Exception e) {
         LOG.error("Unable to load resources for " + qualifiedName + ":" + e, e);
         return null;
@@ -682,8 +683,14 @@ public class Registry {
       // Lookup of UDf class failed
       LOG.error("Unable to load UDF class: " + e);
       Utilities.restoreSessionSpecifiedClassLoader(prev);
+
+      throw new SemanticException("Unable to load UDF class: " + e +
+              "\nPlease ensure that the JAR file containing this class has been properly installed " +
+              "in the auxiliary directory or was added with ADD JAR command.");
+    }finally {
+      function.shareStateWith(ret);
     }
-    function.shareStateWith(ret);
+
     return ret;
   }
 
@@ -779,7 +786,7 @@ public class Registry {
       }
       // Found UDF in metastore - now add it to the function registry.
       FunctionInfo fi = registerPermanentFunction(functionName, func.getClassName(), true,
-          FunctionTask.toFunctionResource(func.getResourceUris()));
+          FunctionUtils.toFunctionResource(func.getResourceUris()));
       if (fi == null) {
         LOG.error(func.getClassName() + " is not a valid UDF class and was not registered");
         return null;

@@ -75,6 +75,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: date_dim_n1
+            filterExpr: ((d_date > DATE'1900-01-02') and (d_date_sk = 2416945L)) (type: boolean)
             Statistics: Num rows: 1 Data size: 56 Basic stats: COMPLETE Column stats: COMPLETE
             Filter Operator
               predicate: (d_date > DATE'1900-01-02') (type: boolean)
@@ -83,10 +84,12 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 56 Basic stats: COMPLETE Column stats: COMPLETE
                 Group By Operator
                   aggregations: count()
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                     value expressions: _col0 (type: bigint)
@@ -136,6 +139,8 @@ POSTHOOK: Input: default@date_dim_n1@d_date_sk=2416946
 POSTHOOK: Input: default@date_dim_n1@d_date_sk=2416947
 POSTHOOK: Input: default@date_dim_n1@d_date_sk=2416948
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT `d_date`
+FROM `default`.`date_dim_n1`
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
 
@@ -166,7 +171,7 @@ STAGE PLANS:
               serialization.ddl struct date_dim_n1 { date d_date}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.ql.io.orc.OrcSerde
-              totalSize 199
+              totalSize 201
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
           
@@ -212,7 +217,7 @@ STAGE PLANS:
               serialization.ddl struct date_dim_n1 { date d_date}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.ql.io.orc.OrcSerde
-              totalSize 199
+              totalSize 201
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
           
@@ -258,7 +263,7 @@ STAGE PLANS:
               serialization.ddl struct date_dim_n1 { date d_date}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.ql.io.orc.OrcSerde
-              totalSize 199
+              totalSize 201
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
           
@@ -288,7 +293,7 @@ STAGE PLANS:
             partition values:
               d_date_sk 2416948
             properties:
-              COLUMN_STATS_ACCURATE {"BASIC_STATS":"true"}
+              COLUMN_STATS_ACCURATE {"BASIC_STATS":"true","COLUMN_STATS":{"d_date":"true"}}
               bucket_count -1
               column.name.delimiter ,
               columns d_date
@@ -304,7 +309,7 @@ STAGE PLANS:
               serialization.ddl struct date_dim_n1 { date d_date}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.ql.io.orc.OrcSerde
-              totalSize 199
+              totalSize 201
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.ql.io.orc.OrcSerde
           
@@ -331,11 +336,11 @@ STAGE PLANS:
       Processor Tree:
         TableScan
           alias: date_dim_n1
-          Statistics: Num rows: 4 Data size: 224 Basic stats: COMPLETE Column stats: PARTIAL
+          Statistics: Num rows: 4 Data size: 224 Basic stats: COMPLETE Column stats: COMPLETE
           GatherStats: false
           Select Operator
             expressions: d_date (type: date)
             outputColumnNames: _col0
-            Statistics: Num rows: 4 Data size: 224 Basic stats: COMPLETE Column stats: PARTIAL
+            Statistics: Num rows: 4 Data size: 224 Basic stats: COMPLETE Column stats: COMPLETE
             ListSink
 

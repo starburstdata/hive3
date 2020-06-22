@@ -115,12 +115,7 @@ public class Optimizer {
       transformations.add(new ConstantPropagate());
     }
 
-    if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.DYNAMICPARTITIONING) &&
-        HiveConf.getVar(hiveConf, HiveConf.ConfVars.DYNAMICPARTITIONINGMODE).equals("nonstrict") &&
-        HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTSORTDYNAMICPARTITION) &&
-        !HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTLISTBUCKETING)) {
-      transformations.add(new SortedDynPartitionOptimizer());
-    }
+
 
     transformations.add(new SortedDynPartitionTimeGranularityOptimizer());
 
@@ -196,7 +191,7 @@ public class Optimizer {
       transformations.add(new FixedBucketPruningOptimizer(compatMode));
     }
 
-    if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTREDUCEDEDUPLICATION) || pctx.hasAcidWrite()) {
+    if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTREDUCEDEDUPLICATION)) {
       transformations.add(new ReduceSinkDeDuplication());
     }
     transformations.add(new NonBlockingOpDeDupProc());

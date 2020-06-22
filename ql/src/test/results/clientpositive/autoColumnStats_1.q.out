@@ -28,6 +28,8 @@ POSTHOOK: query: explain extended select * from src_multi1_n1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src_multi1_n1
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT `key`, `value`
+FROM `default`.`src_multi1_n1`
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
 
@@ -64,6 +66,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	500                 
 	rawDataSize         	5312                
@@ -140,6 +143,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	500                 
 	rawDataSize         	5312                
@@ -174,6 +178,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	500                 
 	rawDataSize         	5312                
@@ -258,6 +263,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	500                 
 	rawDataSize         	5312                
@@ -292,6 +298,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	500                 
 	rawDataSize         	5312                
@@ -350,6 +357,7 @@ Retention:          	0
 Table Type:         	MANAGED_TABLE       	 
 Table Parameters:	 	 
 	COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
+	bucketing_version   	2                   
 	numFiles            	1                   
 	numRows             	508                 
 	rawDataSize         	5400                
@@ -576,11 +584,11 @@ STAGE PLANS:
       Processor Tree:
         TableScan
           alias: nzhang_part14_n1
-          Statistics: Num rows: 11 Data size: 946 Basic stats: COMPLETE Column stats: PARTIAL
+          Statistics: Num rows: 11 Data size: 957 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
             expressions: key (type: string)
             outputColumnNames: _col0
-            Statistics: Num rows: 11 Data size: 946 Basic stats: COMPLETE Column stats: PARTIAL
+            Statistics: Num rows: 11 Data size: 957 Basic stats: COMPLETE Column stats: COMPLETE
             ListSink
 
 PREHOOK: query: create table alter5_n0 ( col1 string ) partitioned by (dt string)
@@ -696,6 +704,7 @@ STAGE PLANS:
       Processor Tree:
         TableScan
           alias: alter5_n0
+          filterExpr: (dt = 'a') (type: boolean)
           Statistics: Num rows: 500 Data size: 43500 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
             expressions: col1 (type: string), 'a' (type: string)

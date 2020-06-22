@@ -23,6 +23,9 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.lockmgr.HiveTxnManager;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.hive.ql.session.LineageState;
+import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.tez.dag.api.TezConfiguration;
 
 /**
  * The class to store query level info such as queryId. Multiple queries can run
@@ -50,6 +53,11 @@ public class QueryState {
   private HiveTxnManager txnManager;
 
   /**
+   * Holds the number of rows affected for insert queries.
+   */
+  private long numModifiedRows = 0;
+
+  /**
    * Private constructor, use QueryState.Builder instead.
    * @param conf The query specific configuration object
    */
@@ -57,6 +65,7 @@ public class QueryState {
     this.queryConf = conf;
   }
 
+  // Get the query id stored in query specific config.
   public String getQueryId() {
     return (queryConf.getVar(HiveConf.ConfVars.HIVEQUERYID));
   }
@@ -98,6 +107,50 @@ public class QueryState {
 
   public void setTxnManager(HiveTxnManager txnManager) {
     this.txnManager = txnManager;
+  }
+
+  public long getNumModifiedRows() {
+    return numModifiedRows;
+  }
+
+  public void setNumModifiedRows(long numModifiedRows) {
+    this.numModifiedRows = numModifiedRows;
+  }
+
+  public String getQueryTag() {
+    return HiveConf.getVar(this.queryConf, HiveConf.ConfVars.HIVEQUERYTAG);
+  }
+
+  public void setQueryTag(String queryTag) {
+    HiveConf.setVar(this.queryConf, HiveConf.ConfVars.HIVEQUERYTAG, queryTag);
+  }
+
+  public static void setApplicationTag(HiveConf queryConf, String queryTag) {
+    String jobTag = HiveConf.getVar(queryConf, HiveConf.ConfVars.HIVEQUERYTAG);
+    if (jobTag == null || jobTag.isEmpty()) {
+      jobTag = queryTag;
+    } else {
+      jobTag = jobTag.concat("," + queryTag);
+    }
+    if (SessionState.get() != null) {
+      jobTag = jobTag.concat("," + "userid=" + SessionState.get().getUserName());
+    }
+    queryConf.set(MRJobConfig.JOB_TAGS, jobTag);
+    queryConf.set(TezConfiguration.TEZ_APPLICATION_TAGS, jobTag);
+  }
+
+  /**
+   * Generating the new QueryState object. Making sure, that the new queryId is generated.
+   * @param conf The HiveConf which should be used
+   * @param lineageState a LineageState to be set in the new QueryState object
+   * @return The new QueryState object
+   */
+  public static QueryState getNewQueryState(HiveConf conf, LineageState lineageState) {
+    return new QueryState.Builder()
+        .withGenerateNewQueryId(true)
+        .withHiveConf(conf)
+        .withLineageState(lineageState)
+        .build();
   }
 
   /**
@@ -209,6 +262,8 @@ public class QueryState {
       if (generateNewQueryId) {
         String queryId = QueryPlan.makeQueryId();
         queryConf.setVar(HiveConf.ConfVars.HIVEQUERYID, queryId);
+        setApplicationTag(queryConf, queryId);
+
         // FIXME: druid storage handler relies on query.id to maintain some staging directories
         // expose queryid to session level
         if (hiveConf != null) {

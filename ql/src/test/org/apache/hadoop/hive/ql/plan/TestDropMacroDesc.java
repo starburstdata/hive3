@@ -17,7 +17,8 @@
  */
 package org.apache.hadoop.hive.ql.plan;
 
-import junit.framework.Assert;
+import org.apache.hadoop.hive.ql.ddl.function.macro.drop.DropMacroDesc;
+import org.junit.Assert;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -31,6 +32,6 @@ public class TestDropMacroDesc {
   @Test
   public void testCreateMacroDesc() throws Exception {
     DropMacroDesc desc = new DropMacroDesc(name);
-    Assert.assertEquals(name, desc.getMacroName());
+    Assert.assertEquals(name, desc.getName());
   }
 }

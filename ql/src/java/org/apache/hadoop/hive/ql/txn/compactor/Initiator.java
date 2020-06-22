@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.CompactionRequest;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.shims.HadoopShims.HdfsFileStatusWithId;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hive.common.util.Ref;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,13 +60,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * A class to initiate compactions.  This will run in a separate thread.
  * It's critical that there exactly 1 of these in a given warehouse.
  */
-public class Initiator extends CompactorThread {
+public class Initiator extends MetaStoreCompactorThread {
   static final private String CLASS_NAME = Initiator.class.getName();
   static final private Logger LOG = LoggerFactory.getLogger(CLASS_NAME);
 
   static final private String COMPACTORTHRESHOLD_PREFIX = "compactorthreshold.";
 
   private long checkInterval;
+  private long prevStart = -1;
 
   @Override
   public void run() {
@@ -88,14 +91,24 @@ public class Initiator extends CompactorThread {
         try {
           handle = txnHandler.getMutexAPI().acquireLock(TxnStore.MUTEX_KEY.Initiator.name());
           startedAt = System.currentTimeMillis();
+
+          long compactionInterval = (prevStart < 0) ? prevStart : (startedAt - prevStart)/1000;
+          prevStart = startedAt;
+
           //todo: add method to only get current i.e. skip history - more efficient
           ShowCompactResponse currentCompactions = txnHandler.showCompact(new ShowCompactRequest());
-          Set<CompactionInfo> potentials = txnHandler.findPotentialCompactions(abortedThreshold);
+          Set<CompactionInfo> potentials = txnHandler.findPotentialCompactions(abortedThreshold, compactionInterval);
           LOG.debug("Found " + potentials.size() + " potential compactions, " +
               "checking to see if we should compact any of them");
           for (CompactionInfo ci : potentials) {
             LOG.info("Checking to see if we should compact " + ci.getFullPartitionName());
             try {
+              if (replIsCompactionDisabledForDatabase(ci.dbname)) {
+                // Compaction is disabled for replicated database until after first successful incremental load.
+                LOG.info("Compaction is disabled for database " + ci.dbname);
+                continue;
+              }
+
               Table t = resolveTable(ci);
               if (t == null) {
                 // Most likely this means it's a temp table
@@ -107,6 +120,12 @@ public class Initiator extends CompactorThread {
               // check if no compaction set for this table
               if (noAutoCompactSet(t)) {
                 LOG.info("Table " + tableName(t) + " marked " + hive_metastoreConstants.TABLE_NO_AUTO_COMPACT + "=true so we will not compact it.");
+                continue;
+              }
+
+              if (replIsCompactionDisabledForTable(t)) {
+                // Compaction is disabled for replicated table until after first successful incremental load.
+                LOG.info("Compaction is disabled for table " + ci.getFullTableName());
                 continue;
               }
 
@@ -143,13 +162,15 @@ public class Initiator extends CompactorThread {
                     ", assuming it has been dropped and moving on.");
                 continue;
               }
-
-              // Compaction doesn't work under a transaction and hence pass null for validTxnList
+              ValidTxnList validTxnList = TxnUtils
+                  .createValidReadTxnList(txnHandler.getOpenTxns(), 0);
+              conf.set(ValidTxnList.VALID_TXNS_KEY, validTxnList.writeToString());
               // The response will have one entry per table and hence we get only one ValidWriteIdList
               String fullTableName = TxnUtils.getFullTableName(t.getDbName(), t.getTableName());
               GetValidWriteIdsRequest rqst
-                      = new GetValidWriteIdsRequest(Collections.singletonList(fullTableName), null);
-              ValidWriteIdList tblValidWriteIds = TxnUtils.createValidCompactWriteIdList(
+                      = new GetValidWriteIdsRequest(Collections.singletonList(fullTableName));
+              rqst.setValidTxnList(validTxnList.writeToString());
+              final ValidWriteIdList tblValidWriteIds = TxnUtils.createValidCompactWriteIdList(
                       txnHandler.getValidWriteIds(rqst).getTblValidWriteIds().get(0));
 
               StorageDescriptor sd = resolveStorageDescriptor(t, p);
@@ -161,9 +182,9 @@ public class Initiator extends CompactorThread {
                       = checkForCompaction(ci, tblValidWriteIds, sd, t.getParameters(), runAs);
               if (compactionNeeded != null) requestCompaction(ci, runAs, compactionNeeded);
             } catch (Throwable t) {
-              LOG.error("Caught exception while trying to determine if we should compact " +
-                  ci + ".  Marking failed to avoid repeated failures, " +
-                  "" + StringUtils.stringifyException(t));
+              LOG.error("Caught exception while trying to determine if we should compact {}. " +
+                  "Marking failed to avoid repeated failures, {}", ci, t);
+              ci.errorMessage = t.getMessage();
               txnHandler.markFailed(ci);
             }
           }
@@ -198,7 +219,7 @@ public class Initiator extends CompactorThread {
   }
 
   @Override
-  public void init(AtomicBoolean stop, AtomicBoolean looped) throws MetaException {
+  public void init(AtomicBoolean stop, AtomicBoolean looped) throws Exception {
     super.init(stop, looped);
     checkInterval =
         conf.getTimeVar(HiveConf.ConfVars.HIVE_COMPACTOR_CHECK_INTERVAL, TimeUnit.MILLISECONDS) ;
@@ -246,17 +267,21 @@ public class Initiator extends CompactorThread {
       LOG.info("Going to initiate as user " + runAs + " for " + ci.getFullPartitionName());
       UserGroupInformation ugi = UserGroupInformation.createProxyUser(runAs,
         UserGroupInformation.getLoginUser());
-      CompactionType compactionType = ugi.doAs(new PrivilegedExceptionAction<CompactionType>() {
-        @Override
-        public CompactionType run() throws Exception {
-          return determineCompactionType(ci, writeIds, sd, tblproperties);
-        }
-      });
+      CompactionType compactionType;
       try {
-        FileSystem.closeAllForUGI(ugi);
-      } catch (IOException exception) {
-        LOG.error("Could not clean up file-system handles for UGI: " + ugi + " for " +
-            ci.getFullPartitionName(), exception);
+        compactionType = ugi.doAs(new PrivilegedExceptionAction<CompactionType>() {
+          @Override
+          public CompactionType run() throws Exception {
+            return determineCompactionType(ci, writeIds, sd, tblproperties);
+          }
+        });
+      } finally {
+        try {
+          FileSystem.closeAllForUGI(ugi);
+        } catch (IOException exception) {
+          LOG.error("Could not clean up file-system handles for UGI: " + ugi + " for " +
+              ci.getFullPartitionName(), exception);
+        }
       }
       return compactionType;
     }
@@ -269,7 +294,7 @@ public class Initiator extends CompactorThread {
     boolean noBase = false;
     Path location = new Path(sd.getLocation());
     FileSystem fs = location.getFileSystem(conf);
-    AcidUtils.Directory dir = AcidUtils.getAcidState(location, conf, writeIds, false, false);
+    AcidUtils.Directory dir = AcidUtils.getAcidState(fs, location, conf, writeIds, Ref.from(false), false, tblproperties, false);
     Path base = dir.getBaseDirectory();
     long baseSize = 0;
     FileStatus stat = null;

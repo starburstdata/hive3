@@ -71,6 +71,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 112 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: decimal(10,0))
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -125,8 +126,8 @@ POSTHOOK: query: SELECT `dec` FROM `DECIMAL` order by `dec`
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal
 #### A masked pattern was here ####
-NULL
 1000000000
+NULL
 PREHOOK: query: EXPLAIN VECTORIZATION DETAIL
 SELECT `dec` FROM `decimal_txt` order by `dec`
 PREHOOK: type: QUERY
@@ -165,6 +166,7 @@ STAGE PLANS:
               Statistics: Num rows: 1 Data size: 280 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: decimal(10,0))
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -219,8 +221,8 @@ POSTHOOK: query: SELECT `dec` FROM `decimal_txt` order by `dec`
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_txt
 #### A masked pattern was here ####
-NULL
 1000000000
+NULL
 PREHOOK: query: DROP TABLE DECIMAL_txt
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@decimal_txt

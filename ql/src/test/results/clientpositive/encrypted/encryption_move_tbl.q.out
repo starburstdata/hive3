@@ -50,50 +50,50 @@ PREHOOK: query: ANALYZE TABLE encrypted_table_n1 COMPUTE STATISTICS FOR COLUMNS
 PREHOOK: type: ANALYZE_TABLE
 PREHOOK: Input: default@encrypted_table_n1
 PREHOOK: Output: default@encrypted_table_n1
-#### A PARTIAL masked pattern was here #### data/warehouse/encrypted_table/.hive-staging
+PREHOOK: Output: hdfs://### HDFS PATH ###
 POSTHOOK: query: ANALYZE TABLE encrypted_table_n1 COMPUTE STATISTICS FOR COLUMNS
 POSTHOOK: type: ANALYZE_TABLE
 POSTHOOK: Input: default@encrypted_table_n1
 POSTHOOK: Output: default@encrypted_table_n1
-#### A PARTIAL masked pattern was here #### data/warehouse/encrypted_table/.hive-staging
+POSTHOOK: Output: hdfs://### HDFS PATH ###
 PREHOOK: query: DESCRIBE FORMATTED encrypted_table_n1 key
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: default@encrypted_table_n1
 POSTHOOK: query: DESCRIBE FORMATTED encrypted_table_n1 key
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@encrypted_table_n1
-col_name            	key                 	 	 	 	 	 	 	 	 	 	 
-data_type           	int                 	 	 	 	 	 	 	 	 	 	 
-min                 	0                   	 	 	 	 	 	 	 	 	 	 
-max                 	498                 	 	 	 	 	 	 	 	 	 	 
-num_nulls           	0                   	 	 	 	 	 	 	 	 	 	 
-distinct_count      	303                 	 	 	 	 	 	 	 	 	 	 
-avg_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-max_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-num_trues           	                    	 	 	 	 	 	 	 	 	 	 
-num_falses          	                    	 	 	 	 	 	 	 	 	 	 
-bitVector           	HL                  	 	 	 	 	 	 	 	 	 	 
-comment             	from deserializer   	 	 	 	 	 	 	 	 	 	 
-COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}	 	 	 	 	 	 	 	 	 	 
+col_name            	key                 
+data_type           	int                 
+min                 	0                   
+max                 	498                 
+num_nulls           	0                   
+distinct_count      	303                 
+avg_col_len         	                    
+max_col_len         	                    
+num_trues           	                    
+num_falses          	                    
+bit_vector          	HL                  
+comment             	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
 PREHOOK: query: DESCRIBE FORMATTED encrypted_table_n1 value
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: default@encrypted_table_n1
 POSTHOOK: query: DESCRIBE FORMATTED encrypted_table_n1 value
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@encrypted_table_n1
-col_name            	value               	 	 	 	 	 	 	 	 	 	 
-data_type           	string              	 	 	 	 	 	 	 	 	 	 
-min                 	                    	 	 	 	 	 	 	 	 	 	 
-max                 	                    	 	 	 	 	 	 	 	 	 	 
-num_nulls           	0                   	 	 	 	 	 	 	 	 	 	 
-distinct_count      	307                 	 	 	 	 	 	 	 	 	 	 
-avg_col_len         	6.812               	 	 	 	 	 	 	 	 	 	 
-max_col_len         	7                   	 	 	 	 	 	 	 	 	 	 
-num_trues           	                    	 	 	 	 	 	 	 	 	 	 
-num_falses          	                    	 	 	 	 	 	 	 	 	 	 
-bitVector           	HL                  	 	 	 	 	 	 	 	 	 	 
-comment             	from deserializer   	 	 	 	 	 	 	 	 	 	 
-COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}	 	 	 	 	 	 	 	 	 	 
+col_name            	value               
+data_type           	string              
+min                 	                    
+max                 	                    
+num_nulls           	0                   
+distinct_count      	307                 
+avg_col_len         	6.812               
+max_col_len         	7                   
+num_trues           	                    
+num_falses          	                    
+bit_vector          	HL                  
+comment             	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}
 PREHOOK: query: ALTER TABLE default.encrypted_table_n1 RENAME TO encrypted_db.encrypted_table_2
 PREHOOK: type: ALTERTABLE_RENAME
 PREHOOK: Input: default@encrypted_table_n1
@@ -110,8 +110,8 @@ POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
 POSTHOOK: Input: database:default
 src
-FAILED: SemanticException [Error 10001]: Table not found encrypted_table_n1
-FAILED: SemanticException [Error 10001]: Table not found encrypted_table_n1
+FAILED: SemanticException [Error 10001]: Table not found default.encrypted_table_n1
+FAILED: SemanticException [Error 10001]: Table not found default.encrypted_table_n1
 FAILED: SemanticException [Error 10001]: Table not found default.encrypted_table_n1
 PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
@@ -203,14 +203,17 @@ PREHOOK: query: ALTER TABLE encrypted_db_outloc.renamed_encrypted_table_n1 RENAM
 PREHOOK: type: ALTERTABLE_RENAME
 PREHOOK: Input: encrypted_db_outloc@renamed_encrypted_table_n1
 PREHOOK: Output: encrypted_db_outloc@renamed_encrypted_table_n1
-FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. Unable to alter table. Alter Table operation for encrypted_db_outloc.renamed_encrypted_table_n1 failed to move data due to: 'Got exception: org.apache.hadoop.ipc.RemoteException /build/ql/test/data/specified_db_location/renamed_encrypted_table_n1 can't be moved from an encryption zone.' See hive log file for details.
+POSTHOOK: query: ALTER TABLE encrypted_db_outloc.renamed_encrypted_table_n1 RENAME TO default.plain_table_2
+POSTHOOK: type: ALTERTABLE_RENAME
+POSTHOOK: Input: encrypted_db_outloc@renamed_encrypted_table_n1
+POSTHOOK: Output: default@plain_table_2
+POSTHOOK: Output: encrypted_db_outloc@renamed_encrypted_table_n1
 PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 PREHOOK: Input: database:encrypted_db_outloc
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
 POSTHOOK: Input: database:encrypted_db_outloc
-renamed_encrypted_table_n1
 PREHOOK: query: DROP TABLE default.encrypted_table_n1 PURGE
 PREHOOK: type: DROPTABLE
 POSTHOOK: query: DROP TABLE default.encrypted_table_n1 PURGE
@@ -231,15 +234,11 @@ PREHOOK: query: DROP DATABASE encrypted_db
 PREHOOK: type: DROPDATABASE
 PREHOOK: Input: database:encrypted_db
 PREHOOK: Output: database:encrypted_db
-FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. InvalidOperationException(message:Database encrypted_db is not empty. One or more tables exist.)
+FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.ddl.DDLTask. InvalidOperationException(message:Database encrypted_db is not empty. One or more tables exist.)
 PREHOOK: query: DROP TABLE encrypted_db_outloc.renamed_encrypted_table_n1 PURGE
 PREHOOK: type: DROPTABLE
-PREHOOK: Input: encrypted_db_outloc@renamed_encrypted_table_n1
-PREHOOK: Output: encrypted_db_outloc@renamed_encrypted_table_n1
 POSTHOOK: query: DROP TABLE encrypted_db_outloc.renamed_encrypted_table_n1 PURGE
 POSTHOOK: type: DROPTABLE
-POSTHOOK: Input: encrypted_db_outloc@renamed_encrypted_table_n1
-POSTHOOK: Output: encrypted_db_outloc@renamed_encrypted_table_n1
 PREHOOK: query: DROP DATABASE encrypted_db_outloc
 PREHOOK: type: DROPDATABASE
 PREHOOK: Input: database:encrypted_db_outloc

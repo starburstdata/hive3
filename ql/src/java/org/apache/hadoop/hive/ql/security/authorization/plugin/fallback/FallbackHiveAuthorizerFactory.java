@@ -30,7 +30,7 @@ public class FallbackHiveAuthorizerFactory implements HiveAuthorizerFactory {
   @Override
   public HiveAuthorizer createHiveAuthorizer(HiveMetastoreClientFactory metastoreClientFactory,
                                              HiveConf conf, HiveAuthenticationProvider authenticator,
-                                             HiveAuthzSessionContext ctx) {
+                                             HiveAuthzSessionContext ctx) throws HiveAuthzPluginException {
     return new FallbackHiveAuthorizer(conf, authenticator, ctx);
   }
 }

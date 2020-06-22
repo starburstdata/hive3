@@ -28,6 +28,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10)) (type: boolean)
@@ -83,6 +84,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
@@ -135,6 +137,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
@@ -187,6 +190,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
@@ -249,6 +253,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and UDFToDouble(key) is not null) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and UDFToDouble(key) is not null) (type: boolean)
@@ -259,18 +264,21 @@ STAGE PLANS:
                 Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: UDFToDouble(_col0) (type: double)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: UDFToDouble(_col0) (type: double)
                   Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col0 (type: int), _col1 (type: string)
           TableScan
             alias: srcpart
+            filterExpr: UDFToDouble(key) is not null (type: boolean)
             Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: UDFToDouble(key) is not null (type: boolean)
               Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: UDFToDouble(key) (type: double)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: UDFToDouble(key) (type: double)
                 Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
@@ -386,6 +394,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
@@ -438,6 +447,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: masking_test_n10
+            filterExpr: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
@@ -490,9 +500,10 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src
+            filterExpr: ((key > 0) and (key < 10) and ((key % 2) = 0)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (((key % 2) = 0) and (key < 10) and (key > 0)) (type: boolean)
+              predicate: ((key > 0) and (key < 10) and ((key % 2) = 0)) (type: boolean)
               Statistics: Num rows: 27 Data size: 286 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), upper(value) (type: string)

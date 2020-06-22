@@ -82,6 +82,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: boolean)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -136,8 +137,8 @@ POSTHOOK: query: select cast(t as boolean) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 true
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as tinyint) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -177,6 +178,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: tinyint)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -231,8 +233,8 @@ POSTHOOK: query: select cast(t as tinyint) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as smallint) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -272,6 +274,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: smallint)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -326,8 +329,8 @@ POSTHOOK: query: select cast(t as smallint) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as int) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -367,6 +370,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: int)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -421,8 +425,8 @@ POSTHOOK: query: select cast(t as int) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as bigint) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -462,6 +466,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: bigint)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -516,8 +521,8 @@ POSTHOOK: query: select cast(t as bigint) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as float) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -557,6 +562,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: float)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -611,8 +617,8 @@ POSTHOOK: query: select cast(t as float) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17.29
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as double) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -652,6 +658,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: double)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -706,8 +713,8 @@ POSTHOOK: query: select cast(t as double) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17.29
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as string) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -737,7 +744,7 @@ STAGE PLANS:
                 native: true
                 vectorizationSchemaColumns: [0:t:decimal(4,2)/DECIMAL_64, 1:u:decimal(5,0)/DECIMAL_64, 2:v:decimal(10,0)/DECIMAL_64, 3:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
             Select Operator
-              expressions: UDFToString(t) (type: string)
+              expressions: CAST( t AS STRING) (type: string)
               outputColumnNames: _col0
               Select Vectorization:
                   className: VectorSelectOperator
@@ -747,6 +754,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: string)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -801,8 +809,8 @@ POSTHOOK: query: select cast(t as string) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 17.29
+NULL
 PREHOOK: query: explain vectorization detail
 select cast(t as timestamp) from decimal_1 order by t
 PREHOOK: type: QUERY
@@ -842,6 +850,7 @@ STAGE PLANS:
               Statistics: Num rows: 2 Data size: 336 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: _col0 (type: timestamp)
+                null sort order: z
                 sort order: +
                 Reduce Sink Vectorization:
                     className: VectorReduceSinkOperator
@@ -896,8 +905,8 @@ POSTHOOK: query: select cast(t as timestamp) from decimal_1 order by t
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_1
 #### A masked pattern was here ####
-NULL
 1970-01-01 00:00:17.29
+NULL
 PREHOOK: query: drop table decimal_1
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@decimal_1

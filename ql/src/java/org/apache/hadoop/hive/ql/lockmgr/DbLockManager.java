@@ -19,7 +19,6 @@ package org.apache.hadoop.hive.ql.lockmgr;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.DDLTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hive.common.JavaUtils;
@@ -27,8 +26,9 @@ import org.apache.hadoop.hive.common.metrics.common.Metrics;
 import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
 import org.apache.hadoop.hive.common.metrics.common.MetricsFactory;
 import org.apache.hadoop.hive.metastore.api.*;
-import org.apache.hadoop.hive.ql.Driver.LockedDriverState;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.ddl.table.lock.show.ShowLocksOperation;
+import org.apache.hadoop.hive.ql.DriverState;
 import org.apache.thrift.TException;
 
 import java.io.ByteArrayOutputStream;
@@ -75,7 +75,7 @@ public final class DbLockManager implements HiveLockManager{
   }
 
   @Override
-  public List<HiveLock> lock(List<HiveLockObj> objs, boolean keepAlive, LockedDriverState lDrvState) throws
+  public List<HiveLock> lock(List<HiveLockObj> objs, boolean keepAlive, DriverState driverState) throws
       LockException {
     throw new UnsupportedOperationException();
   }
@@ -186,7 +186,7 @@ public final class DbLockManager implements HiveLockManager{
     ByteArrayOutputStream baos = new ByteArrayOutputStream(1024*2);
     DataOutputStream os = new DataOutputStream(baos);
     try {
-      DDLTask.dumpLockInfo(os, rsp);
+      ShowLocksOperation.dumpLockInfo(os, rsp);
       os.flush();
       LOG.info(baos.toString());
     }

@@ -30,7 +30,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.exec.repl.ReplUtils;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.metadata.Hive;
@@ -56,11 +56,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 /**
@@ -90,12 +90,13 @@ public class EximUtil {
   public static class SemanticAnalyzerWrapperContext {
     private HiveConf conf;
     private Hive db;
-    private HashSet<ReadEntity> inputs;
-    private HashSet<WriteEntity> outputs;
+    private Set<ReadEntity> inputs;
+    private Set<WriteEntity> outputs;
     private List<Task<? extends Serializable>> tasks;
     private Logger LOG;
     private Context ctx;
     private DumpType eventType = DumpType.EVENT_UNKNOWN;
+    private Task<? extends Serializable> openTxnTask = null;
 
     public HiveConf getConf() {
       return conf;
@@ -105,11 +106,11 @@ public class EximUtil {
       return db;
     }
 
-    public HashSet<ReadEntity> getInputs() {
+    public Set<ReadEntity> getInputs() {
       return inputs;
     }
 
-    public HashSet<WriteEntity> getOutputs() {
+    public Set<WriteEntity> getOutputs() {
       return outputs;
     }
 
@@ -134,8 +135,8 @@ public class EximUtil {
     }
 
     public SemanticAnalyzerWrapperContext(HiveConf conf, Hive db,
-                                          HashSet<ReadEntity> inputs,
-                                          HashSet<WriteEntity> outputs,
+                                          Set<ReadEntity> inputs,
+                                          Set<WriteEntity> outputs,
                                           List<Task<? extends Serializable>> tasks,
                                           Logger LOG, Context ctx){
       this.conf = conf;
@@ -145,6 +146,14 @@ public class EximUtil {
       this.tasks = tasks;
       this.LOG = LOG;
       this.ctx = ctx;
+    }
+
+    public Task<? extends Serializable> getOpenTxnTask() {
+      return openTxnTask;
+    }
+
+    public void setOpenTxnTask(Task<? extends Serializable> openTxnTask) {
+      this.openTxnTask = openTxnTask;
     }
   }
 
@@ -264,7 +273,8 @@ public class EximUtil {
       tmpParameters.entrySet()
                 .removeIf(e -> e.getKey().startsWith(Utils.BOOTSTRAP_DUMP_STATE_KEY_PREFIX)
                             || e.getKey().equals(ReplUtils.REPL_CHECKPOINT_KEY)
-                            || e.getKey().equals(ReplChangeManager.SOURCE_OF_REPLICATION));
+                            || e.getKey().equals(ReplChangeManager.SOURCE_OF_REPLICATION)
+                            || e.getKey().equals(ReplUtils.REPL_FIRST_INC_PENDING_FLAG));
       dbObj.setParameters(tmpParameters);
     }
     try (JsonWriter jsonWriter = new JsonWriter(fs, metadataPath)) {

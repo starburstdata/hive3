@@ -153,6 +153,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 15 Data size: 60 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
+                      null sort order: 
                       sort order: 
                       Statistics: Num rows: 15 Data size: 60 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
@@ -165,6 +166,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 15 Data size: 60 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
+                      null sort order: 
                       sort order: 
                       Statistics: Num rows: 15 Data size: 60 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
@@ -181,10 +183,12 @@ STAGE PLANS:
                 Statistics: Num rows: 225 Data size: 1800 Basic stats: COMPLETE Column stats: COMPLETE
                 Group By Operator
                   aggregations: count()
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                     value expressions: _col0 (type: bigint)
@@ -275,10 +279,12 @@ STAGE PLANS:
                       Statistics: Num rows: 30577 Data size: 365240 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -352,10 +358,12 @@ STAGE PLANS:
                       Statistics: Num rows: 30577 Data size: 7696590 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -421,7 +429,7 @@ STAGE PLANS:
                   filterExpr: ((cint > 5) and (cint < 10)) (type: boolean)
                   Statistics: Num rows: 122880 Data size: 9173100 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: ((cint < 10) and (cint > 5)) (type: boolean)
+                    predicate: ((cint > 5) and (cint < 10)) (type: boolean)
                     Statistics: Num rows: 13653 Data size: 1019300 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: hash(cstring2) (type: int)
@@ -429,10 +437,12 @@ STAGE PLANS:
                       Statistics: Num rows: 13653 Data size: 1019300 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -504,11 +514,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: count()
                       keys: cstring1 (type: string), cstring2 (type: string)
+                      minReductionHashAggr: 0.0
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 122880 Data size: 18412870 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: aa
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 122880 Data size: 18412870 Basic stats: COMPLETE Column stats: COMPLETE
@@ -530,10 +542,12 @@ STAGE PLANS:
                   Statistics: Num rows: 122880 Data size: 18412870 Basic stats: COMPLETE Column stats: COMPLETE
                   Group By Operator
                     aggregations: sum(_col0)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
+                      null sort order: 
                       sort order: 
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col0 (type: bigint)
@@ -598,18 +612,19 @@ STAGE PLANS:
                   filterExpr: (csmallint is not null and cbigint is not null) (type: boolean)
                   Statistics: Num rows: 122880 Data size: 9724466 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: (cbigint is not null and csmallint is not null) (type: boolean)
+                    predicate: (csmallint is not null and cbigint is not null) (type: boolean)
                     Statistics: Num rows: 68484 Data size: 5419732 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: csmallint (type: smallint), cstring1 (type: string)
-                      outputColumnNames: _col0, _col2
-                      Statistics: Num rows: 68484 Data size: 5419732 Basic stats: COMPLETE Column stats: COMPLETE
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 68484 Data size: 5010740 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: smallint)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: smallint)
-                        Statistics: Num rows: 68484 Data size: 5419732 Basic stats: COMPLETE Column stats: COMPLETE
-                        value expressions: _col2 (type: string)
+                        Statistics: Num rows: 68484 Data size: 5010740 Basic stats: COMPLETE Column stats: COMPLETE
+                        value expressions: _col1 (type: string)
             Execution mode: vectorized, llap
             LLAP IO: all inputs
         Map 2 
@@ -619,32 +634,34 @@ STAGE PLANS:
                   filterExpr: (csmallint is not null and cbigint is not null) (type: boolean)
                   Statistics: Num rows: 122880 Data size: 9906988 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: (cbigint is not null and csmallint is not null) (type: boolean)
+                    predicate: (csmallint is not null and cbigint is not null) (type: boolean)
                     Statistics: Num rows: 68484 Data size: 5521416 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: csmallint (type: smallint), cstring2 (type: string)
-                      outputColumnNames: _col0, _col2
-                      Statistics: Num rows: 68484 Data size: 5521416 Basic stats: COMPLETE Column stats: COMPLETE
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 68484 Data size: 5112424 Basic stats: COMPLETE Column stats: COMPLETE
                       Map Join Operator
                         condition map:
                              Inner Join 0 to 1
                         keys:
                           0 _col0 (type: smallint)
                           1 _col0 (type: smallint)
-                        outputColumnNames: _col2, _col5
+                        outputColumnNames: _col1, _col3
                         input vertices:
                           0 Map 1
-                        Statistics: Num rows: 285509 Data size: 50948874 Basic stats: COMPLETE Column stats: COMPLETE
+                        Statistics: Num rows: 159130 Data size: 26936864 Basic stats: COMPLETE Column stats: COMPLETE
                         Select Operator
-                          expressions: hash(_col2,_col5) (type: int)
+                          expressions: hash(_col1,_col3) (type: int)
                           outputColumnNames: _col0
-                          Statistics: Num rows: 285509 Data size: 50948874 Basic stats: COMPLETE Column stats: COMPLETE
+                          Statistics: Num rows: 159130 Data size: 26936864 Basic stats: COMPLETE Column stats: COMPLETE
                           Group By Operator
                             aggregations: sum(_col0)
+                            minReductionHashAggr: 0.99
                             mode: hash
                             outputColumnNames: _col0
                             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                             Reduce Output Operator
+                              null sort order: 
                               sort order: 
                               Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                               value expressions: _col0 (type: bigint)
@@ -753,10 +770,12 @@ STAGE PLANS:
                       Statistics: Num rows: 61153 Data size: 730452 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -830,10 +849,12 @@ STAGE PLANS:
                       Statistics: Num rows: 61153 Data size: 15392750 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -899,7 +920,7 @@ STAGE PLANS:
                   filterExpr: ((cint > 5) and (cint < 10)) (type: boolean)
                   Statistics: Num rows: 245760 Data size: 18346100 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: ((cint < 10) and (cint > 5)) (type: boolean)
+                    predicate: ((cint > 5) and (cint < 10)) (type: boolean)
                     Statistics: Num rows: 27306 Data size: 2038500 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: hash(cstring2) (type: int)
@@ -907,10 +928,12 @@ STAGE PLANS:
                       Statistics: Num rows: 27306 Data size: 2038500 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         aggregations: sum(_col0)
+                        minReductionHashAggr: 0.99
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
+                          null sort order: 
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           value expressions: _col0 (type: bigint)
@@ -982,11 +1005,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: count()
                       keys: cstring1 (type: string), cstring2 (type: string)
+                      minReductionHashAggr: 0.0
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 245760 Data size: 36825550 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: aa
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 245760 Data size: 36825550 Basic stats: COMPLETE Column stats: COMPLETE
@@ -1008,10 +1033,12 @@ STAGE PLANS:
                   Statistics: Num rows: 245760 Data size: 36825550 Basic stats: COMPLETE Column stats: COMPLETE
                   Group By Operator
                     aggregations: sum(_col0)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
+                      null sort order: 
                       sort order: 
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col0 (type: bigint)
@@ -1065,8 +1092,8 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
+        Map 2 <- Map 1 (BROADCAST_EDGE)
+        Reducer 3 <- Map 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1076,65 +1103,61 @@ STAGE PLANS:
                   filterExpr: (csmallint is not null and cbigint is not null) (type: boolean)
                   Statistics: Num rows: 245760 Data size: 19448826 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: (cbigint is not null and csmallint is not null) (type: boolean)
+                    predicate: (csmallint is not null and cbigint is not null) (type: boolean)
                     Statistics: Num rows: 136968 Data size: 10839366 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: csmallint (type: smallint), cstring1 (type: string)
-                      outputColumnNames: _col0, _col2
-                      Statistics: Num rows: 136968 Data size: 10839366 Basic stats: COMPLETE Column stats: COMPLETE
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 136968 Data size: 10021382 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: smallint)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: smallint)
-                        Statistics: Num rows: 136968 Data size: 10839366 Basic stats: COMPLETE Column stats: COMPLETE
-                        value expressions: _col2 (type: string)
+                        Statistics: Num rows: 136968 Data size: 10021382 Basic stats: COMPLETE Column stats: COMPLETE
+                        value expressions: _col1 (type: string)
             Execution mode: vectorized, llap
             LLAP IO: all inputs
-        Map 4 
+        Map 2 
             Map Operator Tree:
                 TableScan
                   alias: o2
                   filterExpr: (csmallint is not null and cbigint is not null) (type: boolean)
                   Statistics: Num rows: 245760 Data size: 19813868 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
-                    predicate: (cbigint is not null and csmallint is not null) (type: boolean)
+                    predicate: (csmallint is not null and cbigint is not null) (type: boolean)
                     Statistics: Num rows: 136968 Data size: 11042828 Basic stats: COMPLETE Column stats: COMPLETE
                     Select Operator
                       expressions: csmallint (type: smallint), cstring2 (type: string)
-                      outputColumnNames: _col0, _col2
-                      Statistics: Num rows: 136968 Data size: 11042828 Basic stats: COMPLETE Column stats: COMPLETE
-                      Reduce Output Operator
-                        key expressions: _col0 (type: smallint)
-                        sort order: +
-                        Map-reduce partition columns: _col0 (type: smallint)
-                        Statistics: Num rows: 136968 Data size: 11042828 Basic stats: COMPLETE Column stats: COMPLETE
-                        value expressions: _col2 (type: string)
+                      outputColumnNames: _col0, _col1
+                      Statistics: Num rows: 136968 Data size: 10224844 Basic stats: COMPLETE Column stats: COMPLETE
+                      Map Join Operator
+                        condition map:
+                             Inner Join 0 to 1
+                        keys:
+                          0 _col0 (type: smallint)
+                          1 _col0 (type: smallint)
+                        outputColumnNames: _col1, _col3
+                        input vertices:
+                          0 Map 1
+                        Statistics: Num rows: 636522 Data size: 114343414 Basic stats: COMPLETE Column stats: COMPLETE
+                        Select Operator
+                          expressions: hash(_col1,_col3) (type: int)
+                          outputColumnNames: _col0
+                          Statistics: Num rows: 636522 Data size: 114343414 Basic stats: COMPLETE Column stats: COMPLETE
+                          Group By Operator
+                            aggregations: sum(_col0)
+                            minReductionHashAggr: 0.99
+                            mode: hash
+                            outputColumnNames: _col0
+                            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
+                            Reduce Output Operator
+                              null sort order: 
+                              sort order: 
+                              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
+                              value expressions: _col0 (type: bigint)
             Execution mode: vectorized, llap
             LLAP IO: all inputs
-        Reducer 2 
-            Execution mode: llap
-            Reduce Operator Tree:
-              Merge Join Operator
-                condition map:
-                     Inner Join 0 to 1
-                keys:
-                  0 _col0 (type: smallint)
-                  1 _col0 (type: smallint)
-                outputColumnNames: _col2, _col5
-                Statistics: Num rows: 1142036 Data size: 210391074 Basic stats: COMPLETE Column stats: COMPLETE
-                Select Operator
-                  expressions: hash(_col2,_col5) (type: int)
-                  outputColumnNames: _col0
-                  Statistics: Num rows: 1142036 Data size: 210391074 Basic stats: COMPLETE Column stats: COMPLETE
-                  Group By Operator
-                    aggregations: sum(_col0)
-                    mode: hash
-                    outputColumnNames: _col0
-                    Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
-                    Reduce Output Operator
-                      sort order: 
-                      Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
-                      value expressions: _col0 (type: bigint)
         Reducer 3 
             Execution mode: vectorized, llap
             Reduce Operator Tree:

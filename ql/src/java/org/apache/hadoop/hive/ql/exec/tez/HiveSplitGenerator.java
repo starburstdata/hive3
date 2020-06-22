@@ -128,7 +128,7 @@ public class HiveSplitGenerator extends InputInitializer {
         MRInputHelpers.parseMRInputPayload(initializerContext.getInputUserPayload());
 
     this.conf = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
-
+    
     this.jobConf = new JobConf(conf);
 
     // Read all credentials into the credentials instance stored in JobConf.
@@ -189,6 +189,12 @@ public class HiveSplitGenerator extends InputInitializer {
           availableSlots = totalResource / taskResource;
         }
 
+        final int configAvailableSlots = HiveConf.getIntVar(conf,
+          HiveConf.ConfVars.HIVE_SERVER2_USE_PER_QUERY_LLAP_TOTAL_AVAILABLE_SLOTS);
+        if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_SERVER2_USE_PER_QUERY_TEZ_EXTERNAL_SESSION) && configAvailableSlots > 0) {
+          availableSlots = configAvailableSlots;
+          LOG.info("Using availableSlots: {} specified in the config", availableSlots);
+        }
         if (HiveConf.getLongVar(conf, HiveConf.ConfVars.MAPREDMINSPLITSIZE, 1) <= 1) {
           // broken configuration from mapred-default.xml
           final long blockSize = conf.getLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,

@@ -359,7 +359,7 @@ public abstract class CompactorTest {
       }
       FSDataOutputStream out = fs.create(partFile);
       if (type == FileType.LENGTH_FILE) {
-        out.writeInt(numRecords);
+        out.writeInt(numRecords);//hmm - length files should store length in bytes...
       } else {
         for (int i = 0; i < numRecords; i++) {
           RecordIdentifier ri = new RecordIdentifier(maxTxn - 1, bucket, i);
@@ -383,7 +383,7 @@ public abstract class CompactorTest {
     @Override
     public RawReader<Text> getRawReader(Configuration conf, boolean collapseEvents, int bucket,
                                         ValidWriteIdList validWriteIdList,
-                                        Path baseDirectory, Path... deltaDirectory) throws IOException {
+                                        Path baseDirectory, Path[] deltaDirectory, Map<String, String> deltaToAttemptId) throws IOException {
 
       List<Path> filesToRead = new ArrayList<Path>();
       if (baseDirectory != null) {

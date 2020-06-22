@@ -44,6 +44,7 @@ public class LlapClusterStateForCompile {
   private volatile Long lastClusterUpdateNs;
   private volatile Integer noConfigNodeCount, executorCount;
   private volatile int numExecutorsPerNode = -1;
+  private volatile long memoryPerInstance = -1;
   private LlapRegistryService svc;
   private final Configuration conf;
   private final long updateIntervalNs;
@@ -93,6 +94,14 @@ public class LlapClusterStateForCompile {
     return numExecutorsPerNode;
   }
 
+  public long getMemoryPerInstance() {
+    return memoryPerInstance;
+  }
+
+  public long getMemoryPerExecutor() {
+    return getMemoryPerInstance() / getNumExecutorsPerNode();
+  }
+
   private boolean isUpdateNeeded() {
     Long lastUpdateLocal = lastClusterUpdateNs;
     if (lastUpdateLocal == null) return true;
@@ -113,7 +122,7 @@ public class LlapClusterStateForCompile {
           return false; // Don't fail; this is best-effort.
         }
       }
-      ServiceInstanceSet<LlapServiceInstance> instances;
+      LlapServiceInstanceSet instances;
       try {
         instances = svc.getInstances(10);
       } catch (IOException e) {
@@ -133,6 +142,9 @@ public class LlapClusterStateForCompile {
           executorsLocal += numExecutors;
           if (numExecutorsPerNode == -1) {
             numExecutorsPerNode = numExecutors;
+          }
+          if (memoryPerInstance == -1) {
+            memoryPerInstance = si.getResource().getMemorySize() * 1024L * 1024L;
           }
         } catch (NumberFormatException e) {
           ++noConfigNodesLocal;

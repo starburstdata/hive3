@@ -141,9 +141,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t5
+                  filterExpr: ((predicate = 'http://www.ontosearch.com/2007/12/ontosofa-ns#_to') and subject is not null and object is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
-                    predicate: ((predicate = 'http://www.ontosearch.com/2007/12/ontosofa-ns#_to') and object is not null and subject is not null) (type: boolean)
+                    predicate: ((predicate = 'http://www.ontosearch.com/2007/12/ontosofa-ns#_to') and subject is not null and object is not null) (type: boolean)
                     Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                     Select Operator
                       expressions: subject (type: string), object (type: string)
@@ -151,6 +152,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col1 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col1 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -160,9 +162,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t1
+                  filterExpr: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and (object = 'http://ontos/OntosMiner/Common.English/ontology#Citation') and subject is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
-                    predicate: ((object = 'http://ontos/OntosMiner/Common.English/ontology#Citation') and (predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and subject is not null) (type: boolean)
+                    predicate: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and (object = 'http://ontos/OntosMiner/Common.English/ontology#Citation') and subject is not null) (type: boolean)
                     Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                     Select Operator
                       expressions: subject (type: string)
@@ -170,6 +173,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -178,6 +182,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t6
+                  filterExpr: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__LABEL_REL') and subject is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
                     predicate: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__LABEL_REL') and subject is not null) (type: boolean)
@@ -188,6 +193,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -197,6 +203,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t3
+                  filterExpr: ((predicate = 'http://www.ontosearch.com/2007/12/ontosofa-ns#_from') and object is not null and subject is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
                     predicate: ((predicate = 'http://www.ontosearch.com/2007/12/ontosofa-ns#_from') and object is not null and subject is not null) (type: boolean)
@@ -207,6 +214,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -216,9 +224,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t4
+                  filterExpr: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and (object = 'http://ontos/OntosMiner/Common.English/ontology#Author') and subject is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
-                    predicate: ((object = 'http://ontos/OntosMiner/Common.English/ontology#Author') and (predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and subject is not null) (type: boolean)
+                    predicate: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__INSTANCEOF_REL') and (object = 'http://ontos/OntosMiner/Common.English/ontology#Author') and subject is not null) (type: boolean)
                     Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                     Select Operator
                       expressions: subject (type: string)
@@ -226,6 +235,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -234,6 +244,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t2
+                  filterExpr: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__LABEL_REL') and subject is not null) (type: boolean)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                   Filter Operator
                     predicate: ((predicate = 'http://sofa.semanticweb.org/sofa/v1.0/system#__LABEL_REL') and subject is not null) (type: boolean)
@@ -244,6 +255,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -261,6 +273,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col2 (type: string)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -277,6 +290,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col0 (type: string)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -293,6 +307,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col5 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col5 (type: string)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
@@ -330,6 +345,7 @@ STAGE PLANS:
                 Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: _col2 (type: string)
                   Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE

@@ -28,6 +28,8 @@ import org.apache.hadoop.hive.ql.exec.vector.mapjoin.fast.CheckFastHashTable.Ver
 import org.apache.hadoop.hive.ql.exec.vector.mapjoin.fast.VectorMapJoinFastLongHashMap;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.VectorMapJoinDesc.HashTableKeyType;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -186,7 +188,7 @@ public class TestVectorMapJoinFastLongHashMap extends CommonFastHashTable {
 
     VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    for (int i = 0; i < 18; ++i) {
+    for (int i = 0; i < 6; ++i) {
       long key;
       while (true) {
         key = random.nextLong();
@@ -276,6 +278,7 @@ public class TestVectorMapJoinFastLongHashMap extends CommonFastHashTable {
     addAndVerifyMultipleKeyMultipleValue(keyCount, map, verifyTable);
   }
 
+  @Ignore
   @Test
   public void testOutOfBounds() throws Exception {
     random = new Random(42662);

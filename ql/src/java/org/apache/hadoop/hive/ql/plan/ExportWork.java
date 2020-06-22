@@ -102,12 +102,12 @@ public class ExportWork implements Serializable {
    * For exporting Acid table, change the "pointer" to the temp table.
    * This has to be done after the temp table is populated and all necessary Partition objects
    * exist in the metastore.
-   * See {@link org.apache.hadoop.hive.ql.parse.UpdateDeleteSemanticAnalyzer#isAcidExport(ASTNode)}
+   * See {@link org.apache.hadoop.hive.ql.parse.AcidExportAnalyzer#isAcidExport(ASTNode)}
    * for more info.
    */
   public void acidPostProcess(Hive db) throws HiveException {
     if (acidFqTableName != null) {
-      LOG.info("Swapping export of " + tableSpec.tableName + " to " + acidFqTableName +
+      LOG.info("Swapping export of " + tableSpec.getTableName().getTable() + " to " + acidFqTableName +
           " using partSpec=" + tableSpec.partSpec);
       tableSpec = new TableSpec(db, acidFqTableName, tableSpec.partSpec, true);
     }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
+import org.apache.hadoop.hive.common.format.datetime.HiveSqlDateTimeFormatter;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 
@@ -31,7 +32,6 @@ import java.time.temporal.ChronoField;
 
 public class CastTimestampToString extends TimestampToStringUnaryUDF {
   private static final long serialVersionUID = 1L;
-  protected transient Timestamp dt = new Timestamp(0);
   private static final DateTimeFormatter PRINT_FORMATTER;
 
   static {
@@ -58,11 +58,32 @@ public class CastTimestampToString extends TimestampToStringUnaryUDF {
 
   @Override
   protected void func(BytesColumnVector outV, TimestampColumnVector inV, int i) {
-    dt.setTime(inV.time[i]);
-    dt.setNanos(inV.nanos[i]);
     byte[] temp = LocalDateTime.ofInstant(Instant.ofEpochMilli(inV.time[i]), ZoneOffset.UTC)
         .withNano(inV.nanos[i])
         .format(PRINT_FORMATTER).getBytes();
     assign(outV, i, temp, temp.length);
+  }
+
+  /**
+   * CastTimestampToString, CastTimestampToChar, CastTimestampToVarchar use this.
+   */
+  void sqlFormat(BytesColumnVector outV, TimestampColumnVector inV, int i,
+      HiveSqlDateTimeFormatter sqlFormatter) {
+    String formattedString = sqlFormatter.format(
+        org.apache.hadoop.hive.common.type.Timestamp.ofEpochMilli(inV.time[i], inV.nanos[i]));
+    if (formattedString == null) {
+      outV.isNull[i] = true;
+      outV.noNulls = false;
+      return;
+    }
+    byte[] temp = formattedString.getBytes();
+    assign(outV, i, temp, temp.length);
+  }
+
+  public static String getTimestampString(Timestamp ts) {
+    return
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(ts.getTime()), ZoneOffset.UTC)
+        .withNano(ts.getNanos())
+        .format(PRINT_FORMATTER);
   }
 }

@@ -44,11 +44,16 @@ public class AbortTxnHandler extends AbstractMessageHandler {
     AbortTxnMessage msg = deserializer.getAbortTxnMessage(context.dmd.getPayload());
 
     Task<ReplTxnWork> abortTxnTask = TaskFactory.get(
-        new ReplTxnWork(HiveUtils.getReplPolicy(context.dbName, context.tableName), context.dbName, context.tableName,
+        new ReplTxnWork(HiveUtils.getReplPolicy(context.dbName), context.dbName, null,
                 msg.getTxnId(), ReplTxnWork.OperationType.REPL_ABORT_TXN, context.eventOnlyReplicationSpec()),
         context.hiveConf
     );
-    updatedMetadata.set(context.dmd.getEventTo().toString(), context.dbName, context.tableName, null);
+
+    // For warehouse level dump, don't update the metadata of database as we don't know this txn is for which database.
+    // Anyways, if this event gets executed again, it is taken care of.
+    if (!context.isDbNameEmpty()) {
+      updatedMetadata.set(context.dmd.getEventTo().toString(), context.dbName, null, null);
+    }
     context.log.debug("Added Abort txn task : {}", abortTxnTask.getId());
     return Collections.singletonList(abortTxnTask);
   }

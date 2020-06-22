@@ -48,19 +48,19 @@ PREHOOK: Input: default@decimal_1_n1
 POSTHOOK: query: desc formatted decimal_1_n1 v
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: default@decimal_1_n1
-col_name            	v                   	 	 	 	 	 	 	 	 	 	 
-data_type           	decimal(10,0)       	 	 	 	 	 	 	 	 	 	 
-min                 	                    	 	 	 	 	 	 	 	 	 	 
-max                 	                    	 	 	 	 	 	 	 	 	 	 
-num_nulls           	500                 	 	 	 	 	 	 	 	 	 	 
-distinct_count      	1                   	 	 	 	 	 	 	 	 	 	 
-avg_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-max_col_len         	                    	 	 	 	 	 	 	 	 	 	 
-num_trues           	                    	 	 	 	 	 	 	 	 	 	 
-num_falses          	                    	 	 	 	 	 	 	 	 	 	 
-bitVector           	HL                  	 	 	 	 	 	 	 	 	 	 
-comment             	from deserializer   	 	 	 	 	 	 	 	 	 	 
-COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"t\":\"true\",\"u\":\"true\",\"v\":\"true\"}}	 	 	 	 	 	 	 	 	 	 
+col_name            	v                   
+data_type           	decimal(10,0)       
+min                 	                    
+max                 	                    
+num_nulls           	500                 
+distinct_count      	1                   
+avg_col_len         	                    
+max_col_len         	                    
+num_trues           	                    
+num_falses          	                    
+bit_vector          	HL                  
+comment             	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"t\":\"true\",\"u\":\"true\",\"v\":\"true\"}}
 PREHOOK: query: explain select * from decimal_1_n1 order by t limit 100
 PREHOOK: type: QUERY
 PREHOOK: Input: default@decimal_1_n1
@@ -86,6 +86,7 @@ STAGE PLANS:
               Statistics: Num rows: 500 Data size: 112112 Basic stats: COMPLETE Column stats: COMPLETE
               Reduce Output Operator
                 key expressions: _col0 (type: decimal(4,2))
+                null sort order: z
                 sort order: +
                 Statistics: Num rows: 500 Data size: 112112 Basic stats: COMPLETE Column stats: COMPLETE
                 TopN Hash Memory Usage: 0.1

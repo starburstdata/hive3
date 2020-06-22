@@ -39,6 +39,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
+                  filterExpr: (cint < 2000000000) (type: boolean)
                   Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -67,6 +68,7 @@ STAGE PLANS:
                             className: VectorMapJoinInnerBigOnlyLongOperator
                             native: true
                             nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Fast Hash Table and No Hybrid Hash Join IS true
+                            hashTableImplementationType: FAST
                         input vertices:
                           1 Map 3
                         Statistics: Num rows: 24737 Data size: 197896 Basic stats: COMPLETE Column stats: COMPLETE
@@ -79,10 +81,12 @@ STAGE PLANS:
                               native: false
                               vectorProcessingMode: HASH
                               projectedOutputColumnNums: [0]
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Reduce Sink Vectorization:
                                 className: VectorReduceSinkEmptyKeyOperator
@@ -105,6 +109,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: cd
+                  filterExpr: (cint < 2000000000) (type: boolean)
                   Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -125,6 +130,7 @@ STAGE PLANS:
                       Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: int)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: int)
                         Reduce Sink Vectorization:
@@ -222,6 +228,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
+                  filterExpr: (cint < 2000000000) (type: boolean)
                   Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -250,6 +257,7 @@ STAGE PLANS:
                             className: VectorMapJoinInnerBigOnlyLongOperator
                             native: true
                             nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Fast Hash Table and No Hybrid Hash Join IS true
+                            hashTableImplementationType: FAST
                         input vertices:
                           1 Map 3
                         Statistics: Num rows: 24737 Data size: 197896 Basic stats: COMPLETE Column stats: COMPLETE
@@ -262,10 +270,12 @@ STAGE PLANS:
                               native: false
                               vectorProcessingMode: HASH
                               projectedOutputColumnNums: [0]
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Reduce Sink Vectorization:
                                 className: VectorReduceSinkEmptyKeyOperator
@@ -288,6 +298,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: cd
+                  filterExpr: (cint < 2000000000) (type: boolean)
                   Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -308,6 +319,7 @@ STAGE PLANS:
                       Statistics: Num rows: 12288 Data size: 36696 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: int)
+                        null sort order: a
                         sort order: +
                         Map-reduce partition columns: _col0 (type: int)
                         Reduce Sink Vectorization:

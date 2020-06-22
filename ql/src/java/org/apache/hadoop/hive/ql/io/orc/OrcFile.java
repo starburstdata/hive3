@@ -24,20 +24,29 @@ import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.llap.LlapDaemonInfo;
+import org.apache.hadoop.hive.llap.LlapUtil;
+import org.apache.hadoop.hive.llap.io.api.LlapProxy;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.orc.FileMetadata;
+import org.apache.orc.OrcConf;
 import org.apache.orc.PhysicalWriter;
 import org.apache.orc.MemoryManager;
 import org.apache.orc.TypeDescription;
+import org.apache.orc.impl.MemoryManagerImpl;
 import org.apache.orc.impl.OrcTail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Contains factory methods to read or write ORC files.
  */
 public final class OrcFile extends org.apache.orc.OrcFile {
-
+  private static final Logger LOG = LoggerFactory.getLogger(OrcFile.class);
   // unused
   protected OrcFile() {}
 
@@ -59,6 +68,7 @@ public final class OrcFile extends org.apache.orc.OrcFile {
     public ReaderOptions(Configuration conf) {
       super(conf);
       useUTCTimestamp(true);
+      convertToProlepticGregorian(true);
     }
 
     public ReaderOptions filesystem(FileSystem fs) {
@@ -85,6 +95,11 @@ public final class OrcFile extends org.apache.orc.OrcFile {
       super.useUTCTimestamp(value);
       return this;
     }
+
+    public ReaderOptions convertToProlepticGregorian(boolean value) {
+      super.convertToProlepticGregorian(value);
+      return this;
+    }
   }
 
   public static ReaderOptions readerOptions(Configuration conf) {
@@ -94,6 +109,37 @@ public final class OrcFile extends org.apache.orc.OrcFile {
   public static Reader createReader(Path path,
                                     ReaderOptions options) throws IOException {
     return new ReaderImpl(path, options);
+  }
+
+  @VisibleForTesting
+  static class LlapAwareMemoryManager extends MemoryManagerImpl {
+    private final double maxLoad;
+    private final long totalMemoryPool;
+
+    public LlapAwareMemoryManager(Configuration conf) {
+      super(conf);
+      maxLoad = OrcConf.MEMORY_POOL.getDouble(conf);
+      long memPerExecutor = LlapDaemonInfo.INSTANCE.getMemoryPerExecutor();
+      totalMemoryPool = (long) (memPerExecutor * maxLoad);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Using LLAP memory manager for orc writer. memPerExecutor: {} maxLoad: {} totalMemPool: {}",
+          LlapUtil.humanReadableByteCount(memPerExecutor), maxLoad, LlapUtil.humanReadableByteCount(totalMemoryPool));
+      }
+    }
+
+    @Override
+    public long getTotalMemoryPool() {
+      return totalMemoryPool;
+    }
+  }
+
+  private static ThreadLocal<MemoryManager> threadLocalOrcLlapMemoryManager = null;
+
+  private static synchronized MemoryManager getThreadLocalOrcLlapMemoryManager(final Configuration conf) {
+    if (threadLocalOrcLlapMemoryManager == null) {
+      threadLocalOrcLlapMemoryManager = ThreadLocal.withInitial(() -> new LlapAwareMemoryManager(conf));
+    }
+    return threadLocalOrcLlapMemoryManager.get();
   }
 
   /**
@@ -111,6 +157,10 @@ public final class OrcFile extends org.apache.orc.OrcFile {
     WriterOptions(Properties tableProperties, Configuration conf) {
       super(tableProperties, conf);
       useUTCTimestamp(true);
+      if (conf.getBoolean(HiveConf.ConfVars.HIVE_ORC_WRITER_LLAP_MEMORY_MANAGER_ENABLED.varname, true) &&
+        LlapProxy.isDaemon()) {
+        memory(getThreadLocalOrcLlapMemoryManager(conf));
+      }
     }
 
    /**
@@ -284,6 +334,11 @@ public final class OrcFile extends org.apache.orc.OrcFile {
 
     public WriterOptions useUTCTimestamp(boolean value) {
       super.useUTCTimestamp(value);
+      return this;
+    }
+
+    public WriterOptions setProlepticGregorian(boolean value) {
+      super.setProlepticGregorian(value);
       return this;
     }
 

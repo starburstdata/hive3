@@ -127,10 +127,7 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
     public Object process(StatsAggregator statsAggregator) throws HiveException, MetaException {
       Partish p = partish;
       Map<String, String> parameters = p.getPartParameters();
-      if (p.isTransactionalTable()) {
-        // TODO: this should also happen on any error. Right now this task will just fail.
-        StatsSetupConst.setBasicStatsState(parameters, StatsSetupConst.FALSE);
-      } else if (work.isTargetRewritten()) {
+      if (work.isTargetRewritten()) {
         StatsSetupConst.setBasicStatsState(parameters, StatsSetupConst.TRUE);
       }
 
@@ -169,7 +166,7 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
         // though we are marking stats as not being accurate.
         if (StatsSetupConst.areBasicStatsUptoDate(parameters) || p.isTransactionalTable()) {
           String prefix = getAggregationPrefix(p.getTable(), p.getPartition());
-          updateStats(statsAggregator, parameters, prefix, p.isAcid());
+          updateStats(statsAggregator, parameters, prefix);
         }
       }
 
@@ -206,14 +203,8 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
     }
 
     private void updateStats(StatsAggregator statsAggregator, Map<String, String> parameters,
-        String aggKey, boolean isFullAcid) throws HiveException {
-      for (String statType : StatsSetupConst.statsRequireCompute) {
-        if (isFullAcid && !work.isTargetRewritten()) {
-          // Don't bother with aggregation in this case, it will probably be invalid.
-          parameters.remove(statType);
-          continue;
-        }
-
+        String aggKey) throws HiveException {
+      for (String statType : StatsSetupConst.STATS_REQUIRE_COMPUTE) {
         String value = statsAggregator.aggregateStats(aggKey, statType);
         if (value != null && !value.isEmpty()) {
           long longValue = Long.parseLong(value);
@@ -272,7 +263,7 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
         if (res == null) {
           return 0;
         }
-        db.alterTable(tableFullName, res, environmentContext);
+        db.alterTable(tableFullName, res, environmentContext, true);
 
         if (conf.getBoolVar(ConfVars.TEZ_EXEC_SUMMARY)) {
           console.printInfo("Table " + tableFullName + " stats: [" + toString(p.getPartParameters()) + ']');
@@ -340,7 +331,7 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
         }
 
         if (!updates.isEmpty()) {
-          db.alterPartitions(tableFullName, updates, environmentContext);
+          db.alterPartitions(tableFullName, updates, environmentContext, true);
         }
         if (work.isStatsReliable() && updates.size() != processors.size()) {
           LOG.info("Stats should be reliadble...however seems like there were some issue.. => ret 1");
@@ -417,7 +408,7 @@ public class BasicStatsTask implements Serializable, IStatsProcessor {
 
   private String toString(Map<String, String> parameters) {
     StringBuilder builder = new StringBuilder();
-    for (String statType : StatsSetupConst.supportedStats) {
+    for (String statType : StatsSetupConst.SUPPORTED_STATS) {
       String value = parameters.get(statType);
       if (value != null) {
         if (builder.length() > 0) {

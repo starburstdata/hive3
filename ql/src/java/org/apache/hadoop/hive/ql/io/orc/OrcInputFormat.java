@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.hive.ql.io.orc;
 
-import org.apache.hadoop.hive.ql.plan.DynamicValue.NoDynamicValuesException;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
@@ -42,12 +38,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hive.common.BlobStorageUtils;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -88,6 +88,7 @@ import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.TruthValue;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
+import org.apache.hadoop.hive.ql.plan.DynamicValue.NoDynamicValuesException;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
@@ -117,9 +118,9 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hive.common.util.Ref;
 import org.apache.orc.ColumnStatistics;
 import org.apache.orc.FileFormatException;
+import org.apache.orc.OrcConf;
 import org.apache.orc.OrcProto;
 import org.apache.orc.OrcProto.Footer;
-import org.apache.orc.OrcProto.Type;
 import org.apache.orc.OrcUtils;
 import org.apache.orc.StripeInformation;
 import org.apache.orc.StripeStatistics;
@@ -193,7 +194,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
   @Override
   public boolean shouldSkipCombine(Path path,
                                    Configuration conf) throws IOException {
-    return (conf.get(AcidUtils.CONF_ACID_KEY) != null) || AcidUtils.isAcid(path, conf);
+    return (conf.get(AcidUtils.CONF_ACID_KEY) != null) || AcidUtils.isAcid(null, path, conf);
   }
 
 
@@ -625,6 +626,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     private SplitStrategyKind splitStrategyKind;
     private final SearchArgument sarg;
     private final AcidOperationalProperties acidOperationalProperties;
+    private final boolean isAcid;
+    private final boolean isVectorMode;
 
     Context(Configuration conf) throws IOException {
       this(conf, 1, null);
@@ -638,6 +641,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     Context(Configuration conf, final int minSplits, ExternalFooterCachesByConf efc)
         throws IOException {
       this.conf = conf;
+      this.isAcid = AcidUtils.isFullAcidScan(conf);
+      this.isVectorMode = Utilities.getIsVectorized(conf);
       this.forceThreadpool = HiveConf.getBoolVar(conf, ConfVars.HIVE_IN_TEST);
       this.sarg = ConvertAstToSearchArg.createFromConf(conf);
       minSize = HiveConf.getLongVar(conf, ConfVars.MAPREDMINSPLITSIZE, DEFAULT_MIN_SPLIT_SIZE);
@@ -646,7 +651,6 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       if (ss == null || ss.equals(SplitStrategyKind.HYBRID.name())) {
         splitStrategyKind = SplitStrategyKind.HYBRID;
       } else {
-        LOG.info("Enforcing " + ss + " ORC split strategy");
         splitStrategyKind = SplitStrategyKind.valueOf(ss);
       }
       footerInSplits = HiveConf.getBoolVar(conf,
@@ -654,10 +658,9 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       numBuckets =
           Math.max(conf.getInt(hive_metastoreConstants.BUCKET_COUNT, 0), 0);
       splitStrategyBatchMs = HiveConf.getIntVar(conf, ConfVars.HIVE_ORC_SPLIT_DIRECTORY_BATCH_MS);
-      LOG.debug("Number of buckets specified by conf file is " + numBuckets);
       long cacheMemSize = HiveConf.getSizeVar(
           conf, ConfVars.HIVE_ORC_CACHE_STRIPE_DETAILS_MEMORY_SIZE);
-      int numThreads = HiveConf.getIntVar(conf, ConfVars.HIVE_ORC_COMPUTE_SPLITS_NUM_THREADS);
+      int numThreads = HiveConf.getIntVar(conf, ConfVars.HIVE_COMPUTE_SPLITS_NUM_THREADS);
       boolean useSoftReference = HiveConf.getBoolVar(
           conf, ConfVars.HIVE_ORC_CACHE_USE_SOFT_REFERENCES);
 
@@ -716,8 +719,37 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
       String value = conf.get(ValidWriteIdList.VALID_WRITEIDS_KEY);
       writeIdList = value == null ? new ValidReaderWriteIdList() : new ValidReaderWriteIdList(value);
-      LOG.debug("Context:: Read ValidWriteIdList: " + writeIdList.toString()
-              + " isTransactionalTable: " + isTxnTable + " properties: " + txnProperties);
+      LOG.info("Context:: " +
+          "isAcid: {} " +
+          "isVectorMode: {} " +
+          "sarg: {} " +
+          "minSplitSize: {} " +
+          "maxSplitSize: {} " +
+          "splitStrategy: {} " +
+          "footerInSplits: {} " +
+          "numBuckets: {} " +
+          "numThreads: {} " +
+          "cacheMemSize: {} " +
+          "cacheStripeDetails: {} " +
+          "useSoftReference: {} " +
+          "writeIdList: {} " +
+          "isTransactionalTable: {} " +
+          "txnProperties: {} ",
+        isAcid,
+        isVectorMode,
+        sarg,
+        minSize,
+        maxSize,
+        splitStrategyKind,
+        footerInSplits,
+        numBuckets,
+        numThreads,
+        cacheMemSize,
+        cacheStripeDetails,
+        useSoftReference,
+        writeIdList,
+        isTxnTable,
+        txnProperties);
     }
 
     @VisibleForTesting
@@ -1036,6 +1068,9 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     private final Path dir;
     private final boolean allowSyntheticFileIds;
     private final boolean isDefaultFs;
+    private final Configuration conf;
+    private final boolean isAcid;
+    private final boolean vectorMode;
 
     /**
      * @param dir - root of partition dir
@@ -1051,29 +1086,50 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       this.dir = dir;
       this.allowSyntheticFileIds = allowSyntheticFileIds;
       this.isDefaultFs = isDefaultFs;
+      this.conf = context.conf;
+      this.isAcid = context.isAcid;
+      this.vectorMode = context.isVectorMode;
     }
 
     @Override
     public List<OrcSplit> getSplits() throws IOException {
       List<OrcSplit> splits = Lists.newArrayList();
+      OrcSplit.OffsetAndBucketProperty offsetAndBucket = null;
       for (HdfsFileStatusWithId file : fileStatuses) {
+        if (isOriginal && isAcid && vectorMode) {
+          offsetAndBucket = VectorizedOrcAcidRowBatchReader.computeOffsetAndBucket(file.getFileStatus(), dir,
+              isOriginal, !deltas.isEmpty(), conf);
+        }
+
         FileStatus fileStatus = file.getFileStatus();
-        long logicalLen = AcidUtils.getLogicalLength(fs, fileStatus);
+        long logicalLen = isAcid ? AcidUtils.getLogicalLength(fs, fileStatus) : fileStatus.getLen();
         if (logicalLen != 0) {
           Object fileKey = isDefaultFs ? file.getFileId() : null;
           if (fileKey == null && allowSyntheticFileIds) {
             fileKey = new SyntheticFileId(fileStatus);
           }
-          TreeMap<Long, BlockLocation> blockOffsets = SHIMS.getLocationsWithOffset(fs, fileStatus);
-          for (Map.Entry<Long, BlockLocation> entry : blockOffsets.entrySet()) {
-            if(entry.getKey() + entry.getValue().getLength() > logicalLen) {
-              //don't create splits for anything past logical EOF
-              continue;
+          if (BlobStorageUtils.isBlobStorageFileSystem(conf, fs)) {
+            final long splitSize = HiveConf.getLongVar(conf, HiveConf.ConfVars.HIVE_ORC_BLOB_STORAGE_SPLIT_SIZE);
+            LOG.debug("Blob storage detected for BI split strategy. Splitting files at boundary {}..", splitSize);
+            long start;
+            for (start = 0; start < logicalLen; start = start + splitSize) {
+              OrcSplit orcSplit = new OrcSplit(fileStatus.getPath(), fileKey, start,
+                Math.min(splitSize, logicalLen - start), null, null, isOriginal, true,
+                deltas, -1, logicalLen, dir, offsetAndBucket);
+              splits.add(orcSplit);
             }
-            OrcSplit orcSplit = new OrcSplit(fileStatus.getPath(), fileKey, entry.getKey(),
+          } else {
+            TreeMap<Long, BlockLocation> blockOffsets = SHIMS.getLocationsWithOffset(fs, fileStatus);
+            for (Map.Entry<Long, BlockLocation> entry : blockOffsets.entrySet()) {
+              if (entry.getKey() + entry.getValue().getLength() > logicalLen) {
+                //don't create splits for anything past logical EOF
+                continue;
+              }
+              OrcSplit orcSplit = new OrcSplit(fileStatus.getPath(), fileKey, entry.getKey(),
                 entry.getValue().getLength(), entry.getValue().getHosts(), null, isOriginal, true,
-                deltas, -1, logicalLen, dir);
-            splits.add(orcSplit);
+                deltas, -1, logicalLen, dir, offsetAndBucket);
+              splits.add(orcSplit);
+            }
           }
         }
       }
@@ -1141,7 +1197,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
    */
   static final class FileGenerator implements Callable<AcidDirInfo> {
     private final Context context;
-    private final FileSystem fs;
+    private final Supplier<FileSystem> fs;
     /**
      * For plain or acid tables this is the root of the partition (or table if not partitioned).
      * For MM table this is delta/ or base/ dir.  In MM case applying of the ValidTxnList that
@@ -1153,12 +1209,12 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     private final UserGroupInformation ugi;
 
     @VisibleForTesting
-    FileGenerator(Context context, FileSystem fs, Path dir, boolean useFileIds,
+    FileGenerator(Context context, Supplier<FileSystem> fs, Path dir, boolean useFileIds,
         UserGroupInformation ugi) {
       this(context, fs, dir, Ref.from(useFileIds), ugi);
     }
 
-    FileGenerator(Context context, FileSystem fs, Path dir, Ref<Boolean> useFileIds,
+    FileGenerator(Context context, Supplier<FileSystem> fs, Path dir, Ref<Boolean> useFileIds,
         UserGroupInformation ugi) {
       this.context = context;
       this.fs = fs;
@@ -1184,6 +1240,17 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       }
     }
 
+    private Directory getAcidState() throws IOException {
+      if (context.isAcid && context.splitStrategyKind == SplitStrategyKind.BI) {
+        return AcidUtils.getAcidStateFromCache(fs, dir, context.conf,
+            context.writeIdList, useFileIds, true, null, true);
+      } else {
+        return AcidUtils.getAcidState(fs.get(), dir, context.conf, context.writeIdList,
+            useFileIds, true, null, true);
+      }
+    }
+
+
     private AcidDirInfo callInternal() throws IOException {
       if (context.acidOperationalProperties != null
           && context.acidOperationalProperties.isInsertOnly()) {
@@ -1196,16 +1263,15 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
             context.conf.getBoolean("mapred.input.dir.recursive", false));
         List<HdfsFileStatusWithId> originals = new ArrayList<>();
         List<AcidBaseFileInfo> baseFiles = new ArrayList<>();
-        AcidUtils.findOriginals(fs, fs.getFileStatus(dir), originals, useFileIds, true, isRecursive);
+        AcidUtils.findOriginals(fs.get(), dir, originals, useFileIds, true, isRecursive);
         for (HdfsFileStatusWithId fileId : originals) {
           baseFiles.add(new AcidBaseFileInfo(fileId, AcidUtils.AcidBaseFileType.ORIGINAL_BASE));
         }
-        return new AcidDirInfo(fs, dir, new AcidUtils.DirectoryImpl(Lists.newArrayList(), true, originals,
+        return new AcidDirInfo(fs.get(), dir, new AcidUtils.DirectoryImpl(Lists.newArrayList(), true, originals,
             Lists.newArrayList(), Lists.newArrayList(), null), baseFiles, new ArrayList<>());
       }
       //todo: shouldn't ignoreEmptyFiles be set based on ExecutionEngine?
-      AcidUtils.Directory dirInfo = AcidUtils.getAcidState(
-          dir, context.conf, context.writeIdList, useFileIds, true, null);
+      AcidUtils.Directory dirInfo  = getAcidState();
       // find the base files (original or new style)
       List<AcidBaseFileInfo> baseFiles = new ArrayList<>();
       if (dirInfo.getBaseDirectory() == null) {
@@ -1214,7 +1280,10 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
           baseFiles.add(new AcidBaseFileInfo(fileId, AcidUtils.AcidBaseFileType.ORIGINAL_BASE));
         }
       } else {
-        List<HdfsFileStatusWithId> compactedBaseFiles = findBaseFiles(dirInfo.getBaseDirectory(), useFileIds);
+        List<HdfsFileStatusWithId> compactedBaseFiles = dirInfo.getBaseFiles();
+        if (compactedBaseFiles == null) {
+          compactedBaseFiles = AcidUtils.findBaseFiles(dirInfo.getBaseDirectory(), useFileIds, fs);
+        }
         for (HdfsFileStatusWithId fileId : compactedBaseFiles) {
           baseFiles.add(new AcidBaseFileInfo(fileId, dirInfo.isBaseInRawFormat() ?
             AcidUtils.AcidBaseFileType.ORIGINAL_BASE : AcidUtils.AcidBaseFileType.ACID_SCHEMA));
@@ -1255,7 +1324,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
             if (val == null || val) {
               try {
                 List<HdfsFileStatusWithId> insertDeltaFiles =
-                    SHIMS.listLocatedHdfsStatus(fs, parsedDelta.getPath(), bucketFilter);
+                    SHIMS.listLocatedHdfsStatus(fs.get(), parsedDelta.getPath(), bucketFilter);
                 for (HdfsFileStatusWithId fileId : insertDeltaFiles) {
                   baseFiles.add(new AcidBaseFileInfo(fileId, deltaType));
                 }
@@ -1271,7 +1340,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
               }
             }
             // Fall back to regular API and create statuses without ID.
-            List<FileStatus> children = HdfsUtils.listLocatedStatus(fs, parsedDelta.getPath(), bucketFilter);
+            List<FileStatus> children = HdfsUtils.listLocatedStatus(fs.get(),
+                parsedDelta.getPath(), bucketFilter);
             for (FileStatus child : children) {
               HdfsFileStatusWithId fileId = AcidUtils.createOriginalObj(null, child);
               baseFiles.add(new AcidBaseFileInfo(fileId, deltaType));
@@ -1290,35 +1360,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         // should be considered as usual.
         parsedDeltas.addAll(dirInfo.getCurrentDirectories());
       }
-      return new AcidDirInfo(fs, dir, dirInfo, baseFiles, parsedDeltas);
-    }
-
-    private List<HdfsFileStatusWithId> findBaseFiles(
-        Path base, Ref<Boolean> useFileIds) throws IOException {
-      Boolean val = useFileIds.value;
-      if (val == null || val) {
-        try {
-          List<HdfsFileStatusWithId> result = SHIMS.listLocatedHdfsStatus(
-              fs, base, AcidUtils.hiddenFileFilter);
-          if (val == null) {
-            useFileIds.value = true; // The call succeeded, so presumably the API is there.
-          }
-          return result;
-        } catch (Throwable t) {
-          LOG.error("Failed to get files with ID; using regular API: " + t.getMessage());
-          if (val == null && t instanceof UnsupportedOperationException) {
-            useFileIds.value = false;
-          }
-        }
-      }
-
-      // Fall back to regular API and create states without ID.
-      List<FileStatus> children = HdfsUtils.listLocatedStatus(fs, base, AcidUtils.hiddenFileFilter);
-      List<HdfsFileStatusWithId> result = new ArrayList<>(children.size());
-      for (FileStatus child : children) {
-        result.add(AcidUtils.createOriginalObj(null, child));
-      }
-      return result;
+      return new AcidDirInfo(fs.get(), dir, dirInfo, baseFiles, parsedDeltas);
     }
   }
 
@@ -1352,6 +1394,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     private SchemaEvolution evolution;
     //this is the root of the partition in which the 'file' is located
     private final Path rootDir;
+    OrcSplit.OffsetAndBucketProperty offsetAndBucket = null;
 
     public SplitGenerator(SplitInfo splitInfo, UserGroupInformation ugi,
         boolean allowSyntheticFileIds, boolean isDefaultFs) throws IOException {
@@ -1480,7 +1523,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         fileKey = new SyntheticFileId(file);
       }
       return new OrcSplit(file.getPath(), fileKey, offset, length, hosts,
-          orcTail, isOriginal, hasBase, deltas, scaledProjSize, fileLen, rootDir);
+          orcTail, isOriginal, hasBase, deltas, scaledProjSize, fileLen, rootDir, offsetAndBucket);
     }
 
     private static final class OffsetAndLength { // Java cruft; pair of long.
@@ -1519,6 +1562,14 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     }
 
     private List<OrcSplit> callInternal() throws IOException {
+      boolean isAcid = context.isAcid;
+      boolean vectorMode = context.isVectorMode;
+
+      if (isOriginal && isAcid && vectorMode) {
+        offsetAndBucket = VectorizedOrcAcidRowBatchReader.computeOffsetAndBucket(file, rootDir, isOriginal,
+            !deltas.isEmpty(), context.conf);
+      }
+
       // Figure out which stripes we need to read.
       if (ppdResult != null) {
         assert deltaSplits.isEmpty();
@@ -1532,9 +1583,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       } else {
         populateAndCacheStripeDetails();
         boolean[] includeStripe = null;
-        // We can't eliminate stripes if there are deltas because the
-        // deltas may change the rows making them match the predicate. todo: See HIVE-14516.
-        if ((deltas == null || deltas.isEmpty()) && context.sarg != null) {
+        if (context.sarg != null) {
           String[] colNames =
               extractNeededColNames((readerTypes == null ? fileTypes : readerTypes),
                   context.conf, readerIncluded, isOriginal);
@@ -1647,15 +1696,22 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         Reader orcReader = OrcFile.createReader(file.getPath(),
             OrcFile.readerOptions(context.conf)
                 .filesystem(fs)
-                .maxLength(AcidUtils.getLogicalLength(fs, file)));
+                .maxLength(context.isAcid ? AcidUtils.getLogicalLength(fs, file) : file.getLen()));
         orcTail = new OrcTail(orcReader.getFileTail(), orcReader.getSerializedFileFooter(),
             file.getModificationTime());
         if (context.cacheStripeDetails) {
           context.footerCache.put(new FooterCacheKey(fsFileId, file.getPath()), orcTail);
         }
+        stripes = orcReader.getStripes();
+        stripeStats = orcReader.getStripeStatistics();
+      } else {
+        stripes = orcTail.getStripes();
+        OrcProto.Footer footer = orcTail.getFooter();
+        boolean writerUsedProlepticGregorian = footer.hasCalendar()
+            ? footer.getCalendar() == OrcProto.CalendarKind.PROLEPTIC_GREGORIAN
+            : OrcConf.PROLEPTIC_GREGORIAN_DEFAULT.getBoolean(context.conf);
+        stripeStats = orcTail.getStripeStatistics(writerUsedProlepticGregorian, true);
       }
-      stripes = orcTail.getStripes();
-      stripeStats = orcTail.getStripeStatistics();
       fileTypes = orcTail.getTypes();
       TypeDescription fileSchema = OrcUtils.convertTypeFromProtobuf(fileTypes, 0);
       Reader.Options readerOptions = new Reader.Options(context.conf);
@@ -1754,8 +1810,14 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     Path[] paths = getInputPaths(conf);
     CompletionService<AcidDirInfo> ecs = new ExecutorCompletionService<>(Context.threadPool);
     for (Path dir : paths) {
-      FileSystem fs = dir.getFileSystem(conf);
-      FileGenerator fileGenerator = new FileGenerator(context, fs, dir, useFileIds, ugi);
+      Supplier<FileSystem> fsSupplier = () -> {
+        try {
+          return dir.getFileSystem(conf);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      };
+      FileGenerator fileGenerator = new FileGenerator(context, fsSupplier, dir, useFileIds, ugi);
       pathFutures.add(ecs.submit(fileGenerator));
     }
 
@@ -1928,9 +1990,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
   @Override
   public InputSplit[] getSplits(JobConf job,
                                 int numSplits) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("getSplits started");
-    }
+    long start = System.currentTimeMillis();
+    LOG.info("getSplits started");
     Configuration conf = job;
     if (HiveConf.getBoolVar(job, HiveConf.ConfVars.HIVE_ORC_MS_FOOTER_CACHE_ENABLED)) {
       // Create HiveConf once, since this is expensive.
@@ -1938,9 +1999,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     }
     List<OrcSplit> result = generateSplitsInfo(conf,
         new Context(conf, numSplits, createExternalCaches()));
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("getSplits finished");
-    }
+    long end = System.currentTimeMillis();
+    LOG.info("getSplits finished (#splits: {}). duration: {} ms", result.size(), (end - start));
     return result.toArray(new InputSplit[result.size()]);
   }
 
@@ -2193,7 +2253,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
                                        OrcFile.WriterVersion writerVersion,
                                        List<StripeStatistics> stripeStats,
       int stripeCount, Path filePath, final SchemaEvolution evolution) {
-    if (sarg == null || stripeStats == null || writerVersion == OrcFile.WriterVersion.ORIGINAL) {
+    if (stripeStats == null || writerVersion == OrcFile.WriterVersion.ORIGINAL) {
       return null; // only do split pruning if HIVE-8732 has been fixed in the writer
     }
     // eliminate stripes that doesn't satisfy the predicate condition
@@ -2237,7 +2297,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
           }
           PredicateLeaf leaf = predLeaves.get(pred);
           try {
-            truthValues[pred] = RecordReaderImpl.evaluatePredicate(stats, leaf, null);
+            truthValues[pred] = RecordReaderImpl.evaluatePredicate(stats, leaf, null, true);
           } catch (NoDynamicValuesException dve) {
             LOG.debug("Dynamic values are not available here {}", dve.getMessage());
             boolean hasNulls = stats.hasNull() || leaf.getOperator() != Operator.NULL_SAFE_EQUALS;
@@ -2267,8 +2327,11 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
     boolean checkDefaultFs = HiveConf.getBoolVar(
         context.conf, ConfVars.LLAP_CACHE_DEFAULT_FS_FILE_ID);
-    boolean isDefaultFs = (!checkDefaultFs) || ((fs instanceof DistributedFileSystem)
-            && HdfsUtils.isDefaultFs((DistributedFileSystem) fs));
+    boolean forceSynthetic =
+        !HiveConf.getBoolVar(context.conf, ConfVars.LLAP_IO_USE_FILEID_PATH);
+    // if forceSynthetic == true, then assume it is not a defaultFS
+    boolean isDefaultFs = (forceSynthetic == false) && ((!checkDefaultFs) || ((fs instanceof DistributedFileSystem)
+            && HdfsUtils.isDefaultFs((DistributedFileSystem) fs)));
 
     if (baseFiles.isEmpty()) {
       assert false : "acid 2.0 no base?!: " + dir;
@@ -2375,7 +2438,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
                                            int bucket,
                                            ValidWriteIdList validWriteIdList,
                                            Path baseDirectory,
-                                           Path[] deltaDirectory
+                                           Path[] deltaDirectory,
+                                           Map<String, String> deltasToAttemptId
                                            ) throws IOException {
     boolean isOriginal = false;
     OrcRawRecordMerger.Options mergerOptions = new OrcRawRecordMerger.Options().isCompacting(true)
@@ -2384,7 +2448,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       //it may also be null if there is no base - only deltas
       mergerOptions.baseDir(baseDirectory);
       if (baseDirectory.getName().startsWith(AcidUtils.BASE_PREFIX)) {
-        isOriginal = AcidUtils.MetaDataFile.isRawFormat(baseDirectory, baseDirectory.getFileSystem(conf));
+        isOriginal = AcidUtils.MetaDataFile.isRawFormat(baseDirectory, baseDirectory.getFileSystem(conf), null);
         mergerOptions.rootPath(baseDirectory.getParent());
       } else {
         isOriginal = true;
@@ -2397,7 +2461,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       mergerOptions.rootPath(deltaDirectory[0].getParent());
     }
     return new OrcRawRecordMerger(conf, collapseEvents, null, isOriginal,
-        bucket, validWriteIdList, new Reader.Options(conf), deltaDirectory, mergerOptions);
+        bucket, validWriteIdList, new Reader.Options(conf), deltaDirectory, mergerOptions, deltasToAttemptId);
   }
 
   /**

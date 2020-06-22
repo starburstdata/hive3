@@ -64,7 +64,6 @@ POSTHOOK: Input: default@smb_bucket_1_n3
 #### A masked pattern was here ####
 # Detailed Table Information	NULL	NULL
 # Storage Information	NULL	NULL
-# col_name	data_type	comment
 Bucket Columns:     	[key]               	NULL
 Compressed:         	No                  	NULL
 #### A masked pattern was here ####
@@ -114,6 +113,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: b
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 2060 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -297,7 +297,7 @@ STAGE PLANS:
             Statistics: Num rows: 1 Data size: 2060 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
-                   Outer Join 0 to 1
+                   Full Outer Join 0 to 1
               keys:
                 0 key (type: int)
                 1 key (type: int)
@@ -359,6 +359,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 2080 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -542,7 +543,7 @@ STAGE PLANS:
             Statistics: Num rows: 1 Data size: 2080 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
-                   Outer Join 0 to 1
+                   Full Outer Join 0 to 1
               keys:
                 0 key (type: int)
                 1 key (type: int)

@@ -74,6 +74,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -92,10 +93,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -159,6 +162,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int), _col1 (type: bigint), _col2 (type: bigint)
+              null sort order: aaa
               sort order: +++
       Execution mode: vectorized
       Reduce Operator Tree:
@@ -216,12 +220,14 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
@@ -248,6 +254,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -266,10 +273,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -352,6 +361,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -370,10 +380,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -437,6 +449,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int), _col1 (type: bigint), _col2 (type: bigint)
+              null sort order: aaa
               sort order: +++
       Execution mode: vectorized
       Reduce Operator Tree:
@@ -494,12 +507,14 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
@@ -526,6 +541,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -544,10 +560,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -630,6 +648,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -648,10 +667,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -673,6 +694,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -691,10 +713,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -796,12 +820,14 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
@@ -829,6 +855,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int), _col1 (type: bigint), _col2 (type: bigint)
+              null sort order: aaa
               sort order: +++
       Execution mode: vectorized
       Reduce Operator Tree:
@@ -908,6 +935,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -926,10 +954,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -951,6 +981,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -969,10 +1000,12 @@ STAGE PLANS:
                   Group By Operator
                     aggregations: count()
                     keys: _col0 (type: int)
+                    minReductionHashAggr: 0.99
                     mode: hash
                     outputColumnNames: _col0, _col1
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       value expressions: _col1 (type: bigint)
@@ -1026,12 +1059,14 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: int)
               value expressions: _col1 (type: bigint)
@@ -1107,6 +1142,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: int), _col1 (type: bigint), _col2 (type: bigint)
+              null sort order: aaa
               sort order: +++
       Execution mode: vectorized
       Reduce Operator Tree:

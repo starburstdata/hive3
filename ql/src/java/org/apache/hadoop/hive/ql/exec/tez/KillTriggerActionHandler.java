@@ -16,36 +16,44 @@
 
 package org.apache.hadoop.hive.ql.exec.tez;
 
+import java.io.IOException;
 import java.util.Map;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.session.KillQuery;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.wm.Trigger;
 import org.apache.hadoop.hive.ql.wm.TriggerActionHandler;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Handles only Kill Action.
  */
-public class KillTriggerActionHandler implements TriggerActionHandler<TezSessionState> {
+public class KillTriggerActionHandler implements TriggerActionHandler<TezSession> {
   private static final Logger LOG = LoggerFactory.getLogger(KillTriggerActionHandler.class);
 
   @Override
-  public void applyAction(final Map<TezSessionState, Trigger> queriesViolated) {
-    for (Map.Entry<TezSessionState, Trigger> entry : queriesViolated.entrySet()) {
+  public void applyAction(final Map<TezSession, Trigger> queriesViolated) {
+    for (Map.Entry<TezSession, Trigger> entry : queriesViolated.entrySet()) {
       switch (entry.getValue().getAction().getType()) {
         case KILL_QUERY:
-          TezSessionState sessionState = entry.getKey();
-          String queryId = sessionState.getWmContext().getQueryId();
+          TezSession sessionState = entry.getKey();
           try {
-            KillQuery killQuery = sessionState.getKillQuery();
-            // if kill query is null then session might have been released to pool or closed already
-            if (killQuery != null) {
-              sessionState.getKillQuery().killQuery(queryId, entry.getValue().getViolationMsg());
+            UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+            SessionState ss = new SessionState(new HiveConf(), ugi.getShortUserName());
+            ss.setIsHiveServerQuery(true);
+            SessionState.start(ss);
+            // then session might have been released to pool or closed already
+            boolean wasKilled =  sessionState.killQuery(entry.getValue().getViolationMsg());
+            if (!wasKilled) {
+              LOG.info("Didn't kill the query {}", sessionState.getWmContext().getQueryId());
             }
-          } catch (HiveException e) {
-            LOG.warn("Unable to kill query {} for trigger violation");
+          } catch (HiveException|IOException e) {
+            LOG.warn("Unable to kill query {} for trigger violation",
+                sessionState.getWmContext().getQueryId());
           }
           break;
         default:

@@ -71,10 +71,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 352 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(userid, 'hll'), compute_stats(string1, 'hll'), compute_stats(subtype, 'hll'), compute_stats(decimal1, 'hll'), compute_stats(ts, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1, _col2, _col3, _col4
                           Statistics: Num rows: 1 Data size: 2696 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 2696 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>), _col2 (type: struct<columntype:string,min:double,max:double,countnulls:bigint,bitvector:binary>), _col3 (type: struct<columntype:string,min:decimal(38,0),max:decimal(38,0),countnulls:bigint,bitvector:binary>), _col4 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>)
@@ -205,10 +207,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 352 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(userid, 'hll'), compute_stats(string1, 'hll'), compute_stats(subtype, 'hll'), compute_stats(decimal1, 'hll'), compute_stats(ts, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1, _col2, _col3, _col4
                           Statistics: Num rows: 1 Data size: 2696 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 2696 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>), _col2 (type: struct<columntype:string,min:double,max:double,countnulls:bigint,bitvector:binary>), _col3 (type: struct<columntype:string,min:decimal(38,0),max:decimal(38,0),countnulls:bigint,bitvector:binary>), _col4 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>)
@@ -371,6 +375,8 @@ STAGE DEPENDENCIES:
 
 STAGE PLANS:
   Stage: Stage-0
+    Concatenate
+      table name: default.orc_merge5b_n0
 
   Stage: Stage-1
     Move Operator

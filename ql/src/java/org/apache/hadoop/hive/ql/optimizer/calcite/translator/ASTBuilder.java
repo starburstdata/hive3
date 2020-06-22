@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.common.type.HiveIntervalYearMonth;
 import org.apache.hadoop.hive.conf.Constants;
 import org.apache.hadoop.hive.ql.optimizer.calcite.RelOptHiveTable;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveTableScan;
-import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.jdbc.JdbcHiveTableScan;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.jdbc.HiveJdbcConverter;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
@@ -68,10 +67,7 @@ public class ASTBuilder {
   public static ASTNode table(final RelNode scan) {
     HiveTableScan hts = null;
     if (scan instanceof HiveJdbcConverter) {
-      HiveJdbcConverter jdbcConverter = (HiveJdbcConverter) scan;
-      JdbcHiveTableScan jdbcHiveTableScan = jdbcConverter.getTableScan();
-
-      hts = jdbcHiveTableScan.getHiveTableScan();
+      hts = ((HiveJdbcConverter) scan).getTableScan().getHiveTableScan();
     } else if (scan instanceof DruidQuery) {
       hts = (HiveTableScan) ((DruidQuery) scan).getTableScan();
     } else {
@@ -115,14 +111,29 @@ public class ASTBuilder {
     } else if (scan instanceof HiveJdbcConverter) {
       HiveJdbcConverter jdbcConverter = (HiveJdbcConverter) scan;
       final String query = jdbcConverter.generateSql();
-      LOGGER.info("The HiveJdbcConverter generated sql message is: " + System.lineSeparator() + query);
+      LOGGER.debug("Generated SQL query: " + System.lineSeparator() + query);
       propList.add(ASTBuilder.construct(HiveParser.TOK_TABLEPROPERTY, "TOK_TABLEPROPERTY")
           .add(HiveParser.StringLiteral, "\"" + Constants.JDBC_QUERY + "\"")
           .add(HiveParser.StringLiteral, "\"" + SemanticAnalyzer.escapeSQLString(query) + "\""));
-
+      // Whether we can split the query
       propList.add(ASTBuilder.construct(HiveParser.TOK_TABLEPROPERTY, "TOK_TABLEPROPERTY")
-          .add(HiveParser.StringLiteral, "\"" + Constants.HIVE_JDBC_QUERY + "\"")
-          .add(HiveParser.StringLiteral, "\"" + SemanticAnalyzer.escapeSQLString(query) + "\""));
+          .add(HiveParser.StringLiteral, "\"" + Constants.JDBC_SPLIT_QUERY + "\"")
+          .add(HiveParser.StringLiteral, "\"" + jdbcConverter.splittingAllowed() + "\""));
+      // Adding column names used later by org.apache.hadoop.hive.druid.serde.DruidSerDe
+      propList.add(ASTBuilder.construct(HiveParser.TOK_TABLEPROPERTY, "TOK_TABLEPROPERTY")
+          .add(HiveParser.StringLiteral, "\"" + Constants.JDBC_QUERY_FIELD_NAMES + "\"")
+          .add(HiveParser.StringLiteral,
+              "\"" + scan.getRowType().getFieldNames().stream().map(Object::toString)
+                  .collect(Collectors.joining(",")) + "\""
+          ));
+      // Adding column types used later by org.apache.hadoop.hive.druid.serde.DruidSerDe
+      propList.add(ASTBuilder.construct(HiveParser.TOK_TABLEPROPERTY, "TOK_TABLEPROPERTY")
+          .add(HiveParser.StringLiteral, "\"" + Constants.JDBC_QUERY_FIELD_TYPES + "\"")
+          .add(HiveParser.StringLiteral,
+              "\"" + scan.getRowType().getFieldList().stream()
+                  .map(e -> TypeConverter.convert(e.getType()).getTypeName())
+                  .collect(Collectors.joining(",")) + "\""
+          ));
     }
 
     if (hts.isInsideView()) {
@@ -211,10 +222,6 @@ public class ASTBuilder {
   }
 
   public static ASTNode literal(RexLiteral literal) {
-    return literal(literal, false);
-  }
-
-  public static ASTNode literal(RexLiteral literal, boolean useTypeQualInLiteral) {
     Object val = null;
     int type = 0;
     SqlTypeName sqlType = literal.getType().getSqlTypeName();
@@ -260,30 +267,28 @@ public class ASTBuilder {
 
     switch (sqlType) {
     case TINYINT:
-      if (useTypeQualInLiteral) {
-        val = literal.getValue3() + "Y";
-      } else {
-        val = literal.getValue3();
-      }
-      type = HiveParser.IntegralLiteral;
-      break;
     case SMALLINT:
-      if (useTypeQualInLiteral) {
-        val = literal.getValue3() + "S";
-      } else {
-        val = literal.getValue3();
-      }
-      type = HiveParser.IntegralLiteral;
-      break;
     case INTEGER:
-      val = literal.getValue3();
-      type = HiveParser.IntegralLiteral;
-      break;
     case BIGINT:
-      if (useTypeQualInLiteral) {
-        val = literal.getValue3() + "L";
-      } else {
-        val = literal.getValue3();
+      val = literal.getValue3();
+      // Calcite considers all numeric literals as bigdecimal values
+      // Hive makes a distinction between them most importantly IntegralLiteral
+      if (val instanceof BigDecimal) {
+        val = ((BigDecimal) val).longValue();
+      }
+      switch (sqlType) {
+      case TINYINT:
+        val += "Y";
+        break;
+      case SMALLINT:
+        val += "S";
+        break;
+      case INTEGER:
+        val += "";
+        break;
+      case BIGINT:
+        val += "L";
+        break;
       }
       type = HiveParser.IntegralLiteral;
       break;
@@ -297,7 +302,7 @@ public class ASTBuilder {
       break;
     case FLOAT:
     case REAL:
-      val = literal.getValue3();
+      val = literal.getValue3() + "F";
       type = HiveParser.Number;
       break;
     case VARCHAR:

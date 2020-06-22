@@ -38,11 +38,13 @@ STAGE PLANS:
               Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 keys: _col0 (type: string)
+                minReductionHashAggr: 0.99
                 mode: hash
                 outputColumnNames: _col0
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col0 (type: string)
+                  null sort order: a
                   sort order: +
                   Map-reduce partition columns: rand() (type: double)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -66,6 +68,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string)
+              null sort order: a
               sort order: +
               Map-reduce partition columns: _col0 (type: string)
               Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -90,6 +93,7 @@ STAGE PLANS:
             Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
             Group By Operator
               aggregations: compute_stats(c1, 'hll')
+              minReductionHashAggr: 0.99
               mode: hash
               outputColumnNames: _col0
               Statistics: Num rows: 1 Data size: 440 Basic stats: COMPLETE Column stats: NONE
@@ -123,6 +127,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             Reduce Output Operator
+              null sort order: 
               sort order: 
               Statistics: Num rows: 1 Data size: 440 Basic stats: COMPLETE Column stats: NONE
               value expressions: _col0 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)

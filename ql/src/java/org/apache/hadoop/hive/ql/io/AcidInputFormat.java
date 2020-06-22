@@ -34,6 +34,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The interface required for input formats that what to support ACID
@@ -112,21 +113,26 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
     private long minWriteId;
     private long maxWriteId;
     private List<Integer> stmtIds;
-    //would be useful to have enum for Type: insert/delete/load data
+    /**
+     * {@link AcidUtils#?}
+     */
+    private long visibilityTxnId;
 
     public DeltaMetaData() {
-      this(0,0,new ArrayList<Integer>());
+      this(0,0,new ArrayList<Integer>(), 0);
     }
     /**
      * @param stmtIds delta dir suffixes when a single txn writes > 1 delta in the same partition
+     * @param visibilityTxnId maybe 0, if the dir name didn't have it.  txnid:0 is always visible
      */
-    DeltaMetaData(long minWriteId, long maxWriteId, List<Integer> stmtIds) {
+    DeltaMetaData(long minWriteId, long maxWriteId, List<Integer> stmtIds, long visibilityTxnId) {
       this.minWriteId = minWriteId;
       this.maxWriteId = maxWriteId;
       if (stmtIds == null) {
         throw new IllegalArgumentException("stmtIds == null");
       }
       this.stmtIds = stmtIds;
+      this.visibilityTxnId = visibilityTxnId;
     }
     long getMinWriteId() {
       return minWriteId;
@@ -137,6 +143,9 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
     List<Integer> getStmtIds() {
       return stmtIds;
     }
+    long getVisibilityTxnId() {
+      return visibilityTxnId;
+    }
     @Override
     public void write(DataOutput out) throws IOException {
       out.writeLong(minWriteId);
@@ -145,6 +154,7 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
       for(Integer id : stmtIds) {
         out.writeInt(id);
       }
+      out.writeLong(visibilityTxnId);
     }
     @Override
     public void readFields(DataInput in) throws IOException {
@@ -155,11 +165,21 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
       for(int i = 0; i < numStatements; i++) {
         stmtIds.add(in.readInt());
       }
+      visibilityTxnId = in.readLong();
+    }
+    String getName() {
+      assert stmtIds.isEmpty() : "use getName(int)";
+      return AcidUtils.addVisibilitySuffix(AcidUtils
+          .deleteDeltaSubdir(minWriteId, maxWriteId), visibilityTxnId);
+    }
+    String getName(int stmtId) {
+      assert !stmtIds.isEmpty() : "use getName()";
+      return AcidUtils.addVisibilitySuffix(AcidUtils
+          .deleteDeltaSubdir(minWriteId, maxWriteId, stmtId), visibilityTxnId);
     }
     @Override
     public String toString() {
-      //? is Type - when implemented
-      return "Delta(?," + minWriteId + "," + maxWriteId + "," + stmtIds + ")";
+      return "Delta(?," + minWriteId + "," + maxWriteId + "," + stmtIds + "," + visibilityTxnId + ")";
     }
   }
   /**
@@ -239,7 +259,8 @@ public interface AcidInputFormat<KEY extends WritableComparable, VALUE>
                              int bucket,
                              ValidWriteIdList validWriteIdList,
                              Path baseDirectory,
-                             Path[] deltaDirectory
+                             Path[] deltaDirectory,
+                             Map<String, String> deltasToAttemptId
                              ) throws IOException;
 
   /**

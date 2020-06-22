@@ -22,8 +22,8 @@ import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.ReplicationState;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.BootstrapEvent;
+import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
 import org.apache.hadoop.hive.ql.parse.EximUtil;
-import org.apache.hadoop.hive.ql.parse.ReplicationSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.repl.load.log.BootstrapLoadLogger;
 import org.apache.hadoop.hive.ql.parse.repl.ReplLogger;
 
@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 /**
  * Replication layout is from the root directory of replication Dump is
  * db
+ *    _external_tables_info
  *    table1
  *        _metadata
  *        data
@@ -74,23 +75,28 @@ public class BootstrapEventsIterator implements Iterator<BootstrapEvent> {
   private final String dumpDirectory;
   private final String dbNameToLoadIn;
   private final HiveConf hiveConf;
+  private final boolean needLogger;
   private ReplLogger replLogger;
 
-  public BootstrapEventsIterator(String dumpDirectory, String dbNameToLoadIn, HiveConf hiveConf)
+  public BootstrapEventsIterator(String dumpDirectory, String dbNameToLoadIn, boolean needLogger, HiveConf hiveConf)
           throws IOException {
     Path path = new Path(dumpDirectory);
     FileSystem fileSystem = path.getFileSystem(hiveConf);
     FileStatus[] fileStatuses =
-        fileSystem.listStatus(new Path(dumpDirectory), EximUtil.getDirectoryFilter(fileSystem));
+        fileSystem.listStatus(new Path(dumpDirectory), ReplUtils.getBootstrapDirectoryFilter(fileSystem));
+    if ((fileStatuses == null) || (fileStatuses.length == 0)) {
+      throw new IllegalArgumentException("No data to load in path " + dumpDirectory);
+    }
+    if ((dbNameToLoadIn != null) && (fileStatuses.length > 1)) {
+      throw new IllegalArgumentException(
+              "Multiple dirs in "
+                      + dumpDirectory
+                      + " does not correspond to REPL LOAD expecting to load to a singular destination point.");
+    }
 
-    List<FileStatus> dbsToCreate = Arrays.stream(fileStatuses).filter(f -> {
-      Path metadataPath = new Path(f.getPath() + Path.SEPARATOR + EximUtil.METADATA_NAME);
-      try {
-        return fileSystem.exists(metadataPath);
-      } catch (IOException e) {
-        throw new RuntimeException("could not determine if exists : " + metadataPath.toString(), e);
-      }
-    }).collect(Collectors.toList());
+    List<FileStatus> dbsToCreate = Arrays.stream(fileStatuses).filter(
+        f -> !f.getPath().getName().equals(ReplUtils.CONSTRAINTS_ROOT_DIR_NAME)
+    ).collect(Collectors.toList());
     dbEventsIterator = dbsToCreate.stream().map(f -> {
       try {
         return new DatabaseEventsIterator(f.getPath(), hiveConf);
@@ -102,6 +108,7 @@ public class BootstrapEventsIterator implements Iterator<BootstrapEvent> {
 
     this.dumpDirectory = dumpDirectory;
     this.dbNameToLoadIn = dbNameToLoadIn;
+    this.needLogger = needLogger;
     this.hiveConf = hiveConf;
   }
 
@@ -111,7 +118,9 @@ public class BootstrapEventsIterator implements Iterator<BootstrapEvent> {
       if (currentDatabaseIterator == null) {
         if (dbEventsIterator.hasNext()) {
           currentDatabaseIterator = dbEventsIterator.next();
-          initReplLogger();
+          if (needLogger) {
+            initReplLogger();
+          }
         } else {
           return false;
         }
@@ -157,7 +166,7 @@ public class BootstrapEventsIterator implements Iterator<BootstrapEvent> {
 
       long numTables = getSubDirs(fs, dbDumpPath).length;
       long numFunctions = 0;
-      Path funcPath = new Path(dbDumpPath, ReplicationSemanticAnalyzer.FUNCTIONS_ROOT_DIR_NAME);
+      Path funcPath = new Path(dbDumpPath, ReplUtils.FUNCTIONS_ROOT_DIR_NAME);
       if (fs.exists(funcPath)) {
         numFunctions = getSubDirs(fs, funcPath).length;
       }

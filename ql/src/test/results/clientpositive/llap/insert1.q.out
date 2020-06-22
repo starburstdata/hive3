@@ -50,6 +50,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: (key = -1) (type: boolean)
                   Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key = -1) (type: boolean)
@@ -72,10 +73,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)
@@ -144,6 +147,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: (key = -1) (type: boolean)
                   Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key = -1) (type: boolean)
@@ -166,10 +170,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)
@@ -252,6 +258,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: (key = -1) (type: boolean)
                   Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key = -1) (type: boolean)
@@ -274,10 +281,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)
@@ -346,6 +355,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
+                  filterExpr: (key = -1) (type: boolean)
                   Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key = -1) (type: boolean)
@@ -368,10 +378,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)
@@ -473,15 +485,17 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)
                   Filter Operator
-                    predicate: ((key < 20) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 20)) (type: boolean)
                     Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
                       expressions: key (type: int), value (type: string)
@@ -501,10 +515,12 @@ STAGE PLANS:
                         Statistics: Num rows: 1 Data size: 188 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: compute_stats(key, 'hll'), compute_stats(value, 'hll')
+                          minReductionHashAggr: 0.99
                           mode: hash
                           outputColumnNames: _col0, _col1
                           Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                           Reduce Output Operator
+                            null sort order: 
                             sort order: 
                             Statistics: Num rows: 1 Data size: 1052 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: struct<columntype:string,min:bigint,max:bigint,countnulls:bigint,bitvector:binary>), _col1 (type: struct<columntype:string,maxlength:bigint,sumlength:bigint,count:bigint,countnulls:bigint,bitvector:binary>)

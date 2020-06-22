@@ -74,6 +74,7 @@ import org.slf4j.LoggerFactory;
  * each query should call clear() at end of use to remove temporary folders
  */
 public class Context {
+
   private boolean isHDFSCleanup;
   private Path resFile;
   private Path resDir;
@@ -103,6 +104,8 @@ public class Context {
   protected ExplainConfiguration explainConfig = null;
   protected String cboInfo;
   protected boolean cboSucceeded;
+  protected String optimizedSql;
+  protected String calcitePlan;
   protected String cmd = "";
   private TokenRewriteStream tokenRewriteStream;
   // Holds the qualified name to tokenRewriteStream for the views
@@ -164,6 +167,11 @@ public class Context {
 
   // Load data rewrite
   private Table tempTableForLoad;
+  /**
+   * Unparsing is not available in {@link SemanticAnalyzer} by default - because of performance reasons.
+   * After enabling unparsing before analysis - a valid query unparse can be done.
+   */
+  private boolean enableUnparse;
 
   public void setOperation(Operation operation) {
     this.operation = operation;
@@ -181,7 +189,7 @@ public class Context {
    * These ops require special handling in various places
    * (note that Insert into Acid table is in OTHER category)
    */
-  public enum Operation {UPDATE, DELETE, MERGE, OTHER};
+  public enum Operation {UPDATE, DELETE, MERGE, OTHER}
   public enum DestClausePrefix {
     INSERT("insclause-"), UPDATE("updclause-"), DELETE("delclause-");
     private final String prefix;
@@ -197,7 +205,13 @@ public class Context {
     return getTokenRewriteStream().toString(n.getTokenStartIndex(), n.getTokenStopIndex() + 1).trim();
   }
   /**
-   * The suffix is always relative to a given ASTNode
+   * The suffix is always relative to a given ASTNode.
+   * We need this so that FileSinkOperatorS corresponding to different branches of a multi-insert
+   * statement which represents a SQL Merge statement get marked correctly with
+   * {@link org.apache.hadoop.hive.ql.io.AcidUtils.Operation}.  See usages
+   * of {@link #getDestNamePrefix(ASTNode, QB)} and
+   * {@link org.apache.hadoop.hive.ql.parse.SemanticAnalyzer#updating(String)} and
+   * {@link org.apache.hadoop.hive.ql.parse.SemanticAnalyzer#deleting(String)}.
    */
   public DestClausePrefix getDestNamePrefix(ASTNode curNode, QB queryBlock) {
     assert curNode != null : "must supply curNode";
@@ -252,7 +266,7 @@ public class Context {
       case DELETE:
         return DestClausePrefix.DELETE;
       case MERGE:
-      /* This is the structrue expected here
+      /* This is the structure expected here
         HiveParser.TOK_QUERY;
           HiveParser.TOK_FROM
           HiveParser.TOK_INSERT;
@@ -529,14 +543,14 @@ public class Context {
 
   /**
    * Create a map-reduce scratch directory on demand and return it.
+   * @param mkDir flag to indicate if scratch dir is to be created or not
    *
    */
-  public Path getMRScratchDir() {
-
+  public Path getMRScratchDir(boolean mkDir) {
     // if we are executing entirely on the client side - then
     // just (re)use the local scratch directory
     if(isLocalOnlyExecutionMode()) {
-      return getLocalScratchDir(!isExplainSkipExecution());
+      return getLocalScratchDir(mkDir);
     }
 
     try {
@@ -544,15 +558,22 @@ public class Context {
       URI uri = dir.toUri();
 
       Path newScratchDir = getScratchDir(uri.getScheme(), uri.getAuthority(),
-          !isExplainSkipExecution(), uri.getPath());
+                                         mkDir, uri.getPath());
       LOG.info("New scratch dir is " + newScratchDir);
       return newScratchDir;
     } catch (IOException e) {
       throw new RuntimeException(e);
     } catch (IllegalArgumentException e) {
       throw new RuntimeException("Error while making MR scratch "
-          + "directory - check filesystem config (" + e.getCause() + ")", e);
+                                     + "directory - check filesystem config (" + e.getCause() + ")", e);
     }
+  }
+  /**
+   * Create a map-reduce scratch directory on demand and return it.
+   *
+   */
+  public Path getMRScratchDir() {
+    return getMRScratchDir(!isExplainSkipExecution());
   }
 
   /**
@@ -672,6 +693,10 @@ public class Context {
     return new Path(getStagingDir(new Path(uri), !isExplainSkipExecution()), MR_PREFIX + nextPathId());
   }
 
+  public Path getMRTmpPath(boolean mkDir) {
+    return new Path(getMRScratchDir(mkDir), MR_PREFIX +
+        nextPathId());
+  }
   /**
    * Get a path to store map-reduce intermediate data in.
    *
@@ -699,14 +724,13 @@ public class Context {
    */
   public Path getExternalTmpPath(Path path) {
     URI extURI = path.toUri();
-    if (extURI.getScheme().equals("viewfs")) {
+    if ("viewfs".equals(extURI.getScheme())) {
       // if we are on viewfs we don't want to use /tmp as tmp dir since rename from /tmp/..
       // to final /user/hive/warehouse/ will fail later, so instead pick tmp dir
       // on same namespace as tbl dir.
       return getExtTmpPathRelTo(path.getParent());
     }
-    return new Path(getExternalScratchDir(extURI), EXT_PREFIX +
-        nextPathId());
+    return new Path(getExternalScratchDir(extURI), EXT_PREFIX + nextPathId());
   }
 
   /**
@@ -1003,12 +1027,28 @@ public class Context {
     this.cboInfo = cboInfo;
   }
 
+  public String getOptimizedSql() {
+    return this.optimizedSql;
+  }
+
+  public void setOptimizedSql(String newSql) {
+    this.optimizedSql = newSql;
+  }
+
   public boolean isCboSucceeded() {
     return cboSucceeded;
   }
 
   public void setCboSucceeded(boolean cboSucceeded) {
     this.cboSucceeded = cboSucceeded;
+  }
+
+  public String getCalcitePlan() {
+    return this.calcitePlan;
+  }
+
+  public void setCalcitePlan(String calcitePlan) {
+    this.calcitePlan = calcitePlan;
   }
 
   public Table getMaterializedTable(String cteName) {
@@ -1093,6 +1133,10 @@ public class Context {
     return executionId;
   }
 
+  public void setPlanMapper(PlanMapper planMapper) {
+    this.planMapper = planMapper;
+  }
+
   public PlanMapper getPlanMapper() {
     return planMapper;
   }
@@ -1128,6 +1172,14 @@ public class Context {
 
   public void setTempTableForLoad(Table tempTableForLoad) {
     this.tempTableForLoad = tempTableForLoad;
+  }
+
+  public boolean enableUnparse() {
+    return enableUnparse;
+  }
+
+  public void setEnableUnparse(boolean enableUnparse) {
+    this.enableUnparse = enableUnparse;
   }
 
 }

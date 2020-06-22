@@ -29,6 +29,7 @@ import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.optimizer.signature.Signature;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.plan.Explain.Level;
 import org.apache.hadoop.hive.ql.plan.Explain.Vectorization;
 import org.apache.hadoop.hive.ql.plan.VectorReduceSinkDesc.ReduceSinkKeyType;
@@ -47,14 +48,14 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   /**
    * Key columns are passed to reducer in the "key".
    */
-  private java.util.ArrayList<ExprNodeDesc> keyCols;
-  private java.util.ArrayList<java.lang.String> outputKeyColumnNames;
+  private List<ExprNodeDesc> keyCols;
+  private List<java.lang.String> outputKeyColumnNames;
   private List<List<Integer>> distinctColumnIndices;
   /**
    * Value columns are passed to reducer in the "value".
    */
-  private java.util.ArrayList<ExprNodeDesc> valueCols;
-  private java.util.ArrayList<java.lang.String> outputValueColumnNames;
+  private List<ExprNodeDesc> valueCols;
+  private List<java.lang.String> outputValueColumnNames;
   /**
    * Describe how to serialize the key.
    */
@@ -85,7 +86,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
    * Partition columns decide the reducer that the current row goes to.
    * Partition columns are not passed to reducer.
    */
-  private java.util.ArrayList<ExprNodeDesc> partitionCols;
+  private List<ExprNodeDesc> partitionCols;
 
   private int numReducers;
 
@@ -133,13 +134,11 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   public ReduceSinkDesc() {
   }
 
-  public ReduceSinkDesc(ArrayList<ExprNodeDesc> keyCols,
+  public ReduceSinkDesc(List<ExprNodeDesc> keyCols,
       int numDistributionKeys,
-      ArrayList<ExprNodeDesc> valueCols,
-      ArrayList<String> outputKeyColumnNames,
+      List<ExprNodeDesc> valueCols, List<String> outputKeyColumnNames,
       List<List<Integer>> distinctColumnIndices,
-      ArrayList<String> outputValueColumnNames, int tag,
-      ArrayList<ExprNodeDesc> partitionCols, int numReducers,
+      List<String> outputValueColumnNames, int tag, List<ExprNodeDesc> partitionCols, int numReducers,
       final TableDesc keySerializeInfo, final TableDesc valueSerializeInfo,
       AcidUtils.Operation writeType) {
     this.keyCols = keyCols;
@@ -161,9 +160,9 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   @Override
   public Object clone() {
     ReduceSinkDesc desc = new ReduceSinkDesc();
-    desc.setKeyCols((ArrayList<ExprNodeDesc>) getKeyCols().clone());
-    desc.setValueCols((ArrayList<ExprNodeDesc>) getValueCols().clone());
-    desc.setOutputKeyColumnNames((ArrayList<String>) getOutputKeyColumnNames().clone());
+    desc.setKeyCols(new ArrayList<ExprNodeDesc>(getKeyCols()));
+    desc.setValueCols(new ArrayList<ExprNodeDesc>(getValueCols()));
+    desc.setOutputKeyColumnNames(new ArrayList<String>(getOutputKeyColumnNames()));
     List<List<Integer>> distinctColumnIndicesClone = new ArrayList<List<Integer>>();
     for (List<Integer> distinctColumnIndex : getDistinctColumnIndices()) {
       List<Integer> tmp = new ArrayList<Integer>();
@@ -171,11 +170,11 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
       distinctColumnIndicesClone.add(tmp);
     }
     desc.setDistinctColumnIndices(distinctColumnIndicesClone);
-    desc.setOutputValueColumnNames((ArrayList<String>) getOutputValueColumnNames().clone());
+    desc.setOutputValueColumnNames(new ArrayList<String>(getOutputValueColumnNames()));
     desc.setNumDistributionKeys(getNumDistributionKeys());
     desc.setTag(getTag());
     desc.setNumReducers(getNumReducers());
-    desc.setPartitionCols((ArrayList<ExprNodeDesc>) getPartitionCols().clone());
+    desc.setPartitionCols(new ArrayList<ExprNodeDesc>(getPartitionCols()));
     desc.setKeySerializeInfo((TableDesc) getKeySerializeInfo().clone());
     desc.setValueSerializeInfo((TableDesc) getValueSerializeInfo().clone());
     desc.setNumBuckets(numBuckets);
@@ -189,17 +188,38 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     return desc;
   }
 
-  public java.util.ArrayList<java.lang.String> getOutputKeyColumnNames() {
+  public List<String> getOutputKeyColumnNames() {
     return outputKeyColumnNames;
   }
+
+  // NOTE: Debugging only.
+  @Explain(displayName = "output key column names", explainLevels = { Level.DEBUG })
+  public List<String> getOutputKeyColumnNamesDisplay() {
+    List<String> result = new ArrayList<String>();
+    for (String name : outputKeyColumnNames) {
+      result.add(Utilities.ReduceField.KEY.name() + "." + name);
+    }
+    return result;
+  }
+
 
   public void setOutputKeyColumnNames(
       java.util.ArrayList<java.lang.String> outputKeyColumnNames) {
     this.outputKeyColumnNames = outputKeyColumnNames;
   }
 
-  public java.util.ArrayList<java.lang.String> getOutputValueColumnNames() {
+  public List<String> getOutputValueColumnNames() {
     return outputValueColumnNames;
+  }
+
+  // NOTE: Debugging only.
+  @Explain(displayName = "output value column names", explainLevels = { Level.DEBUG })
+  public List<String> getOutputValueColumnNamesDisplay() {
+    List<String> result = new ArrayList<String>();
+    for (String name : outputValueColumnNames) {
+      result.add(Utilities.ReduceField.VALUE.name() + "." + name);
+    }
+    return result;
   }
 
   public void setOutputValueColumnNames(
@@ -213,7 +233,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     return PlanUtils.getExprListString(keyCols);
   }
 
-  public java.util.ArrayList<ExprNodeDesc> getKeyCols() {
+  public List<ExprNodeDesc> getKeyCols() {
     return keyCols;
   }
 
@@ -235,11 +255,11 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     return PlanUtils.getExprListString(valueCols);
   }
 
-  public java.util.ArrayList<ExprNodeDesc> getValueCols() {
+  public List<ExprNodeDesc> getValueCols() {
     return valueCols;
   }
 
-  public void setValueCols(final java.util.ArrayList<ExprNodeDesc> valueCols) {
+  public void setValueCols(List<ExprNodeDesc> valueCols) {
     this.valueCols = valueCols;
   }
 
@@ -254,12 +274,12 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     return PlanUtils.getExprListString(partitionCols, true);
   }
 
-  public java.util.ArrayList<ExprNodeDesc> getPartitionCols() {
+  public List<ExprNodeDesc> getPartitionCols() {
     return partitionCols;
   }
 
   public void setPartitionCols(
-      final java.util.ArrayList<ExprNodeDesc> partitionCols) {
+      final List<ExprNodeDesc> partitionCols) {
     this.partitionCols = partitionCols;
   }
 
@@ -361,7 +381,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
    *         (ascending order) and "-" (descending order).
    */
   @Signature
-  @Explain(displayName = "sort order")
+  @Explain(displayName = "sort order", explainLevels = { Level.DEFAULT, Level.EXTENDED })
   public String getOrder() {
     return keySerializeInfo.getProperties().getProperty(
         org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_SORT_ORDER);
@@ -387,7 +407,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
    *         of the same length as key columns, that consists of only "a"
    *         (null first) and "z" (null last).
    */
-  @Explain(displayName = "null sort order", explainLevels = { Level.EXTENDED })
+  @Explain(displayName = "null sort order", explainLevels = { Level.DEFAULT, Level.EXTENDED })
   public String getNullOrder() {
     return keySerializeInfo.getProperties().getProperty(
         org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_NULL_SORT_ORDER);
@@ -540,34 +560,41 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
       return vectorExpressionsToStringList(vectorReduceSinkInfo.getReduceSinkValueExpressions());
     }
 
-    @Explain(vectorization = Vectorization.DETAIL, displayName = "keyColumnNums", explainLevels = { Level.DEFAULT, Level.EXTENDED })
-    public String getKeyColumnNums() {
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "keyColumns",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public List<String> getKeyColumns() {
       if (!isNative) {
         return null;
       }
       int[] keyColumnMap = vectorReduceSinkInfo.getReduceSinkKeyColumnMap();
       if (keyColumnMap == null) {
         // Always show an array.
-        keyColumnMap = new int[0];
+        return new ArrayList<String>();
       }
-      return Arrays.toString(keyColumnMap);
+      return outputColumnsAndTypesToStringList(
+          vectorReduceSinkInfo.getReduceSinkKeyColumnMap(),
+          vectorReduceSinkInfo.getReduceSinkKeyTypeInfos());
     }
 
-    @Explain(vectorization = Vectorization.DETAIL, displayName = "valueColumnNums", explainLevels = { Level.DEFAULT, Level.EXTENDED })
-    public String getValueColumnNums() {
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "valueColumns",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public List<String> getValueColumns() {
       if (!isNative) {
         return null;
       }
       int[] valueColumnMap = vectorReduceSinkInfo.getReduceSinkValueColumnMap();
       if (valueColumnMap == null) {
         // Always show an array.
-        valueColumnMap = new int[0];
+        return new ArrayList<String>();
       }
-      return Arrays.toString(valueColumnMap);
+      return outputColumnsAndTypesToStringList(
+          vectorReduceSinkInfo.getReduceSinkValueColumnMap(),
+          vectorReduceSinkInfo.getReduceSinkValueTypeInfos());
     }
 
-    @Explain(vectorization = Vectorization.DETAIL, displayName = "bucketColumnNums", explainLevels = { Level.DEFAULT, Level.EXTENDED })
-    public String getBucketColumnNums() {
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "bucketColumns",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public List<String> getBucketColumns() {
       if (!isNative) {
         return null;
       }
@@ -576,11 +603,14 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
         // Suppress empty column map.
         return null;
       }
-      return Arrays.toString(bucketColumnMap);
+      return outputColumnsAndTypesToStringList(
+          vectorReduceSinkInfo.getReduceSinkBucketColumnMap(),
+          vectorReduceSinkInfo.getReduceSinkBucketTypeInfos());
     }
 
-    @Explain(vectorization = Vectorization.DETAIL, displayName = "partitionColumnNums", explainLevels = { Level.DEFAULT, Level.EXTENDED })
-    public String getPartitionColumnNums() {
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "partitionColumns",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public List<String> getPartitionColumns() {
       if (!isNative) {
         return null;
       }
@@ -589,7 +619,9 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
        // Suppress empty column map.
         return null;
       }
-      return Arrays.toString(partitionColumnMap);
+      return outputColumnsAndTypesToStringList(
+          vectorReduceSinkInfo.getReduceSinkPartitionColumnMap(),
+          vectorReduceSinkInfo.getReduceSinkPartitionTypeInfos());
     }
 
     private VectorizationCondition[] createNativeConditions() {
@@ -598,7 +630,8 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
 
       String engine = vectorReduceSinkDesc.getEngine();
       String engineInSupportedCondName =
-          HiveConf.ConfVars.HIVE_EXECUTION_ENGINE.varname + " " + engine + " IN " + vectorizableReduceSinkNativeEngines;
+          HiveConf.ConfVars.HIVE_EXECUTION_ENGINE.varname + " " + engine + " IN " +
+              vectorizableReduceSinkNativeEngines;
       boolean engineInSupported = vectorizableReduceSinkNativeEngines.contains(engine);
 
       VectorizationCondition[] conditions = new VectorizationCondition[] {
@@ -633,7 +666,8 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
       return conditions;
     }
 
-    @Explain(vectorization = Vectorization.OPERATOR, displayName = "nativeConditionsMet", explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    @Explain(vectorization = Vectorization.OPERATOR, displayName = "nativeConditionsMet",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
     public List<String> getNativeConditionsMet() {
       if (nativeConditions == null) {
         nativeConditions = createNativeConditions();
@@ -641,7 +675,8 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
       return VectorizationCondition.getConditionsMet(nativeConditions);
     }
 
-    @Explain(vectorization = Vectorization.OPERATOR, displayName = "nativeConditionsNotMet", explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    @Explain(vectorization = Vectorization.OPERATOR, displayName = "nativeConditionsNotMet",
+        explainLevels = { Level.DEFAULT, Level.EXTENDED })
     public List<String> getNativeConditionsNotMet() {
       if (nativeConditions == null) {
         nativeConditions = createNativeConditions();
@@ -650,7 +685,8 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     }
   }
 
-  @Explain(vectorization = Vectorization.OPERATOR, displayName = "Reduce Sink Vectorization", explainLevels = { Level.DEFAULT, Level.EXTENDED })
+  @Explain(vectorization = Vectorization.OPERATOR, displayName = "Reduce Sink Vectorization",
+      explainLevels = { Level.DEFAULT, Level.EXTENDED })
   public ReduceSinkOperatorExplainVectorization getReduceSinkVectorization() {
     VectorReduceSinkDesc vectorReduceSinkDesc = (VectorReduceSinkDesc) getVectorDesc();
     if (vectorReduceSinkDesc == null) {

@@ -42,14 +42,14 @@ PREHOOK: Input: database:escape_comments_db
 POSTHOOK: query: describe database extended escape_comments_db
 POSTHOOK: type: DESCDATABASE
 POSTHOOK: Input: database:escape_comments_db
-escape_comments_db	a\nb	location/in/test	user	USER	
+escape_comments_db	a\nb	location/in/test		user	USER	
 PREHOOK: query: describe database escape_comments_db
 PREHOOK: type: DESCDATABASE
 PREHOOK: Input: database:escape_comments_db
 POSTHOOK: query: describe database escape_comments_db
 POSTHOOK: type: DESCDATABASE
 POSTHOOK: Input: database:escape_comments_db
-escape_comments_db	a\nb	location/in/test	user	USER	
+escape_comments_db	a\nb	location/in/test		user	USER	
 PREHOOK: query: show create table escape_comments_tbl1
 PREHOOK: type: SHOW_CREATETABLE
 PREHOOK: Input: escape_comments_db@escape_comments_tbl1
@@ -78,7 +78,6 @@ PREHOOK: Input: escape_comments_db@escape_comments_tbl1
 POSTHOOK: query: describe formatted escape_comments_tbl1
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: escape_comments_db@escape_comments_tbl1
-# col_name	data_type	comment
 col1	string	a\nb';
 	NULL	NULL
 # Partition Information	NULL	NULL
@@ -131,14 +130,13 @@ PREHOOK: Input: escape_comments_db@escape_comments_view1
 POSTHOOK: query: show create table escape_comments_view1
 POSTHOOK: type: SHOW_CREATETABLE
 POSTHOOK: Input: escape_comments_db@escape_comments_view1
-CREATE VIEW `escape_comments_view1` AS SELECT `col1` AS `col1` FROM (select `escape_comments_tbl1`.`col1` from `escape_comments_db`.`escape_comments_tbl1`) `escape_comments_db.escape_comments_view1`
+CREATE VIEW `escape_comments_view1` AS SELECT `col1` AS `col1` FROM (select `escape_comments_tbl1`.`col1` from `escape_comments_db`.`escape_comments_tbl1`) `escape_comments_view1`
 PREHOOK: query: describe formatted escape_comments_view1
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: escape_comments_db@escape_comments_view1
 POSTHOOK: query: describe formatted escape_comments_view1
 POSTHOOK: type: DESCTABLE
 POSTHOOK: Input: escape_comments_db@escape_comments_view1
-# col_name	data_type	comment
 col1	string	a\nb
 	NULL	NULL
 # Detailed Table Information	NULL	NULL
@@ -162,9 +160,8 @@ Bucket Columns:     	[]                  	NULL
 Sort Columns:       	[]                  	NULL
 	NULL	NULL
 # View Information	NULL	NULL
-View Original Text: 	select col1 from escape_comments_tbl1	NULL
-View Expanded Text: 	SELECT `col1` AS `col1` FROM (select `escape_comments_tbl1`.`col1` from `escape_comments_db`.`escape_comments_tbl1`) `escape_comments_db.escape_comments_view1`	NULL
-View Rewrite Enabled:	No                  	NULL
+Original Query:     	select col1 from escape_comments_tbl1	NULL
+Expanded Query:     	SELECT `col1` AS `col1` FROM (select `escape_comments_tbl1`.`col1` from `escape_comments_db`.`escape_comments_tbl1`) `escape_comments_view1`	NULL
 PREHOOK: query: drop database escape_comments_db cascade
 PREHOOK: type: DROPDATABASE
 PREHOOK: Input: database:escape_comments_db

@@ -1583,6 +1583,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_RS_8: 1000
    RECORDS_OUT_OPERATOR_SEL_7: 1000
    RECORDS_OUT_OPERATOR_TS_0: 1000
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
    CACHE_MISS_BYTES: 3812
    NUM_DECODED_BATCHES: 618
@@ -1614,6 +1615,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_RS_10: 8
    RECORDS_OUT_OPERATOR_SEL_9: 8
    RECORDS_OUT_OPERATOR_TS_0: 8
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
    CACHE_HIT_BYTES: 18
    NUM_DECODED_BATCHES: 4
@@ -1717,6 +1719,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_RS_10: 240
    RECORDS_OUT_OPERATOR_SEL_9: 240
    RECORDS_OUT_OPERATOR_TS_0: 240
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
    CACHE_HIT_BYTES: 922
    NUM_DECODED_BATCHES: 148
@@ -1813,9 +1816,9 @@ PREHOOK: Output: default@testpart1
 Stage-1 FILE SYSTEM COUNTERS:
 Stage-1 HIVE COUNTERS:
    CREATED_DYNAMIC_PARTITIONS: 74
-   CREATED_FILES: 78
+   CREATED_FILES: 76
    DESERIALIZE_ERRORS: 0
-   RECORDS_IN_Map_1: 240
+   RECORDS_IN_Map_1: 1
    RECORDS_OUT_0: 74
    RECORDS_OUT_1_default.testpart1: 240
    RECORDS_OUT_INTERMEDIATE_Map_1: 240
@@ -1829,11 +1832,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_SEL_13: 240
    RECORDS_OUT_OPERATOR_SEL_8: 74
    RECORDS_OUT_OPERATOR_TS_0: 240
-Stage-1 LLAP IO COUNTERS:
-   CACHE_HIT_BYTES: 922
-   NUM_DECODED_BATCHES: 148
-   NUM_VECTOR_BATCHES: 148
-   ROWS_EMITTED: 240
+   TOTAL_TABLE_ROWS_WRITTEN: 240
 Stage-1 INPUT COUNTERS:
    GROUPED_INPUT_SPLITS_Map_1: 1
    INPUT_DIRECTORIES_Map_1: 74
@@ -2244,6 +2243,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t1
+                  filterExpr: v is not null (type: boolean)
                   Statistics: Num rows: 1000 Data size: 188000 Basic stats: COMPLETE Column stats: COMPLETE
                   Select Operator
                     expressions: k (type: int), v (type: string)
@@ -2251,6 +2251,7 @@ STAGE PLANS:
                     Statistics: Num rows: 1000 Data size: 188000 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col1 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col1 (type: string)
                       Statistics: Num rows: 1000 Data size: 188000 Basic stats: COMPLETE Column stats: COMPLETE
@@ -2258,17 +2259,18 @@ STAGE PLANS:
                     Select Operator
                       expressions: _col1 (type: string)
                       outputColumnNames: _col0
-                      Statistics: Num rows: 1000 Data size: 188000 Basic stats: COMPLETE Column stats: COMPLETE
+                      Statistics: Num rows: 1000 Data size: 184000 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         keys: _col0 (type: string)
+                        minReductionHashAggr: 0.691
                         mode: hash
                         outputColumnNames: _col0
-                        Statistics: Num rows: 500 Data size: 94000 Basic stats: COMPLETE Column stats: COMPLETE
+                        Statistics: Num rows: 309 Data size: 56856 Basic stats: COMPLETE Column stats: COMPLETE
                         Dynamic Partitioning Event Operator
                           Target column: v (string)
                           Target Input: t2
                           Partition key expr: v
-                          Statistics: Num rows: 500 Data size: 94000 Basic stats: COMPLETE Column stats: COMPLETE
+                          Statistics: Num rows: 309 Data size: 56856 Basic stats: COMPLETE Column stats: COMPLETE
                           Target Vertex: Map 4
             Execution mode: vectorized, llap
             LLAP IO: no inputs
@@ -2276,6 +2278,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t2
+                  filterExpr: v is not null (type: boolean)
                   Statistics: Num rows: 240 Data size: 45120 Basic stats: COMPLETE Column stats: COMPLETE
                   Select Operator
                     expressions: k (type: int), v (type: string)
@@ -2283,6 +2286,7 @@ STAGE PLANS:
                     Statistics: Num rows: 240 Data size: 45120 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col1 (type: string)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col1 (type: string)
                       Statistics: Num rows: 240 Data size: 45120 Basic stats: COMPLETE Column stats: COMPLETE
@@ -2305,6 +2309,7 @@ STAGE PLANS:
                   outputColumnNames: _col0
                   Statistics: Num rows: 776 Data size: 6208 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     Statistics: Num rows: 776 Data size: 6208 Basic stats: COMPLETE Column stats: COMPLETE
                     value expressions: _col0 (type: int)
@@ -2729,7 +2734,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_INTERMEDIATE_Map_4: 240
    RECORDS_OUT_INTERMEDIATE_Reducer_2: 952
    RECORDS_OUT_INTERMEDIATE_Reducer_3: 0
-   RECORDS_OUT_OPERATOR_EVENT_30: 309
+   RECORDS_OUT_OPERATOR_EVENT_30: 1
    RECORDS_OUT_OPERATOR_FS_34: 1
    RECORDS_OUT_OPERATOR_GBY_29: 309
    RECORDS_OUT_OPERATOR_GBY_33: 1
@@ -2744,6 +2749,7 @@ Stage-1 HIVE COUNTERS:
    RECORDS_OUT_OPERATOR_SEL_9: 952
    RECORDS_OUT_OPERATOR_TS_0: 1000
    RECORDS_OUT_OPERATOR_TS_3: 240
+   TOTAL_TABLE_ROWS_WRITTEN: 0
 Stage-1 LLAP IO COUNTERS:
    CACHE_HIT_BYTES: 3812
    CACHE_MISS_BYTES: 922

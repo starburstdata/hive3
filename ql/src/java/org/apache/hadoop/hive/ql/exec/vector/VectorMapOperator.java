@@ -28,11 +28,9 @@ import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.AbstractMapOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
-import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
@@ -46,7 +44,6 @@ import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.VectorPartitionDesc;
 import org.apache.hadoop.hive.ql.plan.VectorPartitionDesc.VectorMapOperatorReadType;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
-import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
@@ -92,7 +89,7 @@ public class VectorMapOperator extends AbstractMapOperator {
   /*
    * Overall information on this vectorized Map operation.
    */
-  private transient HashMap<String, VectorPartitionContext> fileToPartitionContextMap;
+  private transient HashMap<Path, VectorPartitionContext> fileToPartitionContextMap;
 
   private transient Operator<? extends OperatorDesc> oneRootOperator;
 
@@ -555,13 +552,13 @@ public class VectorMapOperator extends AbstractMapOperator {
      * The Vectorizer class enforces that there is only one TableScanOperator, so
      * we don't need the more complicated multiple root operator mapping that MapOperator has.
      */
-    fileToPartitionContextMap = new HashMap<String, VectorPartitionContext>();
+    fileToPartitionContextMap = new HashMap<>();
 
     // Temporary map so we only create one partition context entry.
     HashMap<PartitionDesc, VectorPartitionContext> partitionContextMap =
         new HashMap<PartitionDesc, VectorPartitionContext>();
 
-    for (Map.Entry<Path, ArrayList<String>> entry : conf.getPathToAliases().entrySet()) {
+    for (Map.Entry<Path, List<String>> entry : conf.getPathToAliases().entrySet()) {
       Path path = entry.getKey();
       PartitionDesc partDesc = conf.getPathToPartitionInfo().get(path);
 
@@ -573,7 +570,7 @@ public class VectorMapOperator extends AbstractMapOperator {
         vectorPartitionContext = partitionContextMap.get(partDesc);
       }
 
-      fileToPartitionContextMap.put(path.toString(), vectorPartitionContext);
+      fileToPartitionContextMap.put(path, vectorPartitionContext);
     }
 
     // Create list of one.
@@ -593,7 +590,7 @@ public class VectorMapOperator extends AbstractMapOperator {
 
   public void initializeContexts() throws HiveException {
     Path fpath = getExecContext().getCurrentInputPath();
-    String nominalPath = getNominalPath(fpath);
+    Path nominalPath = getNominalPath(fpath);
     setupPartitionContextVars(nominalPath);
   }
 
@@ -602,7 +599,7 @@ public class VectorMapOperator extends AbstractMapOperator {
   public void cleanUpInputFileChangedOp() throws HiveException {
     super.cleanUpInputFileChangedOp();
     Path fpath = getExecContext().getCurrentInputPath();
-    String nominalPath = getNominalPath(fpath);
+    Path nominalPath = getNominalPath(fpath);
 
     setupPartitionContextVars(nominalPath);
 
@@ -641,7 +638,7 @@ public class VectorMapOperator extends AbstractMapOperator {
   /*
    * Setup the context for reading from the next partition file.
    */
-  private void setupPartitionContextVars(String nominalPath) throws HiveException {
+  private void setupPartitionContextVars(Path nominalPath) throws HiveException {
 
     currentVectorPartContext = fileToPartitionContextMap.get(nominalPath);
     if (currentVectorPartContext == null) {

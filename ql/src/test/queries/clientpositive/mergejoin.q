@@ -16,6 +16,9 @@ set hive.optimize.index.filter=true;
 set hive.vectorized.execution.enabled=true;
 set hive.tez.min.bloom.filter.entries=1;
 set hive.tez.bigtable.minsize.semijoin.reduction=1;
+set hive.default.nulls.last=false;
+
+set hive.tez.bucket.pruning=true;
 
 -- SORT_QUERY_RESULTS
 

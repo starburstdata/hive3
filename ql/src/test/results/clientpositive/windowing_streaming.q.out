@@ -69,6 +69,7 @@ STAGE PLANS:
             Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
               key expressions: p_mfgr (type: string), p_name (type: string)
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: p_mfgr (type: string)
               Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -87,7 +88,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col1 ASC NULLS FIRST
+                  order by: _col1 ASC NULLS LAST
                   partition by: _col2
                   raw input shape:
                   window functions:
@@ -144,6 +145,7 @@ STAGE PLANS:
             Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
               key expressions: p_mfgr (type: string), p_name (type: string)
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: p_mfgr (type: string)
               Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -163,7 +165,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col1 ASC NULLS FIRST
+                  order by: _col1 ASC NULLS LAST
                   partition by: _col2
                   raw input shape:
                   window functions:
@@ -349,6 +351,7 @@ STAGE PLANS:
             Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
               key expressions: ctinyint (type: tinyint), cdouble (type: double)
+              null sort order: az
               sort order: ++
               Map-reduce partition columns: ctinyint (type: tinyint)
               Statistics: Num rows: 12288 Data size: 2907994 Basic stats: COMPLETE Column stats: NONE
@@ -367,7 +370,7 @@ STAGE PLANS:
                 Windowing table definition
                   input alias: ptf_1
                   name: windowingtablefunction
-                  order by: _col5 ASC NULLS FIRST
+                  order by: _col5 ASC NULLS LAST
                   partition by: _col0
                   raw input shape:
                   window functions:
@@ -429,48 +432,10 @@ where ctinyint is null
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@sb_n0
 #### A masked pattern was here ####
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
+NULL	-16379.0	1
+NULL	-16310.0	2
+NULL	-16309.0	3
+NULL	-16307.0	4
 PREHOOK: query: drop table if exists sD_n0
 PREHOOK: type: DROPTABLE
 POSTHOOK: query: drop table if exists sD_n0
@@ -500,45 +465,7 @@ where ctinyint is null
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@sd_n0
 #### A masked pattern was here ####
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
-NULL	NULL	1
+NULL	-16379.0	1
+NULL	-16310.0	2
+NULL	-16309.0	3
+NULL	-16307.0	4

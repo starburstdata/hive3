@@ -31,6 +31,7 @@ import java.security.PrivilegedExceptionAction;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -46,6 +47,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.type.Date;
@@ -524,7 +526,7 @@ public class TestInputOutputFormat {
           final OrcInputFormat.Context context = new OrcInputFormat.Context(
               conf, n);
           OrcInputFormat.FileGenerator gen = new OrcInputFormat.FileGenerator(
-              context, fs, new MockPath(fs, "mock:/a/b"), false, null);
+              context, () -> fs, new MockPath(fs, "mock:/a/b"), false, null);
           List<SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
           assertEquals(1, splitStrategies.size());
           final SplitStrategy splitStrategy = splitStrategies.get(0);
@@ -547,7 +549,7 @@ public class TestInputOutputFormat {
           final OrcInputFormat.Context context = new OrcInputFormat.Context(
               conf, n);
           OrcInputFormat.FileGenerator gen = new OrcInputFormat.FileGenerator(
-              context, fs, new MockPath(fs, "mock:/a/b"), false, null);
+              context, () -> fs, new MockPath(fs, "mock:/a/b"), false, null);
           List<SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
           assertEquals(1, splitStrategies.size());
           final SplitStrategy splitStrategy = splitStrategies.get(0);
@@ -565,14 +567,14 @@ public class TestInputOutputFormat {
   @Test
   public void testFileGenerator() throws Exception {
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
-    MockFileSystem fs = new MockFileSystem(conf,
+    final MockFileSystem fs = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[1]),
         new MockFile("mock:/a/b/part-01", 1000, new byte[1]),
         new MockFile("mock:/a/b/_part-02", 1000, new byte[1]),
         new MockFile("mock:/a/b/.part-03", 1000, new byte[1]),
         new MockFile("mock:/a/b/part-04", 1000, new byte[1]));
     OrcInputFormat.FileGenerator gen =
-      new OrcInputFormat.FileGenerator(context, fs,
+      new OrcInputFormat.FileGenerator(context, () -> fs,
           new MockPath(fs, "mock:/a/b"), false, null);
     List<OrcInputFormat.SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
@@ -580,13 +582,13 @@ public class TestInputOutputFormat {
 
     conf.set("mapreduce.input.fileinputformat.split.maxsize", "500");
     context = new OrcInputFormat.Context(conf);
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs1 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[1000]),
         new MockFile("mock:/a/b/part-01", 1000, new byte[1000]),
         new MockFile("mock:/a/b/_part-02", 1000, new byte[1000]),
         new MockFile("mock:/a/b/.part-03", 1000, new byte[1000]),
         new MockFile("mock:/a/b/part-04", 1000, new byte[1000]));
-    gen = new OrcInputFormat.FileGenerator(context, fs,
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs1,
             new MockPath(fs, "mock:/a/b"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
@@ -598,13 +600,15 @@ public class TestInputOutputFormat {
     conf.set("bucket_count", "2");
     conf.setBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, true);
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     MockFileSystem fs = new MockFileSystem(conf,
         new MockFile("mock:/a/delta_000_001/bucket_000000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_000_001/bucket_000001", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_001_002/bucket_000000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_001_002/bucket_000001", 1000, new byte[1], new MockBlock("host1")));
     OrcInputFormat.FileGenerator gen =
-        new OrcInputFormat.FileGenerator(context, fs,
+        new OrcInputFormat.FileGenerator(context, () -> fs,
             new MockPath(fs, "mock:/a"), false, null);
     List<OrcInputFormat.SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.ACIDSplitStrategy);
@@ -621,14 +625,16 @@ public class TestInputOutputFormat {
     conf.set("bucket_count", "2");
     conf.set(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
     conf.set(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES, "default");
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
 
     // Case 1: Test with just originals => Single split strategy with two splits.
-    MockFileSystem fs = new MockFileSystem(conf,
+    final MockFileSystem fs = new MockFileSystem(conf,
         new MockFile("mock:/a/b/000000_0", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/b/000000_1", 1000, new byte[1], new MockBlock("host1")));
     OrcInputFormat.FileGenerator gen =
-        new OrcInputFormat.FileGenerator(context, fs,
+        new OrcInputFormat.FileGenerator(context, () -> fs,
             new MockPath(fs, "mock:/a"), false, null);
     List<OrcInputFormat.SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
@@ -642,12 +648,13 @@ public class TestInputOutputFormat {
 
     // Case 2: Test with originals and base => Single split strategy with two splits on compacted
     // base since the presence of a base will make the originals obsolete.
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs1 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/000000_0", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/b/000000_1", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/base_0000001/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/base_0000001/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
-    gen = new OrcInputFormat.FileGenerator(context, fs, new MockPath(fs, "mock:/a"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs1, new MockPath(fs1,
+        "mock:/a"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.ACIDSplitStrategy);
@@ -659,14 +666,15 @@ public class TestInputOutputFormat {
     assertFalse(splits.get(1).isOriginal());
 
     // Case 3: Test with originals and deltas => Two split strategies with two splits for each.
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs3 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/000000_0", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/b/000000_1", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000001_0000001_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000001_0000001_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
-    gen = new OrcInputFormat.FileGenerator(context, fs, new MockPath(fs, "mock:/a"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs3,
+        new MockPath(fs3, "mock:/a"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(2, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.ACIDSplitStrategy);
@@ -691,12 +699,13 @@ public class TestInputOutputFormat {
     // The reason why we are able to do so is because the valid user data has already been considered
     // as base for the covered buckets. Hence, the uncovered buckets do not have any relevant
     // data and we can just ignore them.
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs4 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/000000_0", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000001_0000001_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000001_0000001_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
-    gen = new OrcInputFormat.FileGenerator(context, fs, new MockPath(fs, "mock:/a"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs4, new MockPath(fs4,
+        "mock:/a"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(2, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.ACIDSplitStrategy);
@@ -712,7 +721,7 @@ public class TestInputOutputFormat {
 
     // Case 5: Test with originals, compacted_base, insert_deltas, delete_deltas (exhaustive test)
     // This should just generate one strategy with splits for base and insert_deltas.
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs5 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/000000_0", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/b/000000_1", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/base_0000001/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
@@ -721,7 +730,8 @@ public class TestInputOutputFormat {
         new MockFile("mock:/a/delta_0000002_0000002_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000002_0000002_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")),
         new MockFile("mock:/a/delete_delta_0000002_0000002_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
-    gen = new OrcInputFormat.FileGenerator(context, fs, new MockPath(fs, "mock:/a"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs5, new MockPath(fs5,
+        "mock:/a"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.ACIDSplitStrategy);
@@ -742,13 +752,13 @@ public class TestInputOutputFormat {
     try {
       MockFileSystem fs = new MockFileSystem(conf);
       MockFileSystem.addGlobalFile(
-        new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")));
+        new MockFile("mock:/a/base_0000001/bucket_00000", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
-        new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
+        new MockFile("mock:/a/base_0000001/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
-        new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00002", 1000, new byte[1], new MockBlock("host1")));
+        new MockFile("mock:/a/base_0000001/bucket_00002", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
-        new MockFile("mock:/a/delta_0000001_0000001_0000/bucket_00003", 1000, new byte[1], new MockBlock("host1")));
+        new MockFile("mock:/a/base_0000001/bucket_00003", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
         new MockFile("mock:/a/delta_0000002_0000002_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
@@ -757,11 +767,21 @@ public class TestInputOutputFormat {
         new MockFile("mock:/a/delta_0000002_0000002_0000/bucket_00002", 1000, new byte[1], new MockBlock("host1")));
       MockFileSystem.addGlobalFile(
         new MockFile("mock:/a/delta_0000002_0000002_0000/bucket_00003", 1000, new byte[1], new MockBlock("host1")));
+      MockFileSystem.addGlobalFile(
+          new MockFile("mock:/a/delta_0000003_0000003_0000/bucket_00000", 1000, new byte[1], new MockBlock("host1")));
+        MockFileSystem.addGlobalFile(
+          new MockFile("mock:/a/delta_0000003_0000003_0000/bucket_00001", 1000, new byte[1], new MockBlock("host1")));
+        MockFileSystem.addGlobalFile(
+          new MockFile("mock:/a/delta_0000003_0000003_0000/bucket_00002", 1000, new byte[1], new MockBlock("host1")));
+        MockFileSystem.addGlobalFile(
+          new MockFile("mock:/a/delta_0000003_0000003_0000/bucket_00003", 1000, new byte[1], new MockBlock("host1")));
 
       conf.set("bucket_count", "4");
       //set up props for read
       conf.setBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, true);
       AcidUtils.setAcidOperationalProperties(conf, true, null);
+      conf.set(ValidTxnList.VALID_TXNS_KEY,
+          new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
       conf.set(IOConstants.SCHEMA_EVOLUTION_COLUMNS,
         TestVectorizedOrcAcidRowBatchReader.DummyRow.getColumnNamesProperty());
       conf.set(IOConstants.SCHEMA_EVOLUTION_COLUMNS_TYPES,
@@ -773,7 +793,9 @@ public class TestInputOutputFormat {
       conf.set("fs.mock.impl", MockFileSystem.class.getName());
       OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
 
-      OrcInputFormat.FileGenerator gen = new OrcInputFormat.FileGenerator(context, fs, new MockPath(fs, "mock:/a"),
+      OrcInputFormat.FileGenerator gen =
+          new OrcInputFormat.FileGenerator(context, () -> fs, new MockPath(fs,
+              "mock:/a"),
         false, null);
       List<OrcInputFormat.SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
       assertEquals(1, splitStrategies.size());
@@ -794,8 +816,8 @@ public class TestInputOutputFormat {
       int readsAfter = fs.statistics.getReadOps();
       System.out.println("STATS TRACE END - " + testCaseName.getMethodName());
       int delta = readsAfter - readsBefore;
-      // 16 without HIVE-19588, 8 with HIVE-19588
-      assertEquals(8, delta);
+      //HIVE-16812 adds 1 read of the footer of each file (only if delete delta exists)
+      assertEquals(12, delta);
     } finally {
       MockFileSystem.clearGlobalFiles();
     }
@@ -805,14 +827,14 @@ public class TestInputOutputFormat {
   public void testBIStrategySplitBlockBoundary() throws Exception {
     conf.set(HiveConf.ConfVars.HIVE_ORC_SPLIT_STRATEGY.varname, "BI");
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
-    MockFileSystem fs = new MockFileSystem(conf,
+    final MockFileSystem fs = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[1], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-01", 1000, new byte[1], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-02", 1000, new byte[1], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-03", 1000, new byte[1], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-04", 1000, new byte[1], new MockBlock("host1", "host2")));
     OrcInputFormat.FileGenerator gen =
-        new OrcInputFormat.FileGenerator(context, fs,
+        new OrcInputFormat.FileGenerator(context, () -> fs,
             new MockPath(fs, "mock:/a/b"), false, null);
     List<OrcInputFormat.SplitStrategy<?>> splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
@@ -822,14 +844,14 @@ public class TestInputOutputFormat {
     assertEquals(5, numSplits);
 
     context = new OrcInputFormat.Context(conf);
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs0 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[1000], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-01", 1000, new byte[1000], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-02", 1000, new byte[1000], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-03", 1000, new byte[1000], new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-04", 1000, new byte[1000], new MockBlock("host1", "host2")));
-    gen = new OrcInputFormat.FileGenerator(context, fs,
-        new MockPath(fs, "mock:/a/b"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs0,
+        new MockPath(fs0, "mock:/a/b"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.BISplitStrategy);
@@ -838,7 +860,7 @@ public class TestInputOutputFormat {
     assertEquals(5, numSplits);
 
     context = new OrcInputFormat.Context(conf);
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs1 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[1100], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-01", 1000, new byte[1100], new MockBlock("host1", "host2"),
@@ -849,8 +871,8 @@ public class TestInputOutputFormat {
             new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-04", 1000, new byte[1100], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2")));
-    gen = new OrcInputFormat.FileGenerator(context, fs,
-        new MockPath(fs, "mock:/a/b"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs1,
+        new MockPath(fs1, "mock:/a/b"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.BISplitStrategy);
@@ -859,7 +881,7 @@ public class TestInputOutputFormat {
     assertEquals(10, numSplits);
 
     context = new OrcInputFormat.Context(conf);
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs2 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[2000], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-01", 1000, new byte[2000], new MockBlock("host1", "host2"),
@@ -870,8 +892,8 @@ public class TestInputOutputFormat {
             new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-04", 1000, new byte[2000], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2")));
-    gen = new OrcInputFormat.FileGenerator(context, fs,
-        new MockPath(fs, "mock:/a/b"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs2,
+        new MockPath(fs2, "mock:/a/b"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.BISplitStrategy);
@@ -880,7 +902,7 @@ public class TestInputOutputFormat {
     assertEquals(10, numSplits);
 
     context = new OrcInputFormat.Context(conf);
-    fs = new MockFileSystem(conf,
+    final MockFileSystem fs3 = new MockFileSystem(conf,
         new MockFile("mock:/a/b/part-00", 1000, new byte[2200], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2"), new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-01", 1000, new byte[2200], new MockBlock("host1", "host2"),
@@ -891,8 +913,8 @@ public class TestInputOutputFormat {
             new MockBlock("host1", "host2"), new MockBlock("host1", "host2")),
         new MockFile("mock:/a/b/part-04", 1000, new byte[2200], new MockBlock("host1", "host2"),
             new MockBlock("host1", "host2"), new MockBlock("host1", "host2")));
-    gen = new OrcInputFormat.FileGenerator(context, fs,
-        new MockPath(fs, "mock:/a/b"), false, null);
+    gen = new OrcInputFormat.FileGenerator(context, () -> fs3,
+        new MockPath(fs3, "mock:/a/b"), false, null);
     splitStrategies = createSplitStrategies(context, gen);
     assertEquals(1, splitStrategies.size());
     assertEquals(true, splitStrategies.get(0) instanceof OrcInputFormat.BISplitStrategy);
@@ -908,6 +930,8 @@ public class TestInputOutputFormat {
     AcidUtils.setAcidOperationalProperties(conf, true, null);
     conf.setBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, true);
     conf.set(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES, "default");
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
 
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
     MockFileSystem fs = new MockFileSystem(conf,
@@ -991,9 +1015,9 @@ public class TestInputOutputFormat {
   }
 
   public OrcInputFormat.AcidDirInfo createAdi(
-      OrcInputFormat.Context context, MockFileSystem fs, String path) throws IOException {
+      OrcInputFormat.Context context, final MockFileSystem fs, String path) throws IOException {
     return new OrcInputFormat.FileGenerator(
-        context, fs, new MockPath(fs, path), false, null).call();
+        context, () -> fs, new MockPath(fs, path), false, null).call();
   }
 
   private List<OrcInputFormat.SplitStrategy<?>> createSplitStrategies(
@@ -1193,9 +1217,16 @@ public class TestInputOutputFormat {
     private static String blockedUgi = null;
     private final static List<MockFile> globalFiles = new ArrayList<MockFile>();
     protected Statistics statistics;
+    private int numExistsCalls;
 
     public MockFileSystem() {
       // empty
+    }
+
+    @Override
+    public boolean exists(Path f) throws IOException {
+      numExistsCalls++;
+      return super.exists(f);
     }
 
     @Override
@@ -1225,6 +1256,11 @@ public class TestInputOutputFormat {
       } catch (URISyntaxException err) {
         throw new IllegalArgumentException("huh?", err);
       }
+    }
+
+    @Override
+    public String getScheme() {
+      return "mock";
     }
 
     // increments file modification time
@@ -1547,6 +1583,10 @@ public class TestInputOutputFormat {
       }
       buffer.append("]}");
       return buffer.toString();
+    }
+
+    public int getNumExistsCalls() {
+      return numExistsCalls;
     }
 
     public static void addGlobalFile(MockFile mockFile) {
@@ -2186,8 +2226,8 @@ public class TestInputOutputFormat {
       mapWork.setVectorizedRowBatchCtx(vectorizedRowBatchCtx);
     }
     mapWork.setUseBucketizedHiveInputFormat(false);
-    LinkedHashMap<Path, ArrayList<String>> aliasMap = new LinkedHashMap<>();
-    ArrayList<String> aliases = new ArrayList<String>();
+    Map<Path, List<String>> aliasMap = new LinkedHashMap<>();
+    List<String> aliases = new ArrayList<String>();
     aliases.add(tableName);
     LinkedHashMap<Path, PartitionDesc> partMap = new LinkedHashMap<>();
     for(int p=0; p < partitions; ++p) {
@@ -2198,7 +2238,7 @@ public class TestInputOutputFormat {
       PartitionDesc part = new PartitionDesc(tbl, partSpec);
       if (isVectorized) {
         part.setVectorPartitionDesc(
-            VectorPartitionDesc.createVectorizedInputFileFormat("MockInputFileFormatClassName", false));
+            VectorPartitionDesc.createVectorizedInputFileFormat("MockInputFileFormatClassName", false, null));
       }
       partMap.put(path, part);
     }
@@ -2337,6 +2377,8 @@ public class TestInputOutputFormat {
     StructObjectInspector inspector = new BigRowInspector();
     JobConf conf = createMockExecutionEnvironment(workDir, new Path("mock:///"),
         "vectorizationAcid", inspector, true, 1);
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
 
     // write the orc file to the mock file system
     Path partDir = new Path(conf.get("mapred.input.dir"));
@@ -2536,6 +2578,8 @@ public class TestInputOutputFormat {
 
     // call getsplits
     conf.setInt(hive_metastoreConstants.BUCKET_COUNT, BUCKETS);
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
     HiveInputFormat<?,?> inputFormat =
         new CombineHiveInputFormat<WritableComparable, Writable>();
     InputSplit[] splits = inputFormat.getSplits(conf, 1);
@@ -2547,14 +2591,14 @@ public class TestInputOutputFormat {
     assertEquals("mock:/combinationAcid/p=0/base_0000010/bucket_00000",
         split.getPath().toString());
     assertEquals(0, split.getStart());
-    assertEquals(700, split.getLength());
+    assertEquals(702, split.getLength());
     split = (HiveInputFormat.HiveInputSplit) splits[1];
     assertEquals("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat",
         split.inputFormatClassName());
     assertEquals("mock:/combinationAcid/p=0/base_0000010/bucket_00001",
         split.getPath().toString());
     assertEquals(0, split.getStart());
-    assertEquals(724, split.getLength());
+    assertEquals(726, split.getLength());
     CombineHiveInputFormat.CombineHiveInputSplit combineSplit =
         (CombineHiveInputFormat.CombineHiveInputSplit) splits[2];
     assertEquals(BUCKETS, combineSplit.getNumPaths());
@@ -2562,7 +2606,7 @@ public class TestInputOutputFormat {
       assertEquals("mock:/combinationAcid/p=1/00000" + bucket + "_0",
           combineSplit.getPath(bucket).toString());
       assertEquals(0, combineSplit.getOffset(bucket));
-      assertEquals(251, combineSplit.getLength(bucket));
+      assertEquals(253, combineSplit.getLength(bucket));
     }
     String[] hosts = combineSplit.getLocations();
     assertEquals(2, hosts.length);
@@ -2793,12 +2837,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktable
-    // call-2: check existence of side file for mock:/mocktable/0_0
-    // call-3: open - mock:/mocktable/0_0
-    // call-4: check existence of side file for mock:/mocktable/0_1
-    // call-5: open - mock:/mocktable/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktable
+    // call-2: open - mock:/mocktable/0_0
+    // call-3: open - mock:/mocktable/0_1
+    assertEquals(3, readOpsDelta);
 
     assertEquals(2, splits.length);
     // revert back to local fs
@@ -2853,12 +2895,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl
-    // call-2: check existence of side file for mock:/mocktbl/0_0
-    // call-3: open - mock:/mocktbl/0_0
-    // call-4: check existence of side file for  mock:/mocktbl/0_1
-    // call-5: open - mock:/mocktbl/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl
+    // call-2: open - mock:/mocktbl/0_0
+    // call-3: open - mock:/mocktbl/0_1
+    assertEquals(3, readOpsDelta);
 
     // force BI to avoid reading footers
     conf.set(HiveConf.ConfVars.HIVE_ORC_SPLIT_STRATEGY.varname, "BI");
@@ -2875,10 +2915,8 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl
-    // call-2: check existence of side file for mock:/mocktbl/0_0
-    // call-3: check existence of side file for  mock:/mocktbl/0_1
-    assertEquals(3, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl
+    assertEquals(1, readOpsDelta);
 
     // enable cache and use default strategy
     conf.set(ConfVars.HIVE_ORC_CACHE_STRIPE_DETAILS_MEMORY_SIZE.varname, "10Mb");
@@ -2896,12 +2934,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl
-    // call-2: check existence of side file for mock:/mocktbl/0_0
-    // call-3: open - mock:/mocktbl/0_0
-    // call-4: check existence of side file for mock:/mocktbl/0_1
-    // call-5: open - mock:/mocktbl/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl
+    // call-2: open - mock:/mocktbl/0_0
+    // call-3: open - mock:/mocktbl/0_1
+    assertEquals(3, readOpsDelta);
 
     for (FileSystem.Statistics statistics : FileSystem.getAllStatistics()) {
       if (statistics.getScheme().equalsIgnoreCase("mock")) {
@@ -2916,7 +2952,7 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl
+    // call-1: getAcidState - mock:/mocktbl
     assertEquals(1, readOpsDelta);
 
     // revert back to local fs
@@ -2970,12 +3006,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktable
-    // call-2: check side file for mock:/mocktbl1/0_0
-    // call-3: open - mock:/mocktbl1/0_0
-    // call-4: check side file for  mock:/mocktbl1/0_1
-    // call-5: open - mock:/mocktbl1/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktable
+    // call-2: open - mock:/mocktbl1/0_0
+    // call-3: open - mock:/mocktbl1/0_1
+    assertEquals(3, readOpsDelta);
 
     // change file length and look for cache misses
 
@@ -3011,12 +3045,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktable
-    // call-2: check side file for mock:/mocktbl1/0_0
-    // call-3: open - mock:/mocktbl1/0_0
-    // call-4: check side file for  mock:/mocktbl1/0_1
-    // call-5: open - mock:/mocktbl1/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktable
+    // call-2: open - mock:/mocktbl1/0_0
+    // call-3: open - mock:/mocktbl1/0_1
+    assertEquals(3, readOpsDelta);
 
     for (FileSystem.Statistics statistics : FileSystem.getAllStatistics()) {
       if (statistics.getScheme().equalsIgnoreCase("mock")) {
@@ -3031,7 +3063,7 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl1
+    // call-1: getAcidState - mock:/mocktbl1
     assertEquals(1, readOpsDelta);
 
     // revert back to local fs
@@ -3086,12 +3118,10 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl2
-    // call-2: check side file for mock:/mocktbl2/0_0
-    // call-3: open - mock:/mocktbl2/0_0
-    // call-4: check side file for  mock:/mocktbl2/0_1
-    // call-5: open - mock:/mocktbl2/0_1
-    assertEquals(5, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl2
+    // call-2: open - mock:/mocktbl2/0_0
+    // call-3: open - mock:/mocktbl2/0_1
+    assertEquals(3, readOpsDelta);
 
     // change file modification time and look for cache misses
     FileSystem fs1 = FileSystem.get(conf);
@@ -3110,10 +3140,9 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl2
-    // call-2: check side file for  mock:/mocktbl2/0_1
-    // call-3: open - mock:/mocktbl2/0_1
-    assertEquals(3, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl2
+    // call-2: open - mock:/mocktbl2/0_1
+    assertEquals(2, readOpsDelta);
 
     // touch the next file
     fs1 = FileSystem.get(conf);
@@ -3132,10 +3161,9 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl2
-    // call-2: check side file for  mock:/mocktbl2/0_0
-    // call-3: open - mock:/mocktbl2/0_0
-    assertEquals(3, readOpsDelta);
+    // call-1: getAcidState - mock:/mocktbl2
+    // call-2: open - mock:/mocktbl2/0_0
+    assertEquals(2, readOpsDelta);
 
     for (FileSystem.Statistics statistics : FileSystem.getAllStatistics()) {
       if (statistics.getScheme().equalsIgnoreCase("mock")) {
@@ -3150,7 +3178,7 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: listLocatedStatus - mock:/mocktbl2
+    // call-1: getAcidState - mock:/mocktbl2
     assertEquals(1, readOpsDelta);
 
     // revert back to local fs
@@ -3219,9 +3247,11 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: open to read - split 1 => mock:/mocktable1/0_0
-    // call-2: open to read - split 2 => mock:/mocktable1/0_1
-    assertEquals(2, readOpsDelta);
+    // call-1: open to read footer - split 1 => mock:/mocktable1/0_0
+    // call-2: open to read data - split 1 => mock:/mocktable1/0_0
+    // call-3: open to read footer - split 2 => mock:/mocktable1/0_1
+    // call-4: open to read data - split 2 => mock:/mocktable1/0_1
+    assertEquals(4, readOpsDelta);
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
@@ -3362,9 +3392,11 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: open to read - split 1 => mock:/mocktable3/0_0
-    // call-2: open to read - split 2 => mock:/mocktable3/0_1
-    assertEquals(2, readOpsDelta);
+    // call-1: open to read footer - split 1 => mock:/mocktable3/0_0
+    // call-2: open to read data - split 1 => mock:/mocktable3/0_0
+    // call-3: open to read footer - split 2 => mock:/mocktable3/0_1
+    // call-4: open to read data - split 2 => mock:/mocktable3/0_1
+    assertEquals(4, readOpsDelta);
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
@@ -3510,7 +3542,9 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    assertEquals(6, readOpsDelta);
+    // for each split, 2 by getAcidState (1 list directory + 1 file status) + 1 footer read + 1 data read
+    // ORC-416 delays opening data reader until data is read but it is not backported to cdpd-master
+    assertEquals(8, readOpsDelta);
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
@@ -3632,6 +3666,8 @@ public class TestInputOutputFormat {
     //set up props for read
     conf.setBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, true);
     AcidUtils.setAcidOperationalProperties(conf, true, null);
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
 
 
     OrcInputFormat orcInputFormat = new OrcInputFormat();
@@ -3662,7 +3698,7 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    assertEquals(5, readOpsDelta);
+    assertEquals(8, readOpsDelta);
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
@@ -3705,6 +3741,8 @@ public class TestInputOutputFormat {
     //set up props for read
     conf.setBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, true);
     AcidUtils.setAcidOperationalProperties(conf, true, null);
+    conf.set(ValidTxnList.VALID_TXNS_KEY,
+        new ValidReadTxnList(new long[0], new BitSet(), 1000, Long.MAX_VALUE).writeToString());
 
     OrcInputFormat orcInputFormat = new OrcInputFormat();
     InputSplit[] splits = orcInputFormat.getSplits(conf, 2);
@@ -3734,12 +3772,7 @@ public class TestInputOutputFormat {
         readOpsDelta = statistics.getReadOps() - readOpsBefore;
       }
     }
-    // call-1: open to read data - split 1 => mock:/mocktable8/0_0
-    // call-2: listLocatedFileStatus(mock:/mocktable8)
-    // call-3: getFileStatus(mock:/mocktable8/delta_0000001_0000001_0000/_metadata_acid)
-    // call-4: getFileStatus(mock:/mocktable8/delta_0000001_0000001_0000/_metadata_acid)
-    // call-5: open(mock:/mocktable8/delta_0000001_0000001_0000/bucket_00001)
-    assertEquals(5, readOpsDelta);
+    assertEquals(6, readOpsDelta);
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
@@ -4030,7 +4063,7 @@ public class TestInputOutputFormat {
     conf.set(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, "0,2");
     OrcSplit split = new OrcSplit(testFilePath, null, 0, fileLength,
         new String[0], null, false, true,
-        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir);
+        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir, null);
     OrcInputFormat inputFormat = new OrcInputFormat();
     AcidInputFormat.RowReader<OrcStruct> reader = inputFormat.getReader(split,
         new AcidInputFormat.Options(conf));
@@ -4058,7 +4091,7 @@ public class TestInputOutputFormat {
     conf.set(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, "0,2,3");
     split = new OrcSplit(testFilePath, null, 0, fileLength,
         new String[0], null, false, true,
-        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir);
+        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir, null);
     inputFormat = new OrcInputFormat();
     reader = inputFormat.getReader(split, new AcidInputFormat.Options(conf));
     record = 0;
@@ -4176,7 +4209,7 @@ public class TestInputOutputFormat {
     // Specify an OrcSplit that starts beyond the offset of the last stripe.
     OrcSplit split = new OrcSplit(testFilePath, null, lastStripeOffset + 1, lastStripeLength,
         new String[0], null, false, true,
-        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir);
+        new ArrayList<AcidInputFormat.DeltaMetaData>(), fileLength, fileLength, workDir, null);
     OrcInputFormat inputFormat = new OrcInputFormat();
     AcidInputFormat.RowReader<OrcStruct> reader = inputFormat.getReader(split,
         new AcidInputFormat.Options(conf));

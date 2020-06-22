@@ -18,22 +18,22 @@
 
 package org.apache.hadoop.hive.ql;
 
+import org.antlr.runtime.tree.Tree;
+import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.ddl.table.AlterTableType;
+import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.ASTNodeOrigin;
+import org.apache.hadoop.security.AccessControlException;
+
 import java.io.FileNotFoundException;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.antlr.runtime.tree.Tree;
-import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
-import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
-import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.parse.ASTNode;
-import org.apache.hadoop.hive.ql.parse.ASTNodeOrigin;
-import org.apache.hadoop.hive.ql.plan.AlterTableDesc.AlterTableTypes;
-import org.apache.hadoop.security.AccessControlException;
 
 /**
  * List of all error messages.
@@ -93,7 +93,7 @@ public enum ErrorMsg {
   INVALID_MAPINDEX_CONSTANT(10031, "Non-constant expression for map indexes not supported"),
   INVALID_MAPINDEX_TYPE(10032, "MAP key type does not match index expression type"),
   NON_COLLECTION_TYPE(10033, "[] not valid on non-collection types"),
-  SELECT_DISTINCT_WITH_GROUPBY(10034, "SELECT DISTINCT and GROUP BY can not be in the same query"),
+  @Deprecated SELECT_DISTINCT_WITH_GROUPBY(10034, "SELECT DISTINCT and GROUP BY can not be in the same query"),
   COLUMN_REPEATED_IN_PARTITIONING_COLS(10035, "Column repeated in partitioning columns"),
   DUPLICATE_COLUMN_NAMES(10036, "Duplicate column name:"),
   INVALID_BUCKET_NUMBER(10037, "Bucket number should be bigger than zero"),
@@ -199,8 +199,8 @@ public enum ErrorMsg {
   NEED_TABLE_SPECIFICATION(10117, "Table name could be determined; It should be specified "),
   PARTITION_EXISTS(10118, "Partition already exists"),
   TABLE_DATA_EXISTS(10119, "Table exists and contains data files"),
-  INCOMPATIBLE_SCHEMA(10120, "The existing table is not compatible with the import spec. "),
-  EXIM_FOR_NON_NATIVE(10121, "Export/Import cannot be done for a non-native table. "),
+  INCOMPATIBLE_SCHEMA(10120, "The existing table is not compatible with the Export/Import spec. "),
+  EXIM_FOR_NON_NATIVE(10121, "Export/Import cannot be done for a non-native table."),
   INSERT_INTO_BUCKETIZED_TABLE(10122, "Bucketized tables do not support INSERT INTO:"),
   PARTSPEC_DIFFER_FROM_SCHEMA(10125, "Partition columns in partition specification are "
       + "not the same as that defined in the table schema. "
@@ -214,7 +214,8 @@ public enum ErrorMsg {
   ALTER_COMMAND_FOR_VIEWS(10131, "To alter a view you need to use the ALTER VIEW command."),
   ALTER_COMMAND_FOR_TABLES(10132, "To alter a base table you need to use the ALTER TABLE command."),
   ALTER_VIEW_DISALLOWED_OP(10133, "Cannot use this form of ALTER on a view"),
-  ALTER_TABLE_NON_NATIVE(10134, "ALTER TABLE can only be used for " + AlterTableTypes.nonNativeTableAllowedTypes + " to a non-native table "),
+  ALTER_TABLE_NON_NATIVE(10134, "ALTER TABLE can only be used for " + AlterTableType.NON_NATIVE_TABLE_ALLOWED +
+      " to a non-native table "),
   SORTMERGE_MAPJOIN_FAILED(10135,
       "Sort merge bucketed join could not be performed. " +
       "If you really want to perform the operation, either set " +
@@ -334,7 +335,7 @@ public enum ErrorMsg {
       "A column on which a partition/table is list bucketed cannot be truncated."),
 
   TABLE_NOT_PARTITIONED(10241, "Table {0} is not a partitioned table", true),
-  DATABSAE_ALREADY_EXISTS(10242, "Database {0} already exists", true),
+  DATABASE_ALREADY_EXISTS(10242, "Database {0} already exists", true),
   CANNOT_REPLACE_COLUMNS(10243, "Replace columns is not supported for table {0}. SerDe may be incompatible.", true),
   BAD_LOCATION_VALUE(10244, "{0}  is not absolute.  Please specify a complete absolute uri."),
   UNSUPPORTED_ALTER_TBL_OP(10245, "{0} alter table options is not supported"),
@@ -386,6 +387,9 @@ public enum ErrorMsg {
   MASKING_FILTERING_ON_ACID_NOT_SUPPORTED(10287,
       "Detected {0}.{1} has row masking/column filtering enabled, " +
       "which is not supported for query involving ACID operations", true),
+  MASKING_FILTERING_ON_MATERIALIZED_VIEWS_SOURCES(10288,
+      "Querying directly materialized view contents is not supported since we detected {0}.{1} " +
+          "used by materialized view has row masking/column filtering enabled", true),
 
   UPDATEDELETE_PARSE_ERROR(10290, "Encountered parse error while parsing rewritten merge/update or " +
       "delete query"),
@@ -458,13 +462,16 @@ public enum ErrorMsg {
     "Grouping sets size cannot be greater than 64"),
   REBUILD_NO_MATERIALIZED_VIEW(10412, "Rebuild command only valid for materialized views"),
   LOAD_DATA_ACID_FILE(10413,
-      "\"{0}\" was created created by Acid write - it cannot be loaded into anther Acid table",
+      "\"{0}\" was created by Acid write - it cannot be loaded into anther Acid table",
       true),
   ACID_OP_ON_INSERTONLYTRAN_TABLE(10414, "Attempt to do update or delete on table {0} that is " +
     "insert-only transactional", true),
   LOAD_DATA_LAUNCH_JOB_IO_ERROR(10415, "Encountered I/O error while parsing rewritten load data into insert query"),
   LOAD_DATA_LAUNCH_JOB_PARSE_ERROR(10416, "Encountered parse error while parsing rewritten load data into insert query"),
-
+  RESOURCE_PLAN_ALREADY_EXISTS(10417, "Resource plan {0} already exists", true),
+  RESOURCE_PLAN_NOT_EXISTS(10418, "Resource plan {0} does not exist", true),
+  INCOMPATIBLE_STRUCT(10419, "Incompatible structs.", true),
+  OBJECTNAME_CONTAINS_DOT(10420, "Table or database name may not contain dot(.) character", true),
 
   //========================== 20000 range starts here ========================//
 
@@ -502,11 +509,15 @@ public enum ErrorMsg {
   //if the error message is changed for REPL_EVENTS_MISSING_IN_METASTORE, then need modification in getNextNotification
   //method in HiveMetaStoreClient
   REPL_EVENTS_MISSING_IN_METASTORE(20016, "Notification events are missing in the meta store."),
-  REPL_BOOTSTRAP_LOAD_PATH_NOT_VALID(20017, "Target database is bootstrapped from some other path."),
+  REPL_BOOTSTRAP_LOAD_PATH_NOT_VALID(20017, "Load path {0} not valid as target database is bootstrapped " +
+          "from some other path : {1}."),
   REPL_FILE_MISSING_FROM_SRC_AND_CM_PATH(20018, "File is missing from both source and cm path."),
   REPL_LOAD_PATH_NOT_FOUND(20019, "Load path does not exist."),
   REPL_DATABASE_IS_NOT_SOURCE_OF_REPLICATION(20020,
           "Source of replication (repl.source.for) is not set in the database properties."),
+  REPL_INVALID_DB_OR_TABLE_PATTERN(20021,
+          "Invalid pattern for the DB or table name in the replication policy. "
+                  + "It should be a valid regex enclosed within single or double quotes."),
 
   // An exception from runtime that will show the full stack to client
   UNRESOLVED_RT_EXCEPTION(29999, "Runtime Error: {0}", "58004", true),

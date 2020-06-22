@@ -18,11 +18,15 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
+import static org.apache.hive.common.util.HiveStringUtils.quoteComments;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +35,7 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.llap.LlapOutputFormat;
@@ -38,12 +43,15 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.hive.ql.ddl.table.create.CreateTableDesc;
+import org.apache.hadoop.hive.ql.ddl.view.create.CreateViewDesc;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
+import org.apache.hadoop.hive.ql.io.HiveSequenceFileInputFormat;
 import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
@@ -62,7 +70,6 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.DelimitedJSONSerDe;
 import org.apache.hadoop.hive.serde2.Deserializer;
-import org.apache.hadoop.hive.serde2.MetadataTypedColumnsetSerDe;
 import org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.lazy.LazySerDeParameters;
@@ -70,6 +77,7 @@ import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
@@ -276,7 +284,10 @@ public final class PlanUtils {
 
     Class inputFormat, outputFormat;
     // get the input & output file formats
-    if ("SequenceFile".equalsIgnoreCase(fileFormat)) {
+    if ("HiveSequenceFile".equalsIgnoreCase(fileFormat)) {
+      inputFormat = HiveSequenceFileInputFormat.class;
+      outputFormat = SequenceFileOutputFormat.class;
+    } else if ("SequenceFile".equalsIgnoreCase(fileFormat)) {
       inputFormat = SequenceFileInputFormat.class;
       outputFormat = SequenceFileOutputFormat.class;
     } else if ("RCFile".equalsIgnoreCase(fileFormat)) {
@@ -376,9 +387,9 @@ public final class PlanUtils {
               crtTblDesc.getNullFormat());
       }
 
-      if (crtTblDesc.getTableName() != null && crtTblDesc.getDatabaseName() != null) {
+      if (crtTblDesc.getDbTableName() != null && crtTblDesc.getDatabaseName() != null) {
         properties.setProperty(org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_NAME,
-            crtTblDesc.getTableName());
+            crtTblDesc.getDbTableName());
       }
 
       if (crtTblDesc.getTblProps() != null) {
@@ -655,7 +666,7 @@ public final class PlanUtils {
    */
   public static List<FieldSchema> getFieldSchemasFromRowSchema(RowSchema row,
       String fieldPrefix) {
-    ArrayList<ColumnInfo> c = row.getSignature();
+    List<ColumnInfo> c = row.getSignature();
     return getFieldSchemasFromColumnInfo(c, fieldPrefix);
   }
 
@@ -663,7 +674,7 @@ public final class PlanUtils {
    * Convert the ColumnInfo to FieldSchema.
    */
   public static List<FieldSchema> getFieldSchemasFromColumnInfo(
-      ArrayList<ColumnInfo> cols, String fieldPrefix) {
+      List<ColumnInfo> cols, String fieldPrefix) {
     if ((cols == null) || (cols.size() == 0)) {
       return new ArrayList<FieldSchema>();
     }
@@ -713,17 +724,22 @@ public final class PlanUtils {
    * @return The reduceSinkDesc object.
    */
   public static ReduceSinkDesc getReduceSinkDesc(
-      ArrayList<ExprNodeDesc> keyCols, ArrayList<ExprNodeDesc> valueCols,
+      List<ExprNodeDesc> keyCols, List<ExprNodeDesc> valueCols,
       List<String> outputColumnNames, boolean includeKeyCols, int tag,
-      ArrayList<ExprNodeDesc> partitionCols, String order, String nullOrder,
+      List<ExprNodeDesc> partitionCols, String order, String nullOrder,
       int numReducers, AcidUtils.Operation writeType) {
-    return getReduceSinkDesc(keyCols, keyCols.size(), valueCols,
-        new ArrayList<List<Integer>>(),
-        includeKeyCols ? outputColumnNames.subList(0, keyCols.size()) :
-          new ArrayList<String>(),
-        includeKeyCols ? outputColumnNames.subList(keyCols.size(),
-            outputColumnNames.size()) : outputColumnNames,
-        includeKeyCols, tag, partitionCols, order, nullOrder, numReducers, writeType);
+    ReduceSinkDesc reduceSinkDesc = getReduceSinkDesc(keyCols, keyCols.size(), valueCols,
+            new ArrayList<List<Integer>>(),
+            includeKeyCols ? outputColumnNames.subList(0, keyCols.size()) :
+                    new ArrayList<String>(),
+            includeKeyCols ? outputColumnNames.subList(keyCols.size(),
+                    outputColumnNames.size()) : outputColumnNames,
+            includeKeyCols, tag, partitionCols, order, nullOrder, numReducers, writeType);
+    if (writeType == AcidUtils.Operation.UPDATE || writeType == AcidUtils.Operation.DELETE) {
+      reduceSinkDesc.setReducerTraits(EnumSet.of(ReduceSinkDesc.ReducerTraits.FIXED));
+      reduceSinkDesc.setNumReducers(1);
+    }
+    return reduceSinkDesc;
   }
 
   /**
@@ -754,18 +770,18 @@ public final class PlanUtils {
    * @return The reduceSinkDesc object.
    */
   public static ReduceSinkDesc getReduceSinkDesc(
-      final ArrayList<ExprNodeDesc> keyCols, int numKeys,
-      ArrayList<ExprNodeDesc> valueCols,
+      final List<ExprNodeDesc> keyCols, int numKeys,
+      List<ExprNodeDesc> valueCols,
       List<List<Integer>> distinctColIndices,
       List<String> outputKeyColumnNames,
       List<String> outputValueColumnNames,
       boolean includeKeyCols, int tag,
-      ArrayList<ExprNodeDesc> partitionCols, String order, String nullOrder,
+      List<ExprNodeDesc> partitionCols, String order, String nullOrder,
       int numReducers, AcidUtils.Operation writeType) {
     TableDesc keyTable = null;
     TableDesc valueTable = null;
-    ArrayList<String> outputKeyCols = new ArrayList<String>();
-    ArrayList<String> outputValCols = new ArrayList<String>();
+    List<String> outputKeyCols = new ArrayList<String>();
+    List<String> outputValCols = new ArrayList<String>();
     if (includeKeyCols) {
       List<FieldSchema> keySchema = getFieldSchemasFromColumnListWithLength(
           keyCols, distinctColIndices, outputKeyColumnNames, numKeys, "");
@@ -815,7 +831,7 @@ public final class PlanUtils {
    * @return The reduceSinkDesc object.
    */
   public static ReduceSinkDesc getReduceSinkDesc(
-      ArrayList<ExprNodeDesc> keyCols, ArrayList<ExprNodeDesc> valueCols,
+      List<ExprNodeDesc> keyCols, List<ExprNodeDesc> valueCols,
       List<String> outputColumnNames, boolean includeKey, int tag,
       int numPartitionFields, int numReducers, AcidUtils.Operation writeType)
       throws SemanticException {
@@ -857,8 +873,7 @@ public final class PlanUtils {
    * @return The reduceSinkDesc object.
    */
   public static ReduceSinkDesc getReduceSinkDesc(
-      ArrayList<ExprNodeDesc> keyCols, int numKeys,
-      ArrayList<ExprNodeDesc> valueCols,
+      List<ExprNodeDesc> keyCols, int numKeys, List<ExprNodeDesc> valueCols,
       List<List<Integer>> distinctColIndices,
       List<String> outputKeyColumnNames, List<String> outputValueColumnNames,
       boolean includeKey, int tag,
@@ -977,6 +992,14 @@ public final class PlanUtils {
       HiveStorageHandler storageHandler = HiveUtils.getStorageHandler(jobConf, handlerClass);
       if (storageHandler != null) {
         storageHandler.configureJobConf(tableDesc, jobConf);
+      }
+      if (tableDesc.getJobSecrets() != null) {
+        for (Map.Entry<String, String> entry : tableDesc.getJobSecrets().entrySet()) {
+          String key = TableDesc.SECRET_PREFIX + TableDesc.SECRET_DELIMIT +
+                  tableDesc.getTableName() + TableDesc.SECRET_DELIMIT + entry.getKey();
+          jobConf.getCredentials().addSecretKey(new Text(key), entry.getValue().getBytes());
+        }
+        tableDesc.getJobSecrets().clear();
       }
     } catch (HiveException e) {
       throw new RuntimeException(e);
@@ -1202,5 +1225,33 @@ public final class PlanUtils {
    */
   public static Class<? extends AbstractSerDe> getDefaultSerDe() {
     return LazySimpleSerDe.class;
+  }
+
+  /**
+   * Get a Map of table or partition properties to be used in explain extended output.
+   * Do some filtering to make output readable and/or concise.
+   */
+  static Map getPropertiesExplain(Properties properties) {
+    if (properties != null) {
+      Map<Object, Object> clone = null;
+      String value = properties.getProperty("columns.comments");
+      if (value != null) {
+        // should copy properties first
+        clone = new HashMap<>(properties);
+        clone.put("columns.comments", quoteComments(value));
+      }
+      value = properties.getProperty(StatsSetupConst.NUM_ERASURE_CODED_FILES);
+      if ("0".equals(value)) {
+        // should copy properties first
+        if (clone == null) {
+          clone = new HashMap<>(properties);
+        }
+        clone.remove(StatsSetupConst.NUM_ERASURE_CODED_FILES);
+      }
+      if (clone != null) {
+        return clone;
+      }
+    }
+    return properties;
   }
 }

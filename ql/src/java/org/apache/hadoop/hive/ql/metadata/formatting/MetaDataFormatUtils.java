@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.hive.ql.metadata.formatting;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -52,7 +54,6 @@ import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.metadata.UniqueConstraint;
 import org.apache.hadoop.hive.ql.metadata.UniqueConstraint.UniqueConstraintCol;
 import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo.ForeignKeyCol;
-import org.apache.hadoop.hive.ql.plan.DescTableDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.serde2.io.DateWritableV2;
 import org.apache.hive.common.util.HiveStringUtils;
@@ -89,7 +90,7 @@ public final class MetaDataFormatUtils {
   private MetaDataFormatUtils() {
   }
 
-  private static String convertToString(Decimal val) {
+  public static String convertToString(Decimal val) {
     if (val == null) {
       return "";
     }
@@ -102,7 +103,7 @@ public final class MetaDataFormatUtils {
     }
   }
 
-  private static String convertToString(org.apache.hadoop.hive.metastore.api.Date val) {
+  public static String convertToString(org.apache.hadoop.hive.metastore.api.Date val) {
     if (val == null) {
       return "";
     }
@@ -123,7 +124,7 @@ public final class MetaDataFormatUtils {
 
   static ColumnStatisticsObj getColumnStatisticsObject(String colName,
       String colType, List<ColumnStatisticsObj> colStats) {
-    if (colStats != null && !colStats.isEmpty()) {
+    if (CollectionUtils.isNotEmpty(colStats)) {
       for (ColumnStatisticsObj cso : colStats) {
         if (cso.getColName().equalsIgnoreCase(colName)
             && cso.getColType().equalsIgnoreCase(colType)) {
@@ -134,34 +135,33 @@ public final class MetaDataFormatUtils {
     return null;
   }
 
-  public static String getConstraintsInformation(PrimaryKeyInfo pkInfo, ForeignKeyInfo fkInfo,
-          UniqueConstraint ukInfo, NotNullConstraint nnInfo, DefaultConstraint dInfo, CheckConstraint cInfo) {
+  public static String getConstraintsInformation(Table table) {
     StringBuilder constraintsInfo = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
 
     constraintsInfo.append(LINE_DELIM).append("# Constraints").append(LINE_DELIM);
-    if (pkInfo != null && !pkInfo.getColNames().isEmpty()) {
+    if (PrimaryKeyInfo.isPrimaryKeyInfoNotEmpty(table.getPrimaryKeyInfo())) {
       constraintsInfo.append(LINE_DELIM).append("# Primary Key").append(LINE_DELIM);
-      getPrimaryKeyInformation(constraintsInfo, pkInfo);
+      getPrimaryKeyInformation(constraintsInfo, table.getPrimaryKeyInfo());
     }
-    if (fkInfo != null && !fkInfo.getForeignKeys().isEmpty()) {
+    if (ForeignKeyInfo.isForeignKeyInfoNotEmpty(table.getForeignKeyInfo())) {
       constraintsInfo.append(LINE_DELIM).append("# Foreign Keys").append(LINE_DELIM);
-      getForeignKeysInformation(constraintsInfo, fkInfo);
+      getForeignKeysInformation(constraintsInfo, table.getForeignKeyInfo());
     }
-    if (ukInfo != null && !ukInfo.getUniqueConstraints().isEmpty()) {
+    if (UniqueConstraint.isUniqueConstraintNotEmpty(table.getUniqueKeyInfo())) {
       constraintsInfo.append(LINE_DELIM).append("# Unique Constraints").append(LINE_DELIM);
-      getUniqueConstraintsInformation(constraintsInfo, ukInfo);
+      getUniqueConstraintsInformation(constraintsInfo, table.getUniqueKeyInfo());
     }
-    if (nnInfo != null && !nnInfo.getNotNullConstraints().isEmpty()) {
+    if (NotNullConstraint.isNotNullConstraintNotEmpty(table.getNotNullConstraint())) {
       constraintsInfo.append(LINE_DELIM).append("# Not Null Constraints").append(LINE_DELIM);
-      getNotNullConstraintsInformation(constraintsInfo, nnInfo);
+      getNotNullConstraintsInformation(constraintsInfo, table.getNotNullConstraint());
     }
-    if (dInfo != null && !dInfo.getDefaultConstraints().isEmpty()) {
+    if (DefaultConstraint.isCheckConstraintNotEmpty(table.getDefaultConstraint())) {
       constraintsInfo.append(LINE_DELIM).append("# Default Constraints").append(LINE_DELIM);
-      getDefaultConstraintsInformation(constraintsInfo, dInfo);
+      getDefaultConstraintsInformation(constraintsInfo, table.getDefaultConstraint());
     }
-    if (cInfo != null && !cInfo.getCheckConstraints().isEmpty()) {
+    if (CheckConstraint.isCheckConstraintNotEmpty(table.getCheckConstraint())) {
       constraintsInfo.append(LINE_DELIM).append("# Check Constraints").append(LINE_DELIM);
-      getCheckConstraintsInformation(constraintsInfo, cInfo);
+      getCheckConstraintsInformation(constraintsInfo, table.getCheckConstraint());
     }
     return constraintsInfo.toString();
   }
@@ -171,10 +171,10 @@ public final class MetaDataFormatUtils {
     formatOutput("Table:", pkInfo.getDatabaseName()+"."+pkInfo.getTableName(), constraintsInfo);
     formatOutput("Constraint Name:", pkInfo.getConstraintName(), constraintsInfo);
     Map<Integer, String> colNames = pkInfo.getColNames();
-    final String columnNames = "Column Names:";
-    constraintsInfo.append(String.format("%-" + ALIGNMENT + "s", columnNames)).append(FIELD_DELIM);
-    if (colNames != null && colNames.size() > 0) {
-      formatOutput(colNames.values().toArray(new String[colNames.size()]), constraintsInfo);
+    final String title = "Column Name:".intern();
+    for (String colName : colNames.values()) {
+      constraintsInfo.append(String.format("%-" + ALIGNMENT + "s", title)).append(FIELD_DELIM);
+      formatOutput(new String[]{colName}, constraintsInfo);
     }
   }
 
@@ -359,7 +359,7 @@ public final class MetaDataFormatUtils {
     getStorageDescriptorInfo(tableInfo, table.getTTable().getSd());
 
     if (table.isView() || table.isMaterializedView()) {
-      tableInfo.append(LINE_DELIM).append("# View Information").append(LINE_DELIM);
+      tableInfo.append(LINE_DELIM).append(table.isView() ? "# View Information" : "# Materialized View Information").append(LINE_DELIM);
       getViewInfo(tableInfo, table);
     }
 
@@ -367,9 +367,13 @@ public final class MetaDataFormatUtils {
   }
 
   private static void getViewInfo(StringBuilder tableInfo, Table tbl) {
-    formatOutput("View Original Text:", tbl.getViewOriginalText(), tableInfo);
-    formatOutput("View Expanded Text:", tbl.getViewExpandedText(), tableInfo);
-    formatOutput("View Rewrite Enabled:", tbl.isRewriteEnabled() ? "Yes" : "No", tableInfo);
+    formatOutput("Original Query:", tbl.getViewOriginalText(), tableInfo);
+    formatOutput("Expanded Query:", tbl.getViewExpandedText(), tableInfo);
+    if (tbl.isMaterializedView()) {
+      formatOutput("Rewrite Enabled:", tbl.isRewriteEnabled() ? "Yes" : "No", tableInfo);
+      formatOutput("Outdated for Rewriting:", tbl.isOutdatedForRewriting() == null ? "Unknown"
+          : tbl.isOutdatedForRewriting() ? "Yes" : "No", tableInfo);
+    }
   }
 
   private static void getStorageDescriptorInfo(StringBuilder tableInfo,
@@ -474,10 +478,16 @@ public final class MetaDataFormatUtils {
     List<String> keys = new ArrayList<String>(params.keySet());
     Collections.sort(keys);
     for (String key : keys) {
+      String value = params.get(key);
+      if (key.equals(StatsSetupConst.NUM_ERASURE_CODED_FILES)) {
+        if ("0".equals(value)) {
+          continue;
+        }
+      }
       tableInfo.append(FIELD_DELIM); // Ensures all params are indented.
       formatOutput(key,
-          escapeUnicode ? StringEscapeUtils.escapeJava(params.get(key))
-              : HiveStringUtils.escapeJava(params.get(key)),
+          escapeUnicode ? StringEscapeUtils.escapeJava(value)
+              : HiveStringUtils.escapeJava(value),
           tableInfo, isOutputPadded);
     }
   }
@@ -741,19 +751,11 @@ public final class MetaDataFormatUtils {
     }
   }
 
-  public static String[] getColumnsHeader(List<ColumnStatisticsObj> colStats) {
-    boolean showColStats = false;
-    if (colStats != null) {
-      showColStats = true;
-    }
-    return DescTableDesc.getSchema(showColStats).split("#")[0].split(",");
-  }
-
   public static MetaDataFormatter getFormatter(HiveConf conf) {
     if ("json".equals(conf.get(HiveConf.ConfVars.HIVE_DDL_OUTPUT_FORMAT.varname, "text"))) {
       return new JsonMetaDataFormatter();
     } else {
-      return new TextMetaDataFormatter(conf.getIntVar(HiveConf.ConfVars.CLIPRETTYOUTPUTNUMCOLS), conf.getBoolVar(ConfVars.HIVE_DISPLAY_PARTITION_COLUMNS_SEPARATELY));
+      return new TextMetaDataFormatter(conf.getBoolVar(ConfVars.HIVE_DISPLAY_PARTITION_COLUMNS_SEPARATELY));
     }
   }
 

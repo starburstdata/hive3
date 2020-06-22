@@ -72,6 +72,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: (one is not null and two is not null) (type: boolean)
             Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
             TableScan Vectorization:
                 native: true
@@ -107,11 +108,13 @@ STAGE PLANS:
                       vectorProcessingMode: HASH
                       projectedOutputColumnNums: []
                   keys: _col0 (type: int), _col1 (type: int)
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0, _col1
                   Statistics: Num rows: 1 Data size: 3 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: int), _col1 (type: int)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: _col0 (type: int), _col1 (type: int)
                     Reduce Sink Vectorization:

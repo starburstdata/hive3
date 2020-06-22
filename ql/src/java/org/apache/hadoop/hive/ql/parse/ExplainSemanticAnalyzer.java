@@ -45,7 +45,7 @@ import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.parse.ExplainConfiguration.AnalyzeState;
 import org.apache.hadoop.hive.ql.parse.ExplainConfiguration.VectorizationDetailLevel;
 import org.apache.hadoop.hive.ql.plan.ExplainWork;
-import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hadoop.hive.ql.stats.StatsAggregator;
 import org.apache.hadoop.hive.ql.stats.StatsCollectionContext;
 import org.apache.hadoop.hive.ql.stats.fs.FSStatsAggregator;
@@ -63,7 +63,6 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
     config = new ExplainConfiguration();
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public void analyzeInternal(ASTNode ast) throws SemanticException {
     final int childCount = ast.getChildCount();
@@ -76,6 +75,12 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
         config.setExtended(true);
       } else if (explainOptions == HiveParser.KW_DEPENDENCY) {
         config.setDependency(true);
+      } else if (explainOptions == HiveParser.KW_CBO) {
+        config.setCbo(true);
+      } else if (explainOptions == HiveParser.KW_COST) {
+        config.setCboCost(true);
+      } else if (explainOptions == HiveParser.KW_JOINCOST) {
+        config.setCboJoinCost(true);
       } else if (explainOptions == HiveParser.KW_LOGICAL) {
         config.setLogical(true);
       } else if (explainOptions == HiveParser.KW_AUTHORIZATION) {
@@ -113,6 +118,10 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
             i++;
           }
         }
+      } else if (explainOptions == HiveParser.KW_LOCKS) {
+        config.setLocks(true);
+      } else if (explainOptions == HiveParser.KW_DEBUG) {
+        config.setDebug(true);
       } else {
         // UNDONE: UNKNOWN OPTION?
       }
@@ -137,15 +146,12 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
         runCtx = new Context(conf);
         // runCtx and ctx share the configuration, but not isExplainPlan()
         runCtx.setExplainConfig(config);
-        Driver driver = new Driver(conf, runCtx, queryState.getLineageState());
-        CommandProcessorResponse ret = driver.run(query);
-        if(ret.getResponseCode() == 0) {
-          // Note that we need to call getResults for simple fetch optimization.
-          // However, we need to skip all the results.
+        try (Driver driver = new Driver(conf, runCtx, queryState.getLineageState())) {
+          driver.run(query);
           while (driver.getResults(new ArrayList<String>())) {
           }
-        } else {
-          throw new SemanticException(ret.getErrorMessage(), ret.getException());
+        } catch (CommandProcessorException e) {
+          throw new SemanticException(e.getErrorMessage(), e);
         }
         config.setOpIdToRuntimeNumRows(aggregateStats(config.getExplainRootPath()));
       } catch (IOException e1) {
@@ -186,6 +192,7 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
     config.setUserLevelExplain(!config.isExtended()
         && !config.isFormatted()
         && !config.isDependency()
+        && !config.isCbo()
         && !config.isLogical()
         && !config.isAuthorize()
         && (
@@ -209,14 +216,16 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
         fetchTask,
         sem,
         config,
-        ctx.getCboInfo());
+        ctx.getCboInfo(),
+        ctx.getOptimizedSql(),
+        ctx.getCalcitePlan());
 
     work.setAppendTaskType(
         HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVEEXPLAINDEPENDENCYAPPENDTASKTYPES));
 
     ExplainTask explTask = (ExplainTask) TaskFactory.get(work);
 
-    fieldList = explTask.getResultSchema();
+    fieldList = ExplainTask.getResultSchema();
     rootTasks.add(explTask);
   }
 

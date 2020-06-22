@@ -18,6 +18,13 @@ INSERT OVERWRITE TABLE dest1_n121 SELECT src1.*, src2.*
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@dest1_n121
+OPTIMIZED SQL: SELECT *
+FROM (SELECT `key`, `value`
+FROM `default`.`src`
+WHERE `key` IS NOT NULL) AS `t0`
+INNER JOIN (SELECT `key`, `value`
+FROM `default`.`src`
+WHERE `key` IS NOT NULL) AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -34,6 +41,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
@@ -111,6 +119,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: key is not null (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator

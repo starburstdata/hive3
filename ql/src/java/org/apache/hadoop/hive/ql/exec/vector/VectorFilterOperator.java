@@ -81,7 +81,7 @@ public class VectorFilterOperator extends FilterOperator
   @Override
   protected void initializeOp(Configuration hconf) throws HiveException {
     super.initializeOp(hconf);
-    VectorExpression.doTransientInit(predicateExpression);
+    VectorExpression.doTransientInit(predicateExpression, hconf);
     try {
       heartbeatInterval = HiveConf.getIntVar(hconf,
           HiveConf.ConfVars.HIVESENDHEARTBEAT);
@@ -133,7 +133,7 @@ public class VectorFilterOperator extends FilterOperator
         // All are selected, do nothing
     }
     if (vrg.size > 0) {
-      forward(vrg, null, true);
+      vectorForward(vrg);
     }
 
     // Restore the original selected vector

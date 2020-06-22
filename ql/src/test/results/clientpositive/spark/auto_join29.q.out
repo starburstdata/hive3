@@ -39,6 +39,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: (key > 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key > 10) (type: boolean)
@@ -90,6 +91,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -648,6 +650,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: (key > 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key > 10) (type: boolean)
@@ -668,9 +671,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       filter predicates:
@@ -719,6 +723,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -1277,6 +1282,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -1297,6 +1303,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -1348,6 +1355,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -1918,6 +1926,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -1986,6 +1995,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -2556,6 +2566,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: ((key < 10) and (key > 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((key < 10) and (key > 10)) (type: boolean)
@@ -2572,9 +2583,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       keys:
@@ -2595,9 +2607,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Map Join Operator
                       condition map:
@@ -2618,6 +2631,7 @@ STAGE PLANS:
                         Statistics: Num rows: 121 Data size: 1284 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                          null sort order: zzzzzz
                           sort order: ++++++
                           Statistics: Num rows: 121 Data size: 1284 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -2676,9 +2690,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       filter predicates:
@@ -2696,6 +2711,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: ((key < 10) and (key > 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((key < 10) and (key > 10)) (type: boolean)
@@ -2747,6 +2763,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -3305,6 +3322,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: ((key < 10) and (key > 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((key < 10) and (key > 10)) (type: boolean)
@@ -3325,9 +3343,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       filter predicates:
@@ -3376,6 +3395,7 @@ STAGE PLANS:
                       Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                        null sort order: zzzzzz
                         sort order: ++++++
                         Statistics: Num rows: 1100 Data size: 11686 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -3434,6 +3454,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -3454,6 +3475,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -3481,6 +3503,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: (key < 10) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: (key < 10) (type: boolean)
@@ -3508,6 +3531,7 @@ STAGE PLANS:
                         Statistics: Num rows: 365 Data size: 3878 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                          null sort order: zzzzzz
                           sort order: ++++++
                           Statistics: Num rows: 365 Data size: 3878 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized
@@ -3588,6 +3612,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src2
+                  filterExpr: ((key < 10) and (key > 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: ((key < 10) and (key > 10)) (type: boolean)
@@ -3604,9 +3629,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src3
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       keys:
@@ -3627,9 +3653,10 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: src1
+                  filterExpr: ((key > 10) and (key < 10)) (type: boolean)
                   Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
-                    predicate: ((key < 10) and (key > 10)) (type: boolean)
+                    predicate: ((key > 10) and (key < 10)) (type: boolean)
                     Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
                     Map Join Operator
                       condition map:
@@ -3650,6 +3677,7 @@ STAGE PLANS:
                         Statistics: Num rows: 121 Data size: 1284 Basic stats: COMPLETE Column stats: NONE
                         Reduce Output Operator
                           key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string), _col4 (type: string), _col5 (type: string)
+                          null sort order: zzzzzz
                           sort order: ++++++
                           Statistics: Num rows: 121 Data size: 1284 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized

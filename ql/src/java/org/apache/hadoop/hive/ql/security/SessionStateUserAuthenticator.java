@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.hive.ql.security;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.hive.shims.HadoopShims;
+import org.apache.hadoop.hive.shims.ShimLoader;
 
 /**
  * Authenticator that returns the userName set in SessionState. For use when authorizing with HS2
@@ -31,14 +33,17 @@ import org.apache.hadoop.hive.ql.session.SessionState;
  */
 public class SessionStateUserAuthenticator implements HiveAuthenticationProvider {
 
-  private final List<String> groupNames = new ArrayList<String>();
-
   protected Configuration conf;
   private SessionState sessionState;
+  private List<String> groups;
 
   @Override
   public List<String> getGroupNames() {
-    return groupNames;
+    // In case of embedded hs2, sessionState.getUserName()=null
+    if (groups == null && sessionState.getUserName() != null) {
+      groups = ShimLoader.getHadoopShims().getGroups(UserGroupInformation.createRemoteUser(sessionState.getUserName()));
+    }
+    return groups;
   }
 
   @Override

@@ -41,6 +41,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -61,18 +62,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int), _col7 (type: double)
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -87,7 +90,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -213,12 +216,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: p1
+                  filterExpr: p_partkey is not null (type: boolean)
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: p_partkey is not null (type: boolean)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: p_partkey (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: p_partkey (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -228,12 +233,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: p2
+                  filterExpr: p_partkey is not null (type: boolean)
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: p_partkey is not null (type: boolean)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: p_partkey (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: p_partkey (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -250,6 +257,7 @@ STAGE PLANS:
                 Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: string), _col1 (type: string)
+                  null sort order: az
                   sort order: ++
                   Map-reduce partition columns: _col2 (type: string)
                   Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
@@ -269,13 +277,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
@@ -295,7 +304,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -403,6 +412,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -423,7 +433,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -529,6 +539,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -549,18 +560,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: abc
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int), _col7 (type: double)
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -575,7 +588,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -709,6 +722,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -729,13 +743,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -755,7 +770,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -892,6 +907,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -912,7 +928,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -923,11 +939,13 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: _col2 (type: string), _col1 (type: string), _col5 (type: int)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: int)
+                        null sort order: aza
                         sort order: +++
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -947,7 +965,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col0
                         raw input shape:
                         window functions:
@@ -1077,6 +1095,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1086,12 +1105,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: p1
+                  filterExpr: p_partkey is not null (type: boolean)
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: p_partkey is not null (type: boolean)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: p_partkey (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: p_partkey (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1111,7 +1132,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: abc
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col0: int, _col1: string, _col2: string, _col3: string, _col4: string, _col5: int, _col6: string, _col7: double, _col8: string
                         partition by: _col2
                         raw input shape:
@@ -1121,6 +1142,7 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1227,12 +1249,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: p1
+                  filterExpr: p_partkey is not null (type: boolean)
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: p_partkey is not null (type: boolean)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: p_partkey (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: p_partkey (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1244,6 +1268,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1285,7 +1310,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: abc
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col0: int, _col1: string, _col2: string, _col3: string, _col4: string, _col5: int, _col6: string, _col7: double, _col8: string
                         partition by: _col2
                         raw input shape:
@@ -1295,6 +1320,7 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1394,7 +1420,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: p_name ASC NULLS FIRST, p_size DESC NULLS LAST
+                          order by: p_name ASC NULLS LAST, p_size DESC NULLS LAST
                           output shape: p_name: string, p_mfgr: string, p_size: int
                           partition by: p_mfgr
                           raw input shape:
@@ -1403,6 +1429,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: p_mfgr (type: string), p_name (type: string), p_size (type: int)
+                      null sort order: azz
                       sort order: ++-
                       Map-reduce partition columns: p_mfgr (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1421,7 +1448,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col1 ASC NULLS FIRST, _col5 DESC NULLS LAST
+                        order by: _col1 ASC NULLS LAST, _col5 DESC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -1429,10 +1456,12 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string), _col5 (type: int)
+                    null sort order: azz
                     sort order: ++-
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), KEY.reducesinkkey2 (type: int)
@@ -1447,7 +1476,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST, _col5 DESC NULLS LAST
+                        order by: _col1 ASC NULLS LAST, _col5 DESC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -1567,7 +1596,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: p_name ASC NULLS FIRST
+                          order by: p_name ASC NULLS LAST
                           output shape: p_name: string, p_mfgr: string, p_size: int, p_retailprice: double
                           partition by: p_mfgr
                           raw input shape:
@@ -1576,6 +1605,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: p_mfgr (type: string), p_name (type: string)
+                      null sort order: az
                       sort order: ++
                       Map-reduce partition columns: p_mfgr (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1595,7 +1625,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
@@ -1603,11 +1633,13 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int), _col7 (type: double)
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -1622,7 +1654,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -1752,6 +1784,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1772,18 +1805,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int), _col7 (type: double)
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -1798,7 +1833,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -1931,6 +1966,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: zz
                     sort order: -+
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -1951,7 +1987,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS FIRST
+                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
@@ -1965,7 +2001,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: _col2 DESC NULLS LAST, _col1 ASC NULLS FIRST
+                          order by: _col2 DESC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int, _col7: double
                           partition by: _col2
                           raw input shape:
@@ -1973,7 +2009,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_2
                           name: noop
-                          order by: _col2 DESC NULLS LAST, _col1 ASC NULLS FIRST
+                          order by: _col2 DESC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int, _col7: double
                           partition by: _col2
                           raw input shape:
@@ -1981,6 +2017,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: _col2 (type: string), _col1 (type: string)
+                      null sort order: zz
                       sort order: -+
                       Map-reduce partition columns: _col2 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2000,7 +2037,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS FIRST
+                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
@@ -2008,18 +2045,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS FIRST
+                        order by: _col2 DESC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int), _col7 (type: double)
         Reducer 4 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -2034,7 +2073,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -2174,6 +2213,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2194,13 +2234,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2220,7 +2261,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -2357,6 +2398,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2366,12 +2408,14 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: p1
+                  filterExpr: p_partkey is not null (type: boolean)
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Filter Operator
                     predicate: p_partkey is not null (type: boolean)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: p_partkey (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: p_partkey (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2391,7 +2435,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: abc
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col0: int, _col1: string, _col2: string, _col5: int, _col7: double
                         partition by: _col2
                         raw input shape:
@@ -2401,6 +2445,7 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: a
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2417,6 +2462,7 @@ STAGE PLANS:
                 Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
                   key expressions: _col2 (type: string), _col1 (type: string)
+                  null sort order: az
                   sort order: ++
                   Map-reduce partition columns: _col2 (type: string)
                   Statistics: Num rows: 28 Data size: 3461 Basic stats: COMPLETE Column stats: NONE
@@ -2436,7 +2482,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -2581,6 +2627,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2601,7 +2648,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -2612,11 +2659,13 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       keys: _col2 (type: string), _col1 (type: string), _col5 (type: int)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: int)
+                        null sort order: aaa
                         sort order: +++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string), _col2 (type: int)
                         Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2748,11 +2797,13 @@ STAGE PLANS:
                     Group By Operator
                       aggregations: sum(p_retailprice)
                       keys: p_mfgr (type: string), p_brand (type: string)
+                      minReductionHashAggr: 0.99
                       mode: hash
                       outputColumnNames: _col0, _col1, _col2
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: za
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -2779,13 +2830,14 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noop
-                          order by: _col0 ASC NULLS FIRST
+                          order by: _col0 ASC NULLS LAST
                           output shape: _col0: string, _col1: string, _col2: double
                           partition by: _col0
                           raw input shape:
                     Statistics: Num rows: 13 Data size: 1573 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col0 (type: string), _col1 (type: string)
+                      null sort order: az
                       sort order: ++
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 13 Data size: 1573 Basic stats: COMPLETE Column stats: NONE
@@ -2805,7 +2857,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col0
                         raw input shape:
                         window functions:
@@ -2977,12 +3029,14 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: p_size (type: int), p_retailprice (type: double)
             Execution mode: vectorized
         Reducer 3 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int), VALUE._col5 (type: double)
@@ -2997,7 +3051,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -3049,7 +3103,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col5 ASC NULLS FIRST
+                        order by: _col5 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -3066,6 +3120,7 @@ STAGE PLANS:
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       key expressions: _col2 (type: string), _col1 (type: string)
+                      null sort order: zz
                       sort order: ++
                       Map-reduce partition columns: _col2 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3085,7 +3140,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col3 ASC NULLS FIRST, _col2 ASC NULLS FIRST
+                        order by: _col3 ASC NULLS LAST, _col2 ASC NULLS LAST
                         partition by: _col3
                         raw input shape:
                         window functions:
@@ -3143,12 +3198,13 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3167,12 +3223,13 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col5 (type: int)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3382,6 +3439,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3402,14 +3460,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -3423,7 +3481,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2, _col1
                           raw input shape:
@@ -3431,7 +3489,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_2
                           name: noop
-                          order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2, _col1
                           raw input shape:
@@ -3439,6 +3497,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: _col2 (type: string), _col1 (type: string)
+                      null sort order: zz
                       sort order: ++
                       Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3458,7 +3517,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
@@ -3466,18 +3525,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int)
         Reducer 4 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int)
@@ -3656,6 +3717,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: p_mfgr (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3676,20 +3738,21 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3709,13 +3772,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3735,18 +3799,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int)
         Reducer 5 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int)
@@ -3761,7 +3827,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -3920,6 +3986,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string), p_name (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3940,20 +4007,21 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -3973,20 +4041,21 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4007,7 +4076,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -4167,6 +4236,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string), p_name (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4187,20 +4257,21 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4220,7 +4291,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -4234,7 +4305,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2, _col1
                           raw input shape:
@@ -4243,6 +4314,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: _col2 (type: string), _col1 (type: string)
+                      null sort order: zz
                       sort order: ++
                       Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4262,7 +4334,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
@@ -4270,11 +4342,13 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int)
         Reducer 5 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int)
@@ -4450,6 +4524,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string), p_name (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4470,7 +4545,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
@@ -4484,7 +4559,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: _col2 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2
                           raw input shape:
@@ -4492,7 +4567,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_2
                           name: noop
-                          order by: _col2 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2
                           raw input shape:
@@ -4500,6 +4575,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: _col2 (type: string)
+                      null sort order: z
                       sort order: +
                       Map-reduce partition columns: _col2 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4519,7 +4595,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
@@ -4527,18 +4603,20 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2
                         raw input shape:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                     value expressions: _col5 (type: int)
         Reducer 4 
+            Execution mode: vectorized
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: string), KEY.reducesinkkey0 (type: string), VALUE._col3 (type: int)
@@ -4553,7 +4631,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         partition by: _col2, _col1
                         raw input shape:
                         window functions:
@@ -4708,6 +4786,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: p_mfgr (type: string), p_name (type: string)
+                    null sort order: zz
                     sort order: ++
                     Map-reduce partition columns: p_mfgr (type: string), p_name (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4728,14 +4807,14 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
                       Partition table definition
                         input alias: ptf_2
                         name: noop
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
@@ -4749,7 +4828,7 @@ STAGE PLANS:
                         Partition table definition
                           input alias: ptf_1
                           name: noopwithmap
-                          order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                          order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                           output shape: _col1: string, _col2: string, _col5: int
                           partition by: _col2, _col1
                           raw input shape:
@@ -4758,6 +4837,7 @@ STAGE PLANS:
                     Map-side function: true
                     Reduce Output Operator
                       key expressions: _col2 (type: string), _col1 (type: string)
+                      null sort order: zz
                       sort order: ++
                       Map-reduce partition columns: _col2 (type: string), _col1 (type: string)
                       Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4777,7 +4857,7 @@ STAGE PLANS:
                       Partition table definition
                         input alias: ptf_1
                         name: noopwithmap
-                        order by: _col2 ASC NULLS FIRST, _col1 ASC NULLS FIRST
+                        order by: _col2 ASC NULLS LAST, _col1 ASC NULLS LAST
                         output shape: _col1: string, _col2: string, _col5: int
                         partition by: _col2, _col1
                         raw input shape:
@@ -4785,6 +4865,7 @@ STAGE PLANS:
                   Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col2 (type: string), _col1 (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: _col2 (type: string)
                     Statistics: Num rows: 26 Data size: 3147 Basic stats: COMPLETE Column stats: NONE
@@ -4805,7 +4886,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col1 ASC NULLS FIRST
+                        order by: _col1 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:

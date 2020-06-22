@@ -54,6 +54,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
@@ -66,9 +67,11 @@ STAGE PLANS:
                   1 key (type: int)
                 Group By Operator
                   aggregations: count()
+                  minReductionHashAggr: 0.99
                   mode: hash
                   outputColumnNames: _col0
                   Reduce Output Operator
+                    null sort order: 
                     sort order: 
                     value expressions: _col0 (type: bigint)
       Reduce Operator Tree:

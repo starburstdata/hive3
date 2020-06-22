@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.security.authorization.plugin.fallback;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
@@ -37,11 +38,13 @@ import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObje
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveRoleGrant;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.SettableConfigUpdater;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.Operation2Privilege;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.RequiredPrivileges;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLAuthorizationUtils;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLPrivTypeGrant;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
@@ -49,15 +52,17 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
 
   private final HiveAuthzSessionContext sessionCtx;
   private final HiveAuthenticationProvider authenticator;
+  private final HiveConf conf;
   private String[] admins = null;
 
-  FallbackHiveAuthorizer(HiveConf hiveConf, HiveAuthenticationProvider hiveAuthenticator,
+  public FallbackHiveAuthorizer(HiveConf hiveConf, HiveAuthenticationProvider hiveAuthenticator,
                                 HiveAuthzSessionContext ctx) {
     this.authenticator = hiveAuthenticator;
     this.sessionCtx = applyTestSettings(ctx, hiveConf);
-    String adminString = hiveConf.getVar(HiveConf.ConfVars.USERS_IN_ADMIN_ROLE);
+    this.conf = hiveConf;
+    String adminString = conf.getVar(HiveConf.ConfVars.USERS_IN_ADMIN_ROLE);
     if (adminString != null) {
-      admins = hiveConf.getVar(HiveConf.ConfVars.USERS_IN_ADMIN_ROLE).split(",");
+      admins = conf.getVar(HiveConf.ConfVars.USERS_IN_ADMIN_ROLE).split(",");
     }
   }
 
@@ -88,19 +93,20 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
   @Override
   public void grantPrivileges(List<HivePrincipal> hivePrincipals, List<HivePrivilege> hivePrivileges,
                               HivePrivilegeObject hivePrivObject, HivePrincipal grantorPrincipal, boolean
-                                        grantOption) throws HiveAuthzPluginException {
+                                        grantOption) throws HiveAuthzPluginException, HiveAccessControlException {
     throw new HiveAuthzPluginException("grantPrivileges not implemented in FallbackHiveAuthorizer");
   }
 
   @Override
   public void revokePrivileges(List<HivePrincipal> hivePrincipals, List<HivePrivilege> hivePrivileges,
                                HivePrivilegeObject hivePrivObject, HivePrincipal grantorPrincipal, boolean
-                                         grantOption) throws HiveAuthzPluginException {
+                                         grantOption) throws HiveAuthzPluginException, HiveAccessControlException {
     throw new HiveAuthzPluginException("revokePrivileges not implemented in FallbackHiveAuthorizer");
   }
 
   @Override
-  public void createRole(String roleName, HivePrincipal adminGrantor) throws HiveAuthzPluginException {
+  public void createRole(String roleName, HivePrincipal adminGrantor) throws HiveAuthzPluginException,
+          HiveAccessControlException {
     throw new HiveAuthzPluginException("createRole not implemented in FallbackHiveAuthorizer");
   }
 
@@ -139,7 +145,7 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
           HiveAuthzPluginException, HiveAccessControlException {
     String userName = authenticator.getUserName();
     // check privileges on input and output objects
-    List<String> deniedMessages = new ArrayList<>();
+    List<String> deniedMessages = new ArrayList<String>();
     checkPrivileges(hiveOpType, inputHObjs, userName, Operation2Privilege.IOType.INPUT, deniedMessages);
     checkPrivileges(hiveOpType, outputHObjs, userName, Operation2Privilege.IOType.OUTPUT, deniedMessages);
 
@@ -149,12 +155,18 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
 
   // Adapted from SQLStdHiveAuthorizationValidator, only check privileges for LOAD/ADD/DFS/COMPILE and admin privileges
   private void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> hiveObjects,
-                               String userName, Operation2Privilege.IOType ioType, List<String> deniedMessages) {
-
+                               String userName, Operation2Privilege.IOType ioType, List<String> deniedMessages)
+          throws HiveAuthzPluginException, HiveAccessControlException {
     if (hiveObjects == null) {
       return;
     }
-    if (admins != null && Arrays.stream(admins).parallel().anyMatch(n -> n.equals(userName))) {
+
+    boolean isAdmin = false;
+    if (admins != null && admins.length > 0) {
+      isAdmin = Arrays.asList(admins).contains(userName);
+    }
+
+    if (isAdmin) {
       return; // Skip rest of checks if user is admin
     }
 
@@ -170,19 +182,17 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
       // If involving local file system
       if (hiveObj.getType() == HivePrivilegeObject.HivePrivilegeObjectType.LOCAL_URI) {
         needAdmin = true;
-        break;
       }
+      break;
     }
-    if (!needAdmin) {
-      switch (hiveOpType) {
-        case ADD:
-        case DFS:
-        case COMPILE:
-          needAdmin = true;
-          break;
-        default:
-          break;
-      }
+    switch (hiveOpType) {
+      case ADD:
+      case DFS:
+      case COMPILE:
+        needAdmin = true;
+        break;
+      default:
+        break;
     }
     if (needAdmin) {
       deniedMessages.add("ADMIN");
@@ -190,23 +200,24 @@ public class FallbackHiveAuthorizer extends AbstractHiveAuthorizer {
   }
 
   @Override
-  public List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs, HiveAuthzContext context) {
+  public List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs, HiveAuthzContext context)
+          throws HiveAuthzPluginException, HiveAccessControlException {
     return listObjs;
   }
 
   @Override
-  public List<String> getAllRoles() throws HiveAuthzPluginException {
+  public List<String> getAllRoles() throws HiveAuthzPluginException, HiveAccessControlException {
     throw new HiveAuthzPluginException("getAllRoles not implemented in FallbackHiveAuthorizer");
   }
 
   @Override
   public List<HivePrivilegeInfo> showPrivileges(HivePrincipal principal, HivePrivilegeObject privObj) throws
-          HiveAuthzPluginException {
+          HiveAuthzPluginException, HiveAccessControlException {
     throw new HiveAuthzPluginException("showPrivileges not implemented in FallbackHiveAuthorizer");
   }
 
   @Override
-  public void setCurrentRole(String roleName) throws HiveAuthzPluginException {
+  public void setCurrentRole(String roleName) throws HiveAccessControlException, HiveAuthzPluginException {
     throw new HiveAuthzPluginException("setCurrentRole not implemented in FallbackHiveAuthorizer");
   }
 

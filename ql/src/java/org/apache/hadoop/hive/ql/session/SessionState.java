@@ -27,11 +27,12 @@ import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLClassLoader;
+import java.security.AccessController;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -67,13 +68,18 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.cache.CachedStore;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.MapRedStats;
+import org.apache.hadoop.hive.ql.exec.AddToClassPathAction;
 import org.apache.hadoop.hive.ql.exec.FunctionInfo;
 import org.apache.hadoop.hive.ql.exec.Registry;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.spark.session.SparkSession;
 import org.apache.hadoop.hive.ql.exec.spark.session.SparkSessionManagerImpl;
+import org.apache.hadoop.hive.ql.exec.tez.ExternalSessionsRegistry;
+import org.apache.hadoop.hive.ql.exec.tez.TezExternalSessionState;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
+import org.apache.hadoop.hive.ql.exec.tez.TezSession;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionState;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
 import org.apache.hadoop.hive.ql.history.HiveHistoryImpl;
@@ -85,8 +91,8 @@ import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
-import org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.metadata.TempTable;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.AuthorizationMetaStoreFilterHook;
@@ -117,7 +123,7 @@ import com.google.common.collect.Maps;
 public class SessionState {
   private static final Logger LOG = LoggerFactory.getLogger(SessionState.class);
 
-  private static final String TMP_PREFIX = "_tmp_space.db";
+  public static final String TMP_PREFIX = "_tmp_space.db";
   private static final String LOCAL_SESSION_PATH_KEY = "_hive.local.session.path";
   private static final String HDFS_SESSION_PATH_KEY = "_hive.hdfs.session.path";
   private static final String TMP_TABLE_SPACE_KEY = "_hive.tmp_table_space";
@@ -130,13 +136,13 @@ public class SessionState {
   private final Map<String, Map<String, Table>> tempTables = new ConcurrentHashMap<>();
   private final Map<String, Map<String, ColumnStatisticsObj>> tempTableColStats =
       new ConcurrentHashMap<>();
-  private final Map<String, SessionHiveMetaStoreClient.TempTable> tempPartitions =
+  private final Map<String, TempTable> tempPartitions =
       new ConcurrentHashMap<>();
 
   protected ClassLoader parentLoader;
 
   // Session-scope compile lock.
-  private final ReentrantLock compileLock = new ReentrantLock();
+  private final ReentrantLock compileLock = new ReentrantLock(true);
 
   /**
    * current configuration.
@@ -231,9 +237,11 @@ public class SessionState {
 
   private Map<String, List<String>> localMapRedErrors;
 
-  private TezSessionState tezSessionState;
+  private TezSession tezSessionState;
 
   private String currentDatabase;
+
+  private String currentCatalog;
 
   private final String CONFIG_AUTHZ_SETTINGS_APPLIED_MARKER =
       "hive.internal.ss.authz.settings.applied.marker";
@@ -246,6 +254,11 @@ public class SessionState {
    * Gets information about HDFS encryption
    */
   private Map<URI, HadoopShims.HdfsEncryptionShim> hdfsEncryptionShims = Maps.newHashMap();
+
+  /**
+   * Cache for Erasure Coding shims.
+   */
+  private Map<URI, HadoopShims.HdfsErasureCodingShim> erasureCodingShims;
 
   private final String userName;
 
@@ -295,6 +308,8 @@ public class SessionState {
    */
   private final Map<String, FunctionInfo> currentFunctionsInUse = new HashMap<>();
 
+  private static ExternalSessionsRegistry externalSessions = null;
+
   /**
    * CURRENT_TIMESTAMP value for query
    */
@@ -309,6 +324,8 @@ public class SessionState {
   private String atsDomainId;
 
   private List<Closeable> cleanupItems = new LinkedList<Closeable>();
+
+  private volatile long waitingTezSession;
 
   public HiveConf getConf() {
     return sessionConf;
@@ -410,7 +427,9 @@ public class SessionState {
     // classloader as parent can pollute the session. See HIVE-11878
     parentLoader = SessionState.class.getClassLoader();
     // Make sure that each session has its own UDFClassloader. For details see {@link UDFClassLoader}
-    final ClassLoader currentLoader = Utilities.createUDFClassLoader((URLClassLoader) parentLoader, new String[]{});
+    AddToClassPathAction addAction = new AddToClassPathAction(
+        parentLoader, Collections.emptyList(), true);
+    final ClassLoader currentLoader = AccessController.doPrivileged(addAction);
     this.sessionConf.setClassLoader(currentLoader);
     resourceDownloader = new ResourceDownloader(conf,
         HiveConf.getVar(conf, ConfVars.DOWNLOADED_RESOURCES_DIR));
@@ -438,7 +457,7 @@ public class SessionState {
     final String currThreadName = Thread.currentThread().getName();
     if (!currThreadName.contains(logPrefix)) {
       final String newThreadName = logPrefix + " " + currThreadName;
-      LOG.info("Updating thread name to {}", newThreadName);
+      LOG.debug("Updating thread name to {}", newThreadName);
       Thread.currentThread().setName(newThreadName);
     }
   }
@@ -449,7 +468,7 @@ public class SessionState {
     final String currThreadName = Thread.currentThread().getName();
     if (currThreadName.contains(logPrefix)) {
       final String[] names = currThreadName.split(logPrefix);
-      LOG.info("Resetting thread name to {}", names[names.length - 1]);
+      LOG.debug("Resetting thread name to {}", names[names.length - 1]);
       Thread.currentThread().setName(names[names.length - 1].trim());
     }
   }
@@ -491,6 +510,7 @@ public class SessionState {
    * it's not coupled to the executing thread.  Since tests run against Derby which often wedges
    * under concurrent access, tests must use a single thead and simulate concurrent access.
    * For example, {@code TestDbTxnManager2}
+   * @return previous {@link HiveTxnManager} or null
    */
   @VisibleForTesting
   public HiveTxnManager setTxnMgr(HiveTxnManager mgr) {
@@ -656,9 +676,23 @@ public class SessionState {
       return;
     }
 
+    if (HiveConf.getBoolVar(startSs.getConf(), ConfVars.HIVE_SERVER2_TEZ_USE_EXTERNAL_SESSIONS)) {
+      try {
+        externalSessions = ExternalSessionsRegistry.getClient(startSs.getConf());
+      } catch (MetaException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      externalSessions = null;
+    }
+
     try {
       if (startSs.tezSessionState == null) {
-        startSs.setTezSession(new TezSessionState(startSs.getSessionId(), startSs.sessionConf));
+        if (externalSessions != null) {
+          startSs.setTezSession(new TezExternalSessionState(startSs.getSessionId(), startSs.sessionConf, externalSessions));
+        } else {
+          startSs.setTezSession(new TezSessionState(startSs.getSessionId(), startSs.sessionConf));
+        }
       } else {
         // Only TezTask sets this, and then removes when done, so we don't expect to see it.
         LOG.warn("Tez session was already present in SessionState before start: "
@@ -892,7 +926,7 @@ public class SessionState {
   /**
    * Setup authentication and authorization plugins for this session.
    */
-  private void setupAuth() {
+  private synchronized void setupAuth() {
 
     if (authenticator != null) {
       // auth has been initialized
@@ -944,10 +978,10 @@ public class SessionState {
     if (sessionConf.get(CONFIG_AUTHZ_SETTINGS_APPLIED_MARKER, "").equals(Boolean.TRUE.toString())) {
       return;
     }
-    String metastoreHook = sessionConf.get(ConfVars.METASTORE_FILTER_HOOK.name());
+    String metastoreHook = sessionConf.getVar(ConfVars.METASTORE_FILTER_HOOK);
     if (!ConfVars.METASTORE_FILTER_HOOK.getDefaultValue().equals(metastoreHook) &&
         !AuthorizationMetaStoreFilterHook.class.getName().equals(metastoreHook)) {
-      LOG.warn(ConfVars.METASTORE_FILTER_HOOK.name() +
+      LOG.warn(ConfVars.METASTORE_FILTER_HOOK.varname +
           " will be ignored, since hive.security.authorization.manager" +
           " is set to instance of HiveAuthorizerFactory.");
     }
@@ -1311,17 +1345,17 @@ public class SessionState {
     if (ArrayUtils.isEmpty(jarPaths)) {
       return;
     }
-
-    URLClassLoader currentCLoader =
-        (URLClassLoader) SessionState.get().getConf().getClassLoader();
-    currentCLoader =
-        (URLClassLoader) Utilities.addToClassPath(currentCLoader, jarPaths);
+    AddToClassPathAction addAction = new AddToClassPathAction(
+        SessionState.get().getConf().getClassLoader(), Arrays.asList(jarPaths)
+        );
+    final ClassLoader currentCLoader = AccessController.doPrivileged(addAction);
     sessionConf.setClassLoader(currentCLoader);
     Thread.currentThread().setContextClassLoader(currentCLoader);
   }
 
   /**
    * Reload the jars under the path specified in hive.reloadable.aux.jars.path property.
+   *
    * @throws IOException
    */
   public void loadReloadableAuxJars() throws IOException {
@@ -1336,7 +1370,7 @@ public class SessionState {
     Set<String> jarPaths = FileUtils.getJarFilesByPath(renewableJarPath, sessionConf);
 
     // load jars under the hive.reloadable.aux.jars.path
-    if(!jarPaths.isEmpty()){
+    if (!jarPaths.isEmpty()) {
       reloadedAuxJars.addAll(jarPaths);
     }
 
@@ -1346,11 +1380,9 @@ public class SessionState {
     }
 
     if (reloadedAuxJars != null && !reloadedAuxJars.isEmpty()) {
-      URLClassLoader currentCLoader =
-          (URLClassLoader) SessionState.get().getConf().getClassLoader();
-      currentCLoader =
-          (URLClassLoader) Utilities.addToClassPath(currentCLoader,
-              reloadedAuxJars.toArray(new String[0]));
+      AddToClassPathAction addAction = new AddToClassPathAction(
+          SessionState.get().getConf().getClassLoader(), reloadedAuxJars);
+      final ClassLoader currentCLoader = AccessController.doPrivileged(addAction);
       sessionConf.setClassLoader(currentCLoader);
       Thread.currentThread().setContextClassLoader(currentCLoader);
     }
@@ -1361,8 +1393,9 @@ public class SessionState {
   static void registerJars(List<String> newJars) throws IllegalArgumentException {
     LogHelper console = getConsole();
     try {
-      ClassLoader loader = Thread.currentThread().getContextClassLoader();
-      ClassLoader newLoader = Utilities.addToClassPath(loader, newJars.toArray(new String[0]));
+      AddToClassPathAction addAction = new AddToClassPathAction(
+          Thread.currentThread().getContextClassLoader(), newJars);
+      final ClassLoader newLoader = AccessController.doPrivileged(addAction);
       Thread.currentThread().setContextClassLoader(newLoader);
       SessionState.get().getConf().setClassLoader(newLoader);
       console.printInfo("Added " + newJars + " to class path");
@@ -1733,6 +1766,17 @@ public class SessionState {
     this.currentDatabase = currentDatabase;
   }
 
+  public String getCurrentCatalog() {
+    if (currentCatalog == null) {
+      currentCatalog = MetaStoreUtils.getDefaultCatalog(getConf());
+    }
+    return currentCatalog;
+  }
+
+  public void setCurrentCatalog(String currentCatalog) {
+    this.currentCatalog = currentCatalog;
+  }
+
   public void close() throws IOException {
     for (Closeable cleanupItem : cleanupItems) {
       try {
@@ -1860,23 +1904,23 @@ public class SessionState {
     }
   }
 
-  public TezSessionState getTezSession() {
+  public TezSession getTezSession() {
     return tezSessionState;
   }
 
   /** Called from TezTask to attach a TezSession to use to the threadlocal. Ugly pattern... */
-  public void setTezSession(TezSessionState session) {
+  public void setTezSession(TezSession session) {
     if (tezSessionState == session) {
       return; // The same object.
     }
     if (tezSessionState != null) {
-      tezSessionState.markFree();
+      tezSessionState.unsetOwnerThread();
       tezSessionState.setKillQuery(null);
       tezSessionState = null;
     }
     tezSessionState = session;
     if (session != null) {
-      session.markInUse();
+      session.setOwnerThread();
       tezSessionState.setKillQuery(getKillQuery());
     }
   }
@@ -1896,7 +1940,7 @@ public class SessionState {
   public Map<String, Map<String, Table>> getTempTables() {
     return tempTables;
   }
-  public Map<String, SessionHiveMetaStoreClient.TempTable> getTempPartitions() {
+  public Map<String, TempTable> getTempPartitions() {
     return tempPartitions;
   }
 
@@ -2047,6 +2091,17 @@ public class SessionState {
     return currentFunctionsInUse;
   }
 
+  public void setWaitingTezSession() {
+    this.waitingTezSession = System.currentTimeMillis();
+  }
+
+  public void resetWaitingTezSession() {
+    this.waitingTezSession = 0;
+  }
+
+  public long getWaitingTezSession() {
+    return this.waitingTezSession;
+  }
 }
 
 class ResourceMaps {

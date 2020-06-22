@@ -26,6 +26,13 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT *
+FROM (SELECT `key`, `value`
+FROM `default`.`src`
+WHERE `key` < 20 AND `key` > 15) AS `t0`
+INNER JOIN (SELECT `key`, `value`
+FROM `default`.`srcpart`
+WHERE `key` > 15 AND `key` < 20 AND `ds` = '2008-04-08') AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -36,6 +43,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: ((UDFToDouble(key) < 20.0D) and (UDFToDouble(key) > 15.0D)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
@@ -57,11 +65,12 @@ STAGE PLANS:
                   auto parallelism: false
           TableScan
             alias: b
+            filterExpr: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
             Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate: ((UDFToDouble(key) < 20.0D) and (UDFToDouble(key) > 15.0D)) (type: boolean)
+              predicate: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
               Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), value (type: string)
@@ -334,6 +343,13 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
+OPTIMIZED SQL: SELECT *
+FROM (SELECT `key`, `value`
+FROM `default`.`src`
+WHERE `key` < 20 AND `key` > 15) AS `t0`
+INNER JOIN (SELECT `key`, `value`
+FROM `default`.`srcpart`
+WHERE `key` > 15 AND `key` < 20 AND `ds` = '2008-04-08') AS `t2` ON `t0`.`key` = `t2`.`key`
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -344,6 +360,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: a
+            filterExpr: ((UDFToDouble(key) < 20.0D) and (UDFToDouble(key) > 15.0D)) (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
@@ -365,11 +382,12 @@ STAGE PLANS:
                   auto parallelism: false
           TableScan
             alias: b
+            filterExpr: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
             Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate: ((UDFToDouble(key) < 20.0D) and (UDFToDouble(key) > 15.0D)) (type: boolean)
+              predicate: ((UDFToDouble(key) > 15.0D) and (UDFToDouble(key) < 20.0D)) (type: boolean)
               Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: key (type: string), value (type: string)

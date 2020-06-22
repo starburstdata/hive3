@@ -4,6 +4,7 @@ set hive.strict.checks.bucketing=false;
 set hive.mapred.mode=nonstrict;
 set hive.explain.user=false;
 set hive.join.emit.interval=2;
+set hive.default.nulls.last=false;
 explain
 select * from src a join src1 b on a.key = b.key;
 
@@ -67,8 +68,7 @@ from tab_n11 a join tab_part_n12 b on a.key = b.key;
 select count(*)
 from tab_n11 a join tab_part_n12 b on a.key = b.key;
 
-
-set hive.auto.convert.join.noconditionaltask.size=2000;
+set hive.auto.convert.join.noconditionaltask.size=800;
 set hive.mapjoin.hybridgrace.minwbsize=125;
 set hive.mapjoin.hybridgrace.minnumpartitions=4;
 set hive.llap.memory.oversubscription.max.executors.per.query=0;
@@ -109,7 +109,7 @@ UNION  ALL
 select s2.key as key, s2.value as value from tab_n11 s2
 ) a join tab_part_n12 b on (a.key = b.key);
 
-set hive.auto.convert.join.noconditionaltask.size=10000;
+set hive.auto.convert.join.noconditionaltask.size=5000;
 
 explain
 select count(*) from

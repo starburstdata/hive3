@@ -19,24 +19,28 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src1
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: key (type: string)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: key (type: string)
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 value expressions: value (type: string)
           TableScan
             alias: src2
+            filterExpr: key is not null (type: boolean)
             Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: key is not null (type: boolean)
               Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 key expressions: key (type: string)
+                null sort order: a
                 sort order: +
                 Map-reduce partition columns: key (type: string)
                 Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
@@ -67,6 +71,7 @@ STAGE PLANS:
           TableScan
             Reduce Output Operator
               key expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string)
+              null sort order: zzzz
               sort order: ++++
               Statistics: Num rows: 550 Data size: 5843 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized

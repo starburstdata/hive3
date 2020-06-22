@@ -30,11 +30,12 @@ import org.apache.hadoop.hive.metastore.messaging.AddNotNullConstraintMessage;
 import org.apache.hadoop.hive.metastore.messaging.AddPrimaryKeyMessage;
 import org.apache.hadoop.hive.metastore.messaging.AddUniqueConstraintMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
-import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
+import org.apache.hadoop.hive.metastore.messaging.json.JSONMessageEncoder;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.ConstraintEvent;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.util.Context;
+import org.apache.hadoop.hive.ql.exec.repl.util.TaskTracker;
 import org.apache.hadoop.hive.ql.parse.EximUtil;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.parse.repl.DumpType;
@@ -62,7 +63,7 @@ public class LoadConstraint {
   private final ConstraintEvent event;
   private final String dbNameToLoadIn;
   private final TaskTracker tracker;
-  private final MessageDeserializer deserializer = MessageFactory.getInstance().getDeserializer();
+  private final MessageDeserializer deserializer = JSONMessageEncoder.getInstance().getDeserializer();
 
   public LoadConstraint(Context context, ConstraintEvent event, String dbNameToLoadIn,
       TaskTracker existingTracker) {
@@ -93,7 +94,7 @@ public class LoadConstraint {
         pkDumpMetaData.setPayload(pksString);
         tasks.addAll(pkHandler.handle(
             new MessageHandler.Context(
-                dbNameToLoadIn, null, fromPath.toString(), null, pkDumpMetaData, context.hiveConf,
+                dbNameToLoadIn, fromPath.toString(), null, pkDumpMetaData, context.hiveConf,
                 context.hiveDb, context.nestedContext, LOG)));
       }
 
@@ -104,7 +105,7 @@ public class LoadConstraint {
         ukDumpMetaData.setPayload(uksString);
         tasks.addAll(ukHandler.handle(
             new MessageHandler.Context(
-                dbNameToLoadIn, null, fromPath.toString(), null, ukDumpMetaData, context.hiveConf,
+                dbNameToLoadIn, fromPath.toString(), null, ukDumpMetaData, context.hiveConf,
                 context.hiveDb, context.nestedContext, LOG)));
       }
 
@@ -115,7 +116,7 @@ public class LoadConstraint {
         nnDumpMetaData.setPayload(nnsString);
         tasks.addAll(nnHandler.handle(
             new MessageHandler.Context(
-                dbNameToLoadIn, null, fromPath.toString(), null, nnDumpMetaData, context.hiveConf,
+                dbNameToLoadIn, fromPath.toString(), null, nnDumpMetaData, context.hiveConf,
                 context.hiveDb, context.nestedContext, LOG)));
       }
 
@@ -126,7 +127,7 @@ public class LoadConstraint {
         fkDumpMetaData.setPayload(fksString);
         tasks.addAll(fkHandler.handle(
             new MessageHandler.Context(
-                dbNameToLoadIn, null, fromPath.toString(), null, fkDumpMetaData, context.hiveConf,
+                dbNameToLoadIn, fromPath.toString(), null, fkDumpMetaData, context.hiveConf,
                 context.hiveDb, context.nestedContext, LOG)));
       }
 

@@ -89,15 +89,15 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: i (type: int), s (type: string), b (type: bigint)
+                    null sort order: azz
                     sort order: +++
                     Map-reduce partition columns: i (type: int)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [2, 7, 3]
+                        keyColumns: 2:int, 7:string, 3:bigint
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [2]
-                        valueColumnNums: []
+                        partitionColumns: 2:int
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: no inputs
@@ -117,16 +117,28 @@ STAGE PLANS:
                     partitionColumnCount: 0
                     scratchColumnTypeNames: []
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: PTF operator: sum UNBOUNDED end frame is not supported for ROWS window type
-                vectorized: false
+                reduceColumnNullOrder: azz
+                reduceColumnSortOrder: +++
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+                rowBatchContext:
+                    dataColumnCount: 3
+                    dataColumns: KEY.reducesinkkey0:int, KEY.reducesinkkey1:string, KEY.reducesinkkey2:bigint
+                    partitionColumnCount: 0
+                    scratchColumnTypeNames: [bigint]
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey2 (type: bigint), KEY.reducesinkkey1 (type: string)
                 outputColumnNames: _col2, _col3, _col7
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumnNums: [0, 2, 1]
                 Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                 PTF Operator
                   Function definitions:
@@ -137,7 +149,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col7 ASC NULLS LAST, _col3 ASC NULLS FIRST
+                        order by: _col7 ASC NULLS LAST, _col3 ASC NULLS LAST
                         partition by: _col2
                         raw input shape:
                         window functions:
@@ -147,16 +159,39 @@ STAGE PLANS:
                               name: sum
                               window function: GenericUDAFSumLong
                               window frame: ROWS PRECEDING(MAX)~CURRENT
+                  PTF Vectorization:
+                      className: VectorPTFOperator
+                      evaluatorClasses: [VectorPTFEvaluatorStreamingLongSum]
+                      functionInputExpressions: [col 2:bigint]
+                      functionNames: [sum]
+                      keyInputColumns: [0, 2, 1]
+                      native: true
+                      nonKeyInputColumns: []
+                      orderExpressions: [col 1:string, col 2:bigint]
+                      outputColumns: [3, 0, 2, 1]
+                      outputTypes: [bigint, int, bigint, string]
+                      partitionExpressions: [col 0:int]
+                      streamingColumns: [3]
                   Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                   Select Operator
                     expressions: _col2 (type: int), _col7 (type: string), _col3 (type: bigint), sum_window_0 (type: bigint)
                     outputColumnNames: _col0, _col1, _col2, _col3
+                    Select Vectorization:
+                        className: VectorSelectOperator
+                        native: true
+                        projectedOutputColumnNums: [0, 1, 2, 3]
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     Limit
                       Number of rows: 10
+                      Limit Vectorization:
+                          className: VectorLimitOperator
+                          native: true
                       Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                       File Output Operator
                         compressed: false
+                        File Sink Vectorization:
+                            className: VectorFileSinkOperator
+                            native: false
                         Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                         table:
                             input format: org.apache.hadoop.mapred.SequenceFileInputFormat
@@ -225,15 +260,15 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: d (type: double), s (type: string), f (type: float)
+                    null sort order: aza
                     sort order: ++-
                     Map-reduce partition columns: d (type: double)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [5, 7, 4]
+                        keyColumns: 5:double, 7:string, 4:float
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [5]
-                        valueColumnNums: []
+                        partitionColumns: 5:double
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: no inputs
@@ -253,16 +288,28 @@ STAGE PLANS:
                     partitionColumnCount: 0
                     scratchColumnTypeNames: []
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: PTF operator: sum UNBOUNDED end frame is not supported for ROWS window type
-                vectorized: false
+                reduceColumnNullOrder: aza
+                reduceColumnSortOrder: ++-
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+                rowBatchContext:
+                    dataColumnCount: 3
+                    dataColumns: KEY.reducesinkkey0:double, KEY.reducesinkkey1:string, KEY.reducesinkkey2:float
+                    partitionColumnCount: 0
+                    scratchColumnTypeNames: [double]
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey2 (type: float), KEY.reducesinkkey0 (type: double), KEY.reducesinkkey1 (type: string)
                 outputColumnNames: _col4, _col5, _col7
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumnNums: [2, 0, 1]
                 Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                 PTF Operator
                   Function definitions:
@@ -273,7 +320,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col7 ASC NULLS FIRST, _col4 DESC NULLS FIRST
+                        order by: _col7 ASC NULLS LAST, _col4 DESC NULLS FIRST
                         partition by: _col5
                         raw input shape:
                         window functions:
@@ -283,16 +330,39 @@ STAGE PLANS:
                               name: sum
                               window function: GenericUDAFSumDouble
                               window frame: ROWS PRECEDING(MAX)~CURRENT
+                  PTF Vectorization:
+                      className: VectorPTFOperator
+                      evaluatorClasses: [VectorPTFEvaluatorStreamingDoubleSum]
+                      functionInputExpressions: [col 2:float]
+                      functionNames: [sum]
+                      keyInputColumns: [2, 0, 1]
+                      native: true
+                      nonKeyInputColumns: []
+                      orderExpressions: [col 1:string, col 2:float]
+                      outputColumns: [3, 2, 0, 1]
+                      outputTypes: [double, float, double, string]
+                      partitionExpressions: [col 0:double]
+                      streamingColumns: [3]
                   Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                   Select Operator
                     expressions: _col5 (type: double), _col7 (type: string), _col4 (type: float), sum_window_0 (type: double)
                     outputColumnNames: _col0, _col1, _col2, _col3
+                    Select Vectorization:
+                        className: VectorSelectOperator
+                        native: true
+                        projectedOutputColumnNums: [0, 1, 2, 3]
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     Limit
                       Number of rows: 10
+                      Limit Vectorization:
+                          className: VectorLimitOperator
+                          native: true
                       Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                       File Output Operator
                         compressed: false
+                        File Sink Vectorization:
+                            className: VectorFileSinkOperator
+                            native: false
                         Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                         table:
                             input format: org.apache.hadoop.mapred.SequenceFileInputFormat
@@ -316,13 +386,13 @@ POSTHOOK: Input: default@over10k_n21
 d	s	f	sum_window_0
 NULL	alice ichabod	NULL	NULL
 NULL	calvin miller	NULL	NULL
-0.01	NULL	NULL	NULL
-0.01	NULL	NULL	NULL
 0.01	calvin miller	8.39	8.390000343322754
-0.02	NULL	NULL	NULL
+0.01	NULL	NULL	8.390000343322754
+0.01	NULL	NULL	8.390000343322754
 0.02	holly polk	5.29	5.289999961853027
 0.02	wendy quirinius	25.5	30.789999961853027
 0.02	yuri laertes	37.59	68.38000011444092
+0.02	NULL	NULL	68.38000011444092
 0.03	nick steinbeck	79.24	79.23999786376953
 PREHOOK: query: explain vectorization detail
 select ts, s, f, sum(f) over (partition by ts order by f asc nulls first range between current row and unbounded following) from over10k_n21 limit 10
@@ -361,15 +431,16 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: ts (type: timestamp), f (type: float)
+                    null sort order: aa
                     sort order: ++
                     Map-reduce partition columns: ts (type: timestamp)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [8, 4]
+                        keyColumns: 8:timestamp, 4:float
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [8]
-                        valueColumnNums: [7]
+                        partitionColumns: 8:timestamp
+                        valueColumns: 7:string
                     Statistics: Num rows: 1 Data size: 228 Basic stats: COMPLETE Column stats: NONE
                     value expressions: s (type: string)
             Execution mode: vectorized, llap
@@ -498,15 +569,15 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: t (type: tinyint), s (type: string), d (type: double)
+                    null sort order: aza
                     sort order: ++-
                     Map-reduce partition columns: t (type: tinyint)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [0, 7, 5]
+                        keyColumns: 0:tinyint, 7:string, 5:double
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [0]
-                        valueColumnNums: []
+                        partitionColumns: 0:tinyint
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: no inputs
@@ -546,7 +617,7 @@ STAGE PLANS:
                       Windowing table definition
                         input alias: ptf_1
                         name: windowingtablefunction
-                        order by: _col7 ASC NULLS FIRST, _col5 DESC NULLS FIRST
+                        order by: _col7 ASC NULLS LAST, _col5 DESC NULLS FIRST
                         partition by: _col0
                         raw input shape:
                         window functions:
@@ -634,15 +705,16 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: ts (type: timestamp), s (type: string)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: ts (type: timestamp)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [8, 7]
+                        keyColumns: 8:timestamp, 7:string
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [8]
-                        valueColumnNums: [2]
+                        partitionColumns: 8:timestamp
+                        valueColumns: 2:int
                     Statistics: Num rows: 1 Data size: 228 Basic stats: COMPLETE Column stats: NONE
                     value expressions: i (type: int)
             Execution mode: vectorized, llap
@@ -760,7 +832,6 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@over10k_n21
 #### A masked pattern was here ####
 ts	s	sum_window_0
-2013-03-01 09:11:58.70307	calvin laertes	197097
 2013-03-01 09:11:58.70307	calvin steinbeck	262874
 2013-03-01 09:11:58.70307	david falkner	328506
 2013-03-01 09:11:58.70307	fred nixon	394118
@@ -770,6 +841,7 @@ ts	s	sum_window_0
 2013-03-01 09:11:58.70307	jessica laertes	656771
 2013-03-01 09:11:58.70307	jessica polk	722558
 2013-03-01 09:11:58.70307	katie king	788310
+2013-03-01 09:11:58.70307	katie white	853920
 PREHOOK: query: explain vectorization detail
 select s, i, round(sum(d) over (partition by s order by i desc nulls last) , 3) from over10k_n21 limit 5
 PREHOOK: type: QUERY
@@ -807,15 +879,16 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: s (type: string), i (type: int)
+                    null sort order: az
                     sort order: +-
                     Map-reduce partition columns: s (type: string)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [7, 2]
+                        keyColumns: 7:string, 2:int
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [7]
-                        valueColumnNums: [5]
+                        partitionColumns: 7:string
+                        valueColumns: 5:double
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     value expressions: d (type: double)
             Execution mode: vectorized, llap
@@ -975,15 +1048,16 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: s (type: string), i (type: int)
+                    null sort order: az
                     sort order: +-
                     Map-reduce partition columns: s (type: string)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [7, 2]
+                        keyColumns: 7:string, 2:int
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [7]
-                        valueColumnNums: [5]
+                        partitionColumns: 7:string
+                        valueColumns: 5:double
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     value expressions: d (type: double)
             Execution mode: vectorized, llap
@@ -1143,15 +1217,16 @@ STAGE PLANS:
                       vectorizationSchemaColumns: [0:t:tinyint, 1:si:smallint, 2:i:int, 3:b:bigint, 4:f:float, 5:d:double, 6:bo:boolean, 7:s:string, 8:ts:timestamp, 9:dec:decimal(10,0)/DECIMAL_64, 10:bin:binary, 11:ROW__ID:struct<writeid:bigint,bucketid:int,rowid:bigint>]
                   Reduce Output Operator
                     key expressions: s (type: string), i (type: int)
+                    null sort order: az
                     sort order: ++
                     Map-reduce partition columns: s (type: string)
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
-                        keyColumnNums: [7, 2]
+                        keyColumns: 7:string, 2:int
                         native: true
                         nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No PTF TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        partitionColumnNums: [7]
-                        valueColumnNums: [5]
+                        partitionColumns: 7:string
+                        valueColumns: 5:double
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     value expressions: d (type: double)
             Execution mode: vectorized, llap
@@ -1185,7 +1260,7 @@ STAGE PLANS:
                     dataColumnCount: 3
                     dataColumns: KEY.reducesinkkey0:string, KEY.reducesinkkey1:int, VALUE._col4:double
                     partitionColumnCount: 0
-                    scratchColumnTypeNames: [double, double, double, double]
+                    scratchColumnTypeNames: [double, double, double, double, double]
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey1 (type: int), VALUE._col4 (type: double), KEY.reducesinkkey0 (type: string)
@@ -1234,8 +1309,8 @@ STAGE PLANS:
                     Select Vectorization:
                         className: VectorSelectOperator
                         native: true
-                        projectedOutputColumnNums: [0, 1, 4]
-                        selectExpressions: RoundWithNumDigitsDoubleToDouble(col 6, decimalPlaces 3)(children: DoubleColSubtractDoubleColumn(col 4:double, col 5:double)(children: DoubleColAddDoubleScalar(col 3:double, val 10.0) -> 4:double, DoubleColSubtractDoubleScalar(col 3:double, val 10.0) -> 5:double) -> 6:double) -> 4:double
+                        projectedOutputColumnNums: [0, 1, 7]
+                        selectExpressions: RoundWithNumDigitsDoubleToDouble(col 6, decimalPlaces 3)(children: DoubleColSubtractDoubleColumn(col 4:double, col 5:double)(children: DoubleColAddDoubleScalar(col 3:double, val 10.0) -> 4:double, DoubleColSubtractDoubleScalar(col 3:double, val 10.0) -> 5:double) -> 6:double) -> 7:double
                     Statistics: Num rows: 1 Data size: 196 Basic stats: COMPLETE Column stats: NONE
                     Limit
                       Number of rows: 5

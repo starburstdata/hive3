@@ -80,6 +80,7 @@ STAGE PLANS:
         $hdt$_1:tbl2_n2 
           TableScan
             alias: tbl2_n2
+            filterExpr: c2 is not null (type: boolean)
             Statistics: Num rows: 2 Data size: 23 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c2 is not null (type: boolean)
@@ -98,6 +99,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: tbl1_n3
+            filterExpr: c1 is not null (type: boolean)
             Statistics: Num rows: 2 Data size: 26 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
               predicate: c1 is not null (type: boolean)
@@ -116,6 +118,7 @@ STAGE PLANS:
                   Statistics: Num rows: 2 Data size: 28 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
                     key expressions: _col0 (type: varchar(10)), _col1 (type: varchar(30))
+                    null sort order: zz
                     sort order: ++
                     Statistics: Num rows: 2 Data size: 28 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized

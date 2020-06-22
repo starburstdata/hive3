@@ -133,9 +133,17 @@ public class LimitPushdownOptimizer extends Transform {
         }
       }
       if (rs != null) {
-        if (OperatorUtils.findOperators(rs, GroupByOperator.class).size() > 1){
-          // Not safe to continue for RS-GBY-GBY-LIM kind of pipelines. See HIVE-10607 for more.
-          return false;
+        Operator<?> currentOp = rs;
+        boolean foundGroupByOperator = false;
+        while (currentOp != nd) { // nd = limitOp
+          if (currentOp instanceof GroupByOperator) {
+            if (foundGroupByOperator) {
+              // Not safe to continue for RS-GBY-GBY-LIM kind of pipelines. See HIVE-10607 for more.
+              return false;
+            }
+            foundGroupByOperator = true;
+          }
+          currentOp = currentOp.getChildOperators().get(0);
         }
         LimitOperator limit = (LimitOperator) nd;
         LimitDesc limitDesc = limit.getConf();
@@ -160,6 +168,10 @@ public class LimitPushdownOptimizer extends Transform {
         // No limit, nothing to propagate, we just bail out
         return false;
       }
+      if (cRS.getConf().isPTFReduceSink()) {
+        // Limit per partition key not supported yet
+        return false;
+      }
       ReduceSinkOperator pRS = null;
       for (int i = stack.size() - 2 ; i >= 0; i--) {
         Operator<?> operator = (Operator<?>) stack.get(i);
@@ -175,9 +187,17 @@ public class LimitPushdownOptimizer extends Transform {
         }
       }
       if (pRS != null) {
-        if (OperatorUtils.findOperators(pRS, GroupByOperator.class).size() > 1){
-          // Not safe to continue for RS-GBY-GBY-LIM kind of pipelines. See HIVE-10607 for more.
-          return false;
+        Operator<?> currentOp = pRS;
+        boolean foundGroupByOperator = false;
+        while (currentOp != nd) { // nd = cRS
+          if (currentOp instanceof GroupByOperator) {
+            if (foundGroupByOperator) {
+              // Not safe to continue for RS-GBY-GBY-LIM kind of pipelines. See HIVE-10607 for more.
+              return false;
+            }
+            foundGroupByOperator = true;
+          }
+          currentOp = currentOp.getChildOperators().get(0);
         }
         List<ExprNodeDesc> cKeys = cRS.getConf().getKeyCols();
         List<ExprNodeDesc> pKeys = pRS.getConf().getKeyCols();

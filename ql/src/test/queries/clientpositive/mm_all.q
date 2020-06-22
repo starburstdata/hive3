@@ -2,7 +2,9 @@
 --! qt:dataset:src
 
 -- MASK_LINEAGE
+-- SORT_QUERY_RESULTS
 
+set hive.metastore.dml.events=true;
 set hive.mapred.mode=nonstrict;
 set hive.explain.user=false;
 set hive.fetch.task.conversion=none;
