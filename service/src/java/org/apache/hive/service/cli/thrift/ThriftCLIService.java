@@ -20,6 +20,7 @@ package org.apache.hive.service.cli.thrift;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.rpc.thrift.TSetClientInfoReq;
 import org.apache.hive.service.rpc.thrift.TSetClientInfoResp;
 
@@ -426,7 +427,11 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       userName = req.getUsername();
     }
 
-    userName = getShortName(userName);
+    if (cliService.getHiveConf().getBoolVar(ConfVars.HIVE_AUTHORIZATION_KERBEROS_USE_SHORTNAME))
+    {
+      userName = getShortName(userName);
+    }
+
     String effectiveClientUser = getProxyUser(userName, req.getConfiguration(), getIpAddress());
     LOG.debug("Client's username: " + effectiveClientUser);
     return effectiveClientUser;
@@ -689,13 +694,20 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     try {
       OperationStatus operationStatus =
           cliService.getOperationStatus(operationHandle, req.isGetProgressUpdate());
+
+      if (operationStatus.getState().equals(OperationState.FINISHED)) {
+        long numModifiedRows = operationStatus.getNumModifiedRows();
+        resp.setNumModifiedRows(numModifiedRows);
+      }
       resp.setOperationState(operationStatus.getState().toTOperationState());
       resp.setErrorMessage(operationStatus.getState().getErrorMessage());
       HiveSQLException opException = operationStatus.getOperationException();
       resp.setTaskStatus(operationStatus.getTaskStatus());
       resp.setOperationStarted(operationStatus.getOperationStarted());
       resp.setOperationCompleted(operationStatus.getOperationCompleted());
-      resp.setHasResultSet(operationStatus.getHasResultSet());
+      if (operationStatus.isHasResultSetIsSet()) {
+        resp.setHasResultSet(operationStatus.getHasResultSet());
+      }
       JobProgressUpdate progressUpdate = operationStatus.jobProgressUpdate();
       ProgressMonitorStatusMapper mapper = ProgressMonitorStatusMapper.DEFAULT;
       if ("tez".equals(hiveConf.getVar(ConfVars.HIVE_EXECUTION_ENGINE))) {
@@ -839,6 +851,9 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       return new TGetQueryIdResp(cliService.getQueryId(req.getOperationHandle()));
     } catch (HiveSQLException e) {
       throw new TException(e);
+    } catch (Exception e) {
+      // If concurrently the query is closed before we fetch queryID.
+      return new TGetQueryIdResp("");
     }
   }
 

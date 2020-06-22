@@ -134,16 +134,6 @@ public class HiveSessionImpl implements HiveSession {
     this.forwardedAddresses = forwardedAddresses;
     this.operationLock = serverConf.getBoolVar(
         ConfVars.HIVE_SERVER2_PARALLEL_OPS_IN_SESSION) ? null : new Semaphore(1);
-    try {
-      // In non-impersonation mode, map scheduler queue to current user
-      // if fair scheduler is configured.
-      if (! sessionConf.getBoolVar(ConfVars.HIVE_SERVER2_ENABLE_DOAS) &&
-        sessionConf.getBoolVar(ConfVars.HIVE_SERVER2_MAP_FAIR_SCHEDULER_QUEUE)) {
-        ShimLoader.getHadoopShims().refreshDefaultQueue(sessionConf, username);
-      }
-    } catch (IOException e) {
-      LOG.warn("Error setting scheduler queue: " + e, e);
-    }
     // Set an explicit session name to control the download directory name
     sessionConf.set(ConfVars.HIVESESSIONID.varname,
         this.sessionHandle.getHandleIdentifier().toString());
@@ -185,11 +175,10 @@ public class HiveSessionImpl implements HiveSession {
       LOG.error(msg, e);
       throw new HiveSQLException(msg, e);
     }
-    try {
-      sessionHive = Hive.get(getHiveConf());
-    } catch (HiveException e) {
-      throw new HiveSQLException("Failed to get metastore connection", e);
-    }
+
+    // Set sessionHive object created based on sessionConf.
+    setSessionHive();
+
     // Process global init file: .hiverc
     processGlobalInitFile();
     // Set fetch size in session conf map
@@ -235,6 +224,28 @@ public class HiveSessionImpl implements HiveSession {
       }
       return rc;
     }
+  }
+
+  /**
+   * Sets sessionHive object created based on sessionConf.
+   * @throws HiveSQLException
+   */
+  private void setSessionHive() throws HiveSQLException {
+    Hive newSessionHive;
+    try {
+      newSessionHive = Hive.get(getHiveConf());
+
+      // HMS connections from sessionHive shouldn't be closed by any query execution thread when it
+      // recreates the Hive object. It is allowed to be closed only when session is closed/released.
+      newSessionHive.setAllowClose(false);
+    } catch (HiveException e) {
+      throw new HiveSQLException("Failed to get metastore connection", e);
+    }
+
+    // The previous sessionHive object might still be referred by any async query execution thread.
+    // So, it shouldn't be closed here explicitly. Anyways, Hive object will auto-close HMS connection
+    // when it is garbage collected. So, it is safe to just overwrite sessionHive here.
+    sessionHive = newSessionHive;
   }
 
   private void processGlobalInitFile() {
@@ -402,7 +413,20 @@ public class HiveSessionImpl implements HiveSession {
     }
     // set the thread name with the logging prefix.
     sessionState.updateThreadName();
-    Hive.set(sessionHive);
+
+    // If the thread local Hive is different from sessionHive, it means, the previous query execution in
+    // master thread has re-created Hive object due to changes in MS related configurations in sessionConf.
+    // So, it is necessary to reset sessionHive object based on new sessionConf. Here, we cannot,
+    // directly set sessionHive with thread local Hive because if the previous command was REPL LOAD, then
+    // the config changes lives only within command execution not in session level.
+    // So, the safer option is to invoke Hive.get() which decides if to reuse Thread local Hive or re-create it.
+    if (Hive.getThreadLocal() != sessionHive) {
+      try {
+        setSessionHive();
+      } catch (HiveSQLException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   /**
@@ -748,7 +772,11 @@ public class HiveSessionImpl implements HiveSession {
         opHandleSet.clear();
       }
       for (OperationHandle opHandle : ops) {
-        operationManager.closeOperation(opHandle);
+        try {
+          operationManager.closeOperation(opHandle);
+        } catch (RuntimeException e) {
+          LOG.warn("Unable to close operation during session close:" + e.getMessage());
+        }
       }
       // Cleanup session log directory.
       cleanupSessionLogDir();
@@ -776,11 +804,19 @@ public class HiveSessionImpl implements HiveSession {
       }
       if (sessionHive != null) {
         try {
-          Hive.closeCurrent();
+          sessionHive.close(true);
         } catch (Throwable t) {
           LOG.warn("Error closing sessionHive", t);
         }
         sessionHive = null;
+      }
+      try {
+        // The thread local Hive in master thread can be different from sessionHive if any query
+        // execution from master thread resets it to new Hive object due to changes in sessionConf.
+        // So, need to close it as well. If it is same as sessionHive, then it is just no-op.
+        Hive.closeCurrent();
+      } catch (Throwable t) {
+        LOG.warn("Error closing thread local Hive", t);
       }
       release(true, false);
     }
@@ -871,6 +907,11 @@ public class HiveSessionImpl implements HiveSession {
     } finally {
       release(true, false);
     }
+  }
+
+  @Override
+  public void updateQueryTag(String queryId, String queryTag) throws HiveSQLException {
+    sessionManager.getOperationManager().updateQueryTag(queryId, queryTag);
   }
 
   @Override

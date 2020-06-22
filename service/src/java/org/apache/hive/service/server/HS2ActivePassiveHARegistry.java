@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.curator.framework.recipes.cache.PathChildrenCache;
+import org.apache.curator.framework.recipes.cache.TreeCache;
 import org.apache.curator.framework.recipes.leader.LeaderLatch;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.apache.curator.utils.CloseableUtils;
@@ -40,9 +40,9 @@ import org.apache.hadoop.hive.registry.ServiceInstanceSet;
 import org.apache.hadoop.hive.registry.ServiceInstanceStateChangeListener;
 import org.apache.hadoop.hive.registry.impl.ZkRegistryBase;
 import org.apache.hadoop.registry.client.binding.RegistryTypeUtils;
-import org.apache.hadoop.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.registry.client.types.Endpoint;
 import org.apache.hadoop.registry.client.types.ServiceRecord;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hive.service.ServiceException;
 import org.slf4j.Logger;
@@ -90,7 +90,8 @@ public class HS2ActivePassiveHARegistry extends ZkRegistryBase<HiveServer2Instan
     final String krbPrincipal, final String krbKeytab, final String saslContextName, final Configuration conf,
     final boolean isClient) {
     super(instanceName, conf, null, zkNamespacePrefix, null, INSTANCE_PREFIX, INSTANCE_GROUP,
-      saslContextName, krbPrincipal, krbKeytab, null);
+          saslContextName, krbPrincipal, krbKeytab, null, null
+    );
     this.isClient = isClient;
     if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_IN_TEST) &&
       conf.get(ZkRegistryBase.UNIQUE_IDENTIFIER) != null) {
@@ -140,9 +141,14 @@ public class HS2ActivePassiveHARegistry extends ZkRegistryBase<HiveServer2Instan
     unregisterInternal();
   }
 
+  @Override
+  public void updateRegistration(Iterable<Map.Entry<String, String>> attributes) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
   private void populateCache() throws IOException {
-    PathChildrenCache pcc = ensureInstancesCache(0);
-    populateCache(pcc, false);
+    TreeCache treeCache = ensureInstancesCache(0);
+    populateCache(treeCache, false);
   }
 
   @Override
@@ -201,7 +207,7 @@ public class HS2ActivePassiveHARegistry extends ZkRegistryBase<HiveServer2Instan
 
   @Override
   protected String getZkPathUser(final Configuration conf) {
-    return RegistryUtils.currentUser();
+    return currentUser();
   }
 
   private boolean hasLeadership() {

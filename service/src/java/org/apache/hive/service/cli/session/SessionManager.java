@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.function.Supplier;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.LongAdder;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hive.common.metrics.common.Metrics;
 import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hive.common.metrics.common.MetricsVariable;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.hooks.HookUtils;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.SessionHandle;
@@ -63,9 +66,20 @@ import org.slf4j.LoggerFactory;
  */
 public class SessionManager extends CompositeService {
 
+  private static final String INACTIVE_ERROR_MESSAGE =
+          "Cannot open sessions on an inactive HS2 instance, " +
+                  "or the HS2 server leader is not ready; please use service discovery to " +
+                  "connect the server leader again";
+  private static final String FAIL_CLOSE_ERROR_MESSAGE="Cannot close the session opened " +
+          "during the HA state change time";
   public static final String HIVERCFILE = ".hiverc";
   private static final Logger LOG = LoggerFactory.getLogger(CompositeService.class);
   private HiveConf hiveConf;
+  /** The lock that synchronizes the allowSessions flag and handleToSession map.
+      Active-passive HA first disables the connections, then closes existing one, making sure
+      there are no races between these two processes. */
+  private final Object sessionAddLock = new Object();
+  private boolean allowSessions;
   private final Map<SessionHandle, HiveSession> handleToSession =
       new ConcurrentHashMap<SessionHandle, HiveSession>();
   private final Map<String, LongAdder> connectionsCount = new ConcurrentHashMap<>();
@@ -80,6 +94,7 @@ public class SessionManager extends CompositeService {
   private long checkInterval;
   private long sessionTimeout;
   private boolean checkOperation;
+  private TezSessionMetricsHelper tezSessionMetricsHelper = new TezSessionMetricsHelper();
 
   private volatile boolean shutdown;
   // The HiveServer2 instance running this service
@@ -87,9 +102,10 @@ public class SessionManager extends CompositeService {
   private String sessionImplWithUGIclassName;
   private String sessionImplclassName;
 
-  public SessionManager(HiveServer2 hiveServer2) {
+  public SessionManager(HiveServer2 hiveServer2, boolean allowSessions) {
     super(SessionManager.class.getSimpleName());
     this.hiveServer2 = hiveServer2;
+    this.allowSessions = allowSessions;
   }
 
   @Override
@@ -106,6 +122,7 @@ public class SessionManager extends CompositeService {
     if(metrics != null){
       registerOpenSesssionMetrics(metrics);
       registerActiveSesssionMetrics(metrics);
+      registerTezSessionMetrics(metrics);
     }
 
     userLimit = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_LIMIT_CONNECTIONS_PER_USER);
@@ -168,6 +185,36 @@ public class SessionManager extends CompositeService {
     };
     metrics.addGauge(MetricsConstant.HS2_ACTIVE_SESSIONS, activeSessionCnt);
     metrics.addRatio(MetricsConstant.HS2_AVG_ACTIVE_SESSION_TIME, activeSessionTime, activeSessionCnt);
+  }
+
+  private static final Integer[] PERCENTILE_SET = {
+      50, 60, 70, 80, 90, 95, 96, 97, 98, 99
+  };
+
+  private void registerTezSessionMetrics(Metrics metrics) {
+    // How many queries are queued waiting for to receive a Tez session.
+    MetricsVariable<Integer> waitingTezSessionCnt = new MetricsVariable<Integer>() {
+      @Override
+      public Integer getValue() {
+        tezSessionMetricsHelper.checkRefresh(() -> getSessions());
+        return tezSessionMetricsHelper.getWaitingTezSessionCount();
+      }
+    };
+
+    // Set up percentile metrics for how long the queries have been waiting for a Tez session.
+    for (Integer percentileVal : PERCENTILE_SET) {
+      String percentileMetricName = "waiting_tez_session_time_pctile_" + percentileVal.toString();
+      MetricsVariable<Double> percentileMetric = new MetricsVariable<Double>() {
+        @Override
+        public Double getValue() {
+          tezSessionMetricsHelper.checkRefresh(() -> getSessions());
+          return tezSessionMetricsHelper.getPercentile(percentileVal);
+        }
+      };
+      metrics.addGauge(percentileMetricName, percentileMetric);
+    }
+
+    metrics.addGauge(MetricsConstant.WAITING_TEZ_SESSION, waitingTezSessionCnt);
   }
 
   private void initSessionImplClassName() {
@@ -373,10 +420,18 @@ public class SessionManager extends CompositeService {
     return createSession(null, protocol, username, password, ipAddress, sessionConf,
       withImpersonation, delegationToken).getSessionHandle();
   }
+
   public HiveSession createSession(SessionHandle sessionHandle, TProtocolVersion protocol, String username,
     String password, String ipAddress, Map<String, String> sessionConf, boolean withImpersonation,
     String delegationToken)
     throws HiveSQLException {
+    // Check the flag opportunistically.
+    synchronized (sessionAddLock) {
+      if (!allowSessions) {
+        throw new HiveSQLException(INACTIVE_ERROR_MESSAGE);
+      }
+    }
+    // Do the expensive operations outside of any locks; we'll recheck the flag again at the end.
 
     // if client proxies connection, use forwarded ip-addresses instead of just the gateway
     final List<String> forwardedAddresses = getForwardedAddresses();
@@ -448,8 +503,23 @@ public class SessionManager extends CompositeService {
       session = null;
       throw new HiveSQLException("Failed to execute session hooks: " + e.getMessage(), e);
     }
-    handleToSession.put(session.getSessionHandle(), session);
-    LOG.info("Session opened, " + session.getSessionHandle() + ", current sessions:" + getOpenSessionCount());
+    boolean isAdded = false;
+    synchronized (sessionAddLock) {
+      if (allowSessions) {
+        handleToSession.put(session.getSessionHandle(), session);
+        isAdded = true;
+      }
+    }
+    if (!isAdded) {
+      try {
+        closeSessionInternal(session);
+      } catch (Exception e) {
+        LOG.warn("Failed to close the session opened during an HA state change; ignoring", e);
+      }
+      throw new HiveSQLException(FAIL_CLOSE_ERROR_MESSAGE);
+    }
+    LOG.info("Session opened, " + session.getSessionHandle()
+        + ", current sessions:" + getOpenSessionCount());
     return session;
   }
 
@@ -548,6 +618,10 @@ public class SessionManager extends CompositeService {
       throw new HiveSQLException("Session does not exist: " + sessionHandle);
     }
     LOG.info("Session closed, " + sessionHandle + ", current sessions:" + getOpenSessionCount());
+    closeSessionInternal(session);
+  }
+
+  private void closeSessionInternal(HiveSession session) throws HiveSQLException {
     try {
       session.close();
     } finally {
@@ -682,6 +756,71 @@ public class SessionManager extends CompositeService {
       return null;
     }
     return hiveServer2.getServerHost();
+  }
+
+  public void allowSessions(boolean b) {
+    synchronized (sessionAddLock) {
+      this.allowSessions = b;
+    }
+  }
+
+  private static class TezSessionMetricsHelper {
+    // Take a snaphot of the wait times for queries waiting for Tez session.
+    // and re-use when generating metrics, for up to this duration.
+    private static final long CALC_REUSE_DURATION_MSEC = 2000;
+
+    private volatile long lastRefreshTime;
+    private ArrayList<Double> vals = new ArrayList<Double>();
+
+    private boolean shouldRefresh() {
+      return (System.currentTimeMillis() - lastRefreshTime) > CALC_REUSE_DURATION_MSEC;
+    }
+
+    public void checkRefresh(Supplier<Collection<HiveSession>> sessionsFunc) {
+      if (shouldRefresh()) {
+        refresh(sessionsFunc.get());
+      }
+    }
+
+    public int getWaitingTezSessionCount() {
+      return vals.size();
+    }
+
+    public Double getPercentile(Integer percentile) {
+      return getPercentile(vals, percentile);
+    }
+
+    private static Double getPercentile(ArrayList<Double> vals, double percentile) {
+      // Assumes vals list is in sorted order.
+      int size = vals.size();
+      if (size == 0) {
+        return Double.valueOf(0);
+      }
+
+      int index = (int) ((percentile / 100.0) * (double) vals.size());
+      index = Math.min(index, vals.size() - 1);
+      return vals.get(index);
+    }
+
+    // Retrieve and sort the list of wait times for queries waiting on Tez sessions.
+    private synchronized void refresh(Collection<HiveSession> sessions) {
+      if (!shouldRefresh()) {
+        // Looks like this may have been updated since this caller was told to refresh.
+        return;
+      }
+
+      vals.clear();
+      long currentTime = System.currentTimeMillis();
+      for (HiveSession session : sessions) {
+        long waitingSince = session.getSessionState().getWaitingTezSession();
+        if (waitingSince != 0) {
+          vals.add((double) (currentTime - waitingSince));
+        }
+      }
+
+      Collections.sort(vals);
+      lastRefreshTime = System.currentTimeMillis();
+    }
   }
 }
 

@@ -21,10 +21,9 @@ package org.apache.hive.service.cli.thrift;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
 import javax.ws.rs.HttpMethod;
 
 import org.apache.hadoop.hive.common.metrics.common.Metrics;
@@ -43,6 +42,9 @@ import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 import org.apache.thrift.server.TServlet;
+import org.eclipse.jetty.io.Connection;
+import org.eclipse.jetty.io.EndPoint;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
@@ -79,7 +81,8 @@ public class ThriftHttpCLIService extends ThriftCLIService {
       ExecutorService executorService = new ThreadPoolExecutorWithOomHook(minWorkerThreads,
           maxWorkerThreads,workerKeepAliveTime, TimeUnit.SECONDS,
           new SynchronousQueue<Runnable>(), new ThreadFactoryWithGarbageCleanup(threadPoolName), oomHook);
-      ExecutorThreadPool threadPool = new ExecutorThreadPool(executorService);
+
+      ExecutorThreadPool threadPool = new ExecutorThreadPool((ThreadPoolExecutor) executorService);
 
       // HTTP Server
       server = new Server(threadPool);
@@ -94,7 +97,21 @@ public class ThriftHttpCLIService extends ThriftCLIService {
           hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_RESPONSE_HEADER_SIZE);
       conf.setRequestHeaderSize(requestHeaderSize);
       conf.setResponseHeaderSize(responseHeaderSize);
-      final HttpConnectionFactory http = new HttpConnectionFactory(conf);
+      final HttpConnectionFactory http = new HttpConnectionFactory(conf) {
+        public Connection newConnection(Connector connector, EndPoint endPoint) {
+          Connection connection = super.newConnection(connector, endPoint);
+          connection.addListener(new Connection.Listener() {
+            public void onOpened(Connection connection) {
+              openConnection();
+            }
+
+            public void onClosed(Connection connection) {
+              closeConnection();
+            }
+          });
+          return connection;
+        }
+      };
 
       boolean useSsl = hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_USE_SSL);
       String schemeName = useSsl ? "https" : "http";
@@ -109,7 +126,7 @@ public class ThriftHttpCLIService extends ThriftCLIService {
               ConfVars.HIVE_SERVER2_SSL_KEYSTORE_PATH.varname 
               + " Not configured for SSL connection");
         }
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
         String[] excludedProtocols = hiveConf.getVar(ConfVars.HIVE_SSL_PROTOCOL_BLACKLIST).split(",");
         LOG.info("HTTP Server SSL: adding excluded protocols: " + Arrays.toString(excludedProtocols));
         sslContextFactory.addExcludeProtocols(excludedProtocols);
@@ -156,33 +173,6 @@ public class ThriftHttpCLIService extends ThriftCLIService {
         LOG.warn("XSRF filter disabled");
       }
 
-      context.addEventListener(new ServletContextListener() {
-        @Override
-        public void contextInitialized(ServletContextEvent servletContextEvent) {
-          Metrics metrics = MetricsFactory.getInstance();
-          if (metrics != null) {
-            try {
-              metrics.incrementCounter(MetricsConstant.OPEN_CONNECTIONS);
-              metrics.incrementCounter(MetricsConstant.CUMULATIVE_CONNECTION_COUNT);
-            } catch (Exception e) {
-              LOG.warn("Error reporting HS2 open connection operation to Metrics system", e);
-            }
-          }
-        }
-
-        @Override
-        public void contextDestroyed(ServletContextEvent servletContextEvent) {
-          Metrics metrics = MetricsFactory.getInstance();
-          if (metrics != null) {
-            try {
-              metrics.decrementCounter(MetricsConstant.OPEN_CONNECTIONS);
-            } catch (Exception e) {
-              LOG.warn("Error reporting HS2 close connection operation to Metrics system", e);
-            }
-          }
-        }
-      });
-
       final String httpPath = getHttpPath(hiveConf.getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_HTTP_PATH));
 
       if (HiveConf.getBoolVar(hiveConf, ConfVars.HIVE_SERVER2_THRIFT_HTTP_COMPRESSION_ENABLED)) {
@@ -206,6 +196,29 @@ public class ThriftHttpCLIService extends ThriftCLIService {
       LOG.info(msg);
     } catch (Exception e) {
       throw new RuntimeException("Failed to init HttpServer", e);
+    }
+  }
+
+  private void openConnection() {
+    Metrics metrics = MetricsFactory.getInstance();
+    if (metrics != null) {
+      try {
+        metrics.incrementCounter(MetricsConstant.OPEN_CONNECTIONS);
+        metrics.incrementCounter(MetricsConstant.CUMULATIVE_CONNECTION_COUNT);
+      } catch (Exception e) {
+        LOG.warn("Error reporting HS2 open connection operation to Metrics system", e);
+      }
+    }
+  }
+
+  private void closeConnection() {
+    Metrics metrics = MetricsFactory.getInstance();
+    if (metrics != null) {
+      try {
+        metrics.decrementCounter(MetricsConstant.OPEN_CONNECTIONS);
+      } catch (Exception e) {
+        LOG.warn("Error reporting HS2 close connection operation to Metrics system", e);
+      }
     }
   }
 
