@@ -16,22 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hive.common.util;
-
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-
-public class AnnotationUtils {
-
-  // until JDK8, this had a lock around annotationClass to avoid
-  // https://bugs.openjdk.java.net/browse/JDK-7122142
-  public static <T extends Annotation> T getAnnotation(Class<?> clazz, Class<T> annotationClass) {
-    return clazz.getAnnotation(annotationClass);
-  }
-
-  // until JDK8, this had a lock around annotationClass to avoid
-  // https://bugs.openjdk.java.net/browse/JDK-7122142
-  public static <T extends Annotation> T getAnnotation(Method method, Class<T> annotationClass) {
-    return method.getAnnotation(annotationClass);
-  }
-}
+/**
+ * Deals with formatting and parsing of datetime objects.
+ */
+package org.apache.hadoop.hive.common.format.datetime;
