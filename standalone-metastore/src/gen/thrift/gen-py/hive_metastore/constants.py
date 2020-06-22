@@ -10,6 +10,11 @@ from thrift.Thrift import TType, TMessageType, TException, TApplicationException
 from ttypes import *
 
 DDL_TIME = "transient_lastDdlTime"
+HMS_API = "1.1.0"
+ACCESSTYPE_NONE = 1
+ACCESSTYPE_READONLY = 2
+ACCESSTYPE_WRITEONLY = 4
+ACCESSTYPE_READWRITE = 8
 HIVE_FILTER_FIELD_OWNER = "hive_filter_field_owner__"
 HIVE_FILTER_FIELD_PARAMS = "hive_filter_field_params__"
 HIVE_FILTER_FIELD_LAST_ACCESS = "hive_filter_field_last_access__"
@@ -34,3 +39,5 @@ TABLE_IS_TRANSACTIONAL = "transactional"
 TABLE_NO_AUTO_COMPACT = "no_auto_compaction"
 TABLE_TRANSACTIONAL_PROPERTIES = "transactional_properties"
 TABLE_BUCKETING_VERSION = "bucketing_version"
+DRUID_CONFIG_PREFIX = "druid."
+JDBC_CONFIG_PREFIX = "hive.sql."

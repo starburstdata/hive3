@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.minihms.AbstractMetaStoreService;
 import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
@@ -101,6 +102,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     Map<String, String> extraConf = new HashMap<>();
     extraConf.put("fs.trash.checkpoint.interval", "30");  // FS_TRASH_CHECKPOINT_INTERVAL_KEY
     extraConf.put("fs.trash.interval", "30");             // FS_TRASH_INTERVAL_KEY (hadoop-2)
+    extraConf.put(ConfVars.HIVE_IN_TEST.getVarname(), "true");
     startMetaStores(msConf, extraConf);
   }
 
@@ -166,12 +168,19 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
             .create(client, metaStore.getConf());
 
     // Create partitions for the partitioned table
-    for(int i=0; i < 3; i++) {
+    for(int i=0; i < 2; i++) {
       new PartitionBuilder()
               .inTable(testTables[3])
               .addValue("a" + i)
               .addToTable(client, metaStore.getConf());
     }
+    // Add an external partition too
+    new PartitionBuilder()
+        .inTable(testTables[3])
+        .addValue("a2")
+        .setLocation(metaStore.getWarehouseRoot() + "/external/a2")
+        .addToTable(client, metaStore.getConf());
+
     // Add data files to the partitioned table
     List<Partition> partitions =
         client.listPartitions(testTables[3].getDbName(), testTables[3].getTableName(), (short)-1);
@@ -213,6 +222,8 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     // Try to create a table with all of the parameters set
     Table table = getTableWithAllParametersSet();
     client.createTable(table);
+    table.unsetId();
+
     Table createdTable = client.getTable(table.getDbName(), table.getTableName());
     // The createTime will be set on the server side, so the comparison should skip it
     table.setCreateTime(createdTable.getCreateTime());
@@ -225,6 +236,10 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     // Reset the parameters, so we can compare
     table.setParameters(createdTable.getParameters());
     table.setCreationMetadata(createdTable.getCreationMetadata());
+    table.setWriteId(createdTable.getWriteId());
+
+    Assert.assertTrue(createdTable.isSetId());
+    createdTable.unsetId();
     Assert.assertEquals("create/get table data", table, createdTable);
 
     // Check that the directory is created
@@ -443,6 +458,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
   @Test(expected = AlreadyExistsException.class)
   public void testCreateTableAlreadyExists() throws Exception {
     Table table = testTables[0];
+    table.unsetId();
 
     client.createTable(table);
   }
@@ -510,6 +526,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
       // Expected exception
     }
 
+    table.unsetId();
     // Test in mixed case
     client.createTable(table);
     client.dropTable("DeFaUlt", "TeST_tAbLE");
@@ -524,12 +541,15 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
   @Test
   public void testDropTableDeleteDir() throws Exception {
     Table table = testTables[0];
+    Partition externalPartition = client.getPartition(partitionedTable.getDbName(),
+        partitionedTable.getTableName(), "test_part_col=a2");
 
     client.dropTable(table.getDbName(), table.getTableName(), true, false);
 
     Assert.assertFalse("Table path should be removed",
         metaStore.isPathExists(new Path(table.getSd().getLocation())));
 
+    table.unsetId();
     client.createTable(table);
     client.dropTable(table.getDbName(), table.getTableName(), false, false);
 
@@ -541,6 +561,9 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
 
     Assert.assertFalse("Table path should be removed",
         metaStore.isPathExists(new Path(partitionedTable.getSd().getLocation())));
+
+    Assert.assertFalse("Extra partition path should be removed",
+        metaStore.isPathExists(new Path(externalPartition.getSd().getLocation())));
   }
 
   @Test
@@ -685,6 +708,10 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     // Some of the data is set on the server side, so reset those
     newTable.setCreateTime(alteredTable.getCreateTime());
     newTable.setCreationMetadata(alteredTable.getCreationMetadata());
+    newTable.setWriteId(alteredTable.getWriteId());
+
+    Assert.assertTrue(alteredTable.isSetId());
+    alteredTable.unsetId();
     Assert.assertEquals("The table data should be the same", newTable, alteredTable);
   }
 
@@ -733,7 +760,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     Table alteredTable = client.getTable(newTable.getDbName(), newTable.getTableName());
     Assert.assertTrue("New table directory should exist",
         metaStore.isPathExists(new Path(alteredTable.getSd().getLocation())));
-    Assert.assertEquals("New directory should be set", new Path(metaStore.getWarehouseRoot()
+    Assert.assertEquals("New directory should be set", new Path(metaStore.getExternalWarehouseRoot()
         + "/" + alteredTable.getDbName() + ".db/" + alteredTable.getTableName()),
         new Path(alteredTable.getSd().getLocation()));
     Path dataFile = new Path(alteredTable.getSd().getLocation() + "/dataFile");
@@ -898,13 +925,18 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullTableNameInNew() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
     newTable.setTableName(null);
 
-    client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
+    try {
+      client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+      // Expected.
+    }
   }
 
   @Test(expected = InvalidOperationException.class)
@@ -933,20 +965,28 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
     client.alter_table(originalTable.getDbName(), originalTable.getTableName(), newTable);
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullDatabase() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
-
-    client.alter_table(null, originalTable.getTableName(), newTable);
+    try {
+      client.alter_table(null, originalTable.getTableName(), newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+    }
   }
 
-  @Test(expected = MetaException.class)
+  @Test
   public void testAlterTableNullTableName() throws Exception {
     Table originalTable = testTables[0];
     Table newTable = originalTable.deepCopy();
 
-    client.alter_table(originalTable.getDbName(), null, newTable);
+    try {
+      client.alter_table(originalTable.getDbName(), null, newTable);
+      Assert.fail("Expected exception");
+    } catch (MetaException | TProtocolException ex) {
+      // Expected.
+    }
   }
 
   @Test
@@ -959,7 +999,7 @@ public class TestTablesCreateDropAlterTruncate extends MetaStoreClientTest {
       Assert.fail("Expected a NullPointerException or TTransportException to be thrown");
     } catch (NullPointerException exception) {
       // Expected exception - Embedded MetaStore
-    } catch (TTransportException exception) {
+    } catch (TProtocolException exception) {
       // Expected exception - Remote MetaStore
     }
   }

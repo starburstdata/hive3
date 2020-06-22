@@ -18,21 +18,33 @@
 package org.apache.hadoop.hive.metastore;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.metastore.annotation.MetastoreUnitTest;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
-import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeResponse;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.LockState;
+import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
+import org.apache.hadoop.hive.metastore.api.TxnType;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.txn.TxnDbUtil;
+import org.apache.hadoop.hive.metastore.txn.TxnUtils;
+import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Rule;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.ExpectedException;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -52,6 +64,10 @@ public class TestHiveMetaStoreTxns {
 
   private final Configuration conf = MetastoreConf.newMetastoreConf();
   private IMetaStoreClient client;
+  private Connection conn;
+
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
 
   @Test
   public void testTxns() throws Exception {
@@ -84,60 +100,16 @@ public class TestHiveMetaStoreTxns {
   }
 
   @Test
-  public void testTxnRange() throws Exception {
-    ValidTxnList validTxns = client.getValidTxns();
-    Assert.assertEquals(ValidTxnList.RangeResponse.NONE,
-        validTxns.isTxnRangeValid(1L, 3L));
-    List<Long> tids = client.openTxns("me", 5).getTxn_ids();
-
-    HeartbeatTxnRangeResponse rsp = client.heartbeatTxnRange(1, 5);
-    Assert.assertEquals(0, rsp.getNosuch().size());
-    Assert.assertEquals(0, rsp.getAborted().size());
-
-    client.rollbackTxn(1L);
-    client.commitTxn(2L);
-    client.commitTxn(3L);
-    client.commitTxn(4L);
-    validTxns = client.getValidTxns();
-    System.out.println("validTxns = " + validTxns);
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(2L, 2L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(2L, 3L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(2L, 4L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(3L, 4L));
-
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(1L, 4L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(2L, 5L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(1L, 2L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(4L, 5L));
-
-    Assert.assertEquals(ValidTxnList.RangeResponse.NONE,
-        validTxns.isTxnRangeValid(1L, 1L));
-    Assert.assertEquals(ValidTxnList.RangeResponse.NONE,
-        validTxns.isTxnRangeValid(5L, 10L));
-
-    validTxns = new ValidReadTxnList("10:5:4,5,6:");
-    Assert.assertEquals(ValidTxnList.RangeResponse.NONE,
-        validTxns.isTxnRangeValid(4,6));
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(7, 10));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(7, 11));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(3, 6));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(4, 7));
-    Assert.assertEquals(ValidTxnList.RangeResponse.SOME,
-        validTxns.isTxnRangeValid(1, 12));
-    Assert.assertEquals(ValidTxnList.RangeResponse.ALL,
-        validTxns.isTxnRangeValid(1, 3));
+  public void testOpenReadOnlyTxnExcluded() throws Exception {
+    client.openTxn("me", TxnType.READ_ONLY);
+    client.openTxns("me", 3);
+    client.rollbackTxn(2);
+    client.commitTxn(3);
+    ValidTxnList validTxns = client.getValidTxns(4);
+    Assert.assertTrue(validTxns.isTxnValid(1));
+    Assert.assertFalse(validTxns.isTxnValid(2));
+    Assert.assertTrue(validTxns.isTxnValid(3));
+    Assert.assertTrue(validTxns.isTxnValid(4));
   }
 
   @Test
@@ -252,16 +224,91 @@ public class TestHiveMetaStoreTxns {
     Assert.assertTrue(sawFive);
   }
 
+  @Test
+  public void testOpenTxnWithType() throws Exception {
+    long txnId = client.openTxn("me", TxnType.DEFAULT);
+    client.commitTxn(txnId);
+    ValidTxnList validTxns = client.getValidTxns();
+    Assert.assertTrue(validTxns.isTxnValid(txnId));
+  }
+
+  @Test
+  public void testTxnTypePersisted() throws Exception {
+    long txnId = client.openTxn("me", TxnType.READ_ONLY);
+    Statement stm = conn.createStatement();
+    ResultSet rs = stm.executeQuery("SELECT txn_type FROM txns WHERE txn_id = " + txnId);
+    Assert.assertTrue(rs.next());
+    Assert.assertEquals(TxnType.findByValue(rs.getInt(1)), TxnType.READ_ONLY);
+  }
+
+  @Test
+  public void testAllocateTableWriteIdForReadOnlyTxn() throws Exception {
+    thrown.expect(IllegalStateException.class);
+    thrown.expectMessage("Write ID allocation failed on db.tbl as not all input txns in open state or read-only");
+
+    long txnId = client.openTxn("me", TxnType.READ_ONLY);
+    client.allocateTableWriteId(txnId, "db", "tbl");
+  }
+
+  @Test
+  public void testGetValidWriteIds() throws TException {
+    List<Long> tids = client.openTxns("me", 3).getTxn_ids();
+    client.allocateTableWriteIdsBatch(tids, "db", "tbl");
+    client.rollbackTxn(tids.get(0));
+
+    ValidTxnList validTxnList = client.getValidTxns();
+    String fullTableName = TxnUtils.getFullTableName("db", "tbl");
+
+    List<TableValidWriteIds> tableValidWriteIds = client.getValidWriteIds(
+        Collections.singletonList(fullTableName), validTxnList.writeToString());
+
+    Assert.assertEquals(tableValidWriteIds.size(), 1);
+    TableValidWriteIds writeIds = tableValidWriteIds.get(0);
+    Assert.assertNotNull(writeIds);
+
+    ValidReaderWriteIdList writeIdList = TxnUtils.createValidReaderWriteIdList(writeIds);
+    Assert.assertNotNull(writeIdList);
+
+    Assert.assertEquals(writeIdList.getInvalidWriteIds().length, 1);
+    Assert.assertTrue(validTxnList.isTxnAborted(tids.get(0)));
+    Assert.assertEquals(writeIdList.getHighWatermark(), 1);
+    Assert.assertEquals(writeIdList.getMinOpenWriteId().longValue(), 2);
+
+    client.commitTxn(tids.get(2));
+    validTxnList = client.getValidTxns();
+
+    tableValidWriteIds = client.getValidWriteIds(
+      Collections.singletonList(fullTableName), validTxnList.writeToString());
+
+    Assert.assertEquals(tableValidWriteIds.size(), 1);
+    writeIds = tableValidWriteIds.get(0);
+    Assert.assertNotNull(writeIds);
+
+    writeIdList = TxnUtils.createValidReaderWriteIdList(writeIds);
+    Assert.assertNotNull(writeIdList);
+
+    Assert.assertEquals(writeIdList.getInvalidWriteIds().length, 2);
+    Assert.assertTrue(validTxnList.isTxnAborted(tids.get(0)));
+    Assert.assertFalse(validTxnList.isTxnValid(tids.get(1)));
+    Assert.assertEquals(writeIdList.getHighWatermark(), 3);
+    Assert.assertEquals(writeIdList.getMinOpenWriteId().longValue(), 2);
+  }
+
   @Before
   public void setUp() throws Exception {
+    conf.setBoolean(ConfVars.HIVE_IN_TEST.getVarname(), true);
     MetaStoreTestUtils.setConfForStandloneMode(conf);
     TxnDbUtil.setConfValues(conf);
     TxnDbUtil.prepDb(conf);
     client = new HiveMetaStoreClient(conf);
+
+    String connectionStr = MetastoreConf.getVar(conf, MetastoreConf.ConfVars.CONNECT_URL_KEY);
+    conn = DriverManager.getConnection(connectionStr);
   }
 
   @After
   public void tearDown() throws Exception {
+    conn.close();
     TxnDbUtil.cleanDb(conf);
   }
 }

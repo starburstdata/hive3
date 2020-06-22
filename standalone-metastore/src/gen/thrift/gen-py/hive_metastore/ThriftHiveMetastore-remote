@@ -24,6 +24,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] function [arg1 [arg2...]]')
   print('')
   print('Functions:')
+  print('  string get_hms_api_version()')
   print('  string getMetaConf(string key)')
   print('  void setMetaConf(string key, string value)')
   print('  void create_catalog(CreateCatalogRequest catalog)')
@@ -33,6 +34,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  void drop_catalog(DropCatalogRequest catName)')
   print('  void create_database(Database database)')
   print('  Database get_database(string name)')
+  print('  Database get_database_req(GetDatabaseRequest request)')
   print('  void drop_database(string name, bool deleteData, bool cascade)')
   print('   get_databases(string pattern)')
   print('   get_all_databases()')
@@ -48,6 +50,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  void create_table(Table tbl)')
   print('  void create_table_with_environment_context(Table tbl, EnvironmentContext environment_context)')
   print('  void create_table_with_constraints(Table tbl,  primaryKeys,  foreignKeys,  uniqueConstraints,  notNullConstraints,  defaultConstraints,  checkConstraints)')
+  print('  void create_table_req(CreateTableRequest request)')
   print('  void drop_constraint(DropConstraintRequest req)')
   print('  void add_primary_key(AddPrimaryKeyRequest req)')
   print('  void add_foreign_key(AddForeignKeyRequest req)')
@@ -58,13 +61,16 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  void drop_table(string dbname, string name, bool deleteData)')
   print('  void drop_table_with_environment_context(string dbname, string name, bool deleteData, EnvironmentContext environment_context)')
   print('  void truncate_table(string dbName, string tableName,  partNames)')
+  print('  TruncateTableResponse truncate_table_req(TruncateTableRequest req)')
   print('   get_tables(string db_name, string pattern)')
   print('   get_tables_by_type(string db_name, string pattern, string tableType)')
+  print('   get_all_materialized_view_objects_for_rewriting()')
   print('   get_materialized_views_for_rewriting(string db_name)')
   print('   get_table_meta(string db_patterns, string tbl_patterns,  tbl_types)')
   print('   get_all_tables(string db_name)')
   print('  Table get_table(string dbname, string tbl_name)')
   print('   get_table_objects_by_name(string dbname,  tbl_names)')
+  print('   get_tables_ext(GetTablesExtRequest req)')
   print('  GetTableResult get_table_req(GetTableRequest req)')
   print('  GetTablesResult get_table_objects_by_name_req(GetTablesRequest req)')
   print('  Materialization get_materialization_invalidation_info(CreationMetadata creation_metadata, string validTxnList)')
@@ -73,6 +79,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  void alter_table(string dbname, string tbl_name, Table new_tbl)')
   print('  void alter_table_with_environment_context(string dbname, string tbl_name, Table new_tbl, EnvironmentContext environment_context)')
   print('  void alter_table_with_cascade(string dbname, string tbl_name, Table new_tbl, bool cascade)')
+  print('  AlterTableResponse alter_table_req(AlterTableRequest req)')
   print('  Partition add_partition(Partition new_part)')
   print('  Partition add_partition_with_environment_context(Partition new_part, EnvironmentContext environment_context)')
   print('  i32 add_partitions( new_parts)')
@@ -105,11 +112,14 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  PartitionsByExprResult get_partitions_by_expr(PartitionsByExprRequest req)')
   print('  i32 get_num_partitions_by_filter(string db_name, string tbl_name, string filter)')
   print('   get_partitions_by_names(string db_name, string tbl_name,  names)')
+  print('  GetPartitionsByNamesResult get_partitions_by_names_req(GetPartitionsByNamesRequest req)')
   print('  void alter_partition(string db_name, string tbl_name, Partition new_part)')
   print('  void alter_partitions(string db_name, string tbl_name,  new_parts)')
   print('  void alter_partitions_with_environment_context(string db_name, string tbl_name,  new_parts, EnvironmentContext environment_context)')
+  print('  AlterPartitionsResponse alter_partitions_req(AlterPartitionsRequest req)')
   print('  void alter_partition_with_environment_context(string db_name, string tbl_name, Partition new_part, EnvironmentContext environment_context)')
   print('  void rename_partition(string db_name, string tbl_name,  part_vals, Partition new_part)')
+  print('  RenamePartitionResponse rename_partition_req(RenamePartitionRequest req)')
   print('  bool partition_name_has_valid_characters( part_vals, bool throw_exception)')
   print('  string get_config_value(string name, string defaultValue)')
   print('   partition_name_to_vals(string part_name)')
@@ -124,14 +134,16 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  CheckConstraintsResponse get_check_constraints(CheckConstraintsRequest request)')
   print('  bool update_table_column_statistics(ColumnStatistics stats_obj)')
   print('  bool update_partition_column_statistics(ColumnStatistics stats_obj)')
+  print('  SetPartitionsStatsResponse update_table_column_statistics_req(SetPartitionsStatsRequest req)')
+  print('  SetPartitionsStatsResponse update_partition_column_statistics_req(SetPartitionsStatsRequest req)')
   print('  ColumnStatistics get_table_column_statistics(string db_name, string tbl_name, string col_name)')
   print('  ColumnStatistics get_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)')
   print('  TableStatsResult get_table_statistics_req(TableStatsRequest request)')
   print('  PartitionsStatsResult get_partitions_statistics_req(PartitionsStatsRequest request)')
   print('  AggrStats get_aggr_stats_for(PartitionsStatsRequest request)')
   print('  bool set_aggr_stats_for(SetPartitionsStatsRequest request)')
-  print('  bool delete_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)')
-  print('  bool delete_table_column_statistics(string db_name, string tbl_name, string col_name)')
+  print('  bool delete_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name, string engine)')
+  print('  bool delete_table_column_statistics(string db_name, string tbl_name, string col_name, string engine)')
   print('  void create_function(Function func)')
   print('  void drop_function(string dbName, string funcName)')
   print('  void alter_function(string dbName, string funcName, Function newFunc)')
@@ -184,11 +196,19 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  CompactionResponse compact2(CompactionRequest rqst)')
   print('  ShowCompactResponse show_compact(ShowCompactRequest rqst)')
   print('  void add_dynamic_partitions(AddDynamicPartitions rqst)')
+  print('  OptionalCompactionInfoStruct find_next_compact(string workerId)')
+  print('  void update_compactor_state(CompactionInfoStruct cr, i64 txn_id)')
+  print('   find_columns_with_stats(CompactionInfoStruct cr)')
+  print('  void mark_cleaned(CompactionInfoStruct cr)')
+  print('  void mark_compacted(CompactionInfoStruct cr)')
+  print('  void mark_failed(CompactionInfoStruct cr)')
+  print('  void set_hadoop_jobid(string jobId, i64 cq_id)')
   print('  NotificationEventResponse get_next_notification(NotificationEventRequest rqst)')
   print('  CurrentNotificationEventId get_current_notificationEventId()')
   print('  NotificationEventsCountResponse get_notification_events_count(NotificationEventsCountRequest rqst)')
   print('  FireEventResponse fire_listener_event(FireEventRequest rqst)')
   print('  void flushCache()')
+  print('  WriteNotificationLogResponse add_write_notification_log(WriteNotificationLogRequest rqst)')
   print('  CmRecycleResponse cm_recycle(CmRecycleRequest request)')
   print('  GetFileMetadataByExprResult get_file_metadata_by_expr(GetFileMetadataByExprRequest req)')
   print('  GetFileMetadataResult get_file_metadata(GetFileMetadataRequest req)')
@@ -231,6 +251,10 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  bool heartbeat_lock_materialization_rebuild(string dbName, string tableName, i64 txnId)')
   print('  void add_runtime_stats(RuntimeStat stat)')
   print('   get_runtime_stats(GetRuntimeStatsRequest rqst)')
+  print('  ScheduledQueryPollResponse scheduled_query_poll(ScheduledQueryPollRequest request)')
+  print('  void scheduled_query_maintenance(ScheduledQueryMaintenanceRequest request)')
+  print('  void scheduled_query_progress(ScheduledQueryProgressInfo info)')
+  print('  ScheduledQuery get_scheduled_query(ScheduledQueryKey scheduleKey)')
   print('  string getName()')
   print('  string getVersion()')
   print('  fb_status getStatus()')
@@ -300,7 +324,13 @@ protocol = TBinaryProtocol.TBinaryProtocol(transport)
 client = ThriftHiveMetastore.Client(protocol)
 transport.open()
 
-if cmd == 'getMetaConf':
+if cmd == 'get_hms_api_version':
+  if len(args) != 0:
+    print('get_hms_api_version requires 0 args')
+    sys.exit(1)
+  pp.pprint(client.get_hms_api_version())
+
+elif cmd == 'getMetaConf':
   if len(args) != 1:
     print('getMetaConf requires 1 args')
     sys.exit(1)
@@ -353,6 +383,12 @@ elif cmd == 'get_database':
     print('get_database requires 1 args')
     sys.exit(1)
   pp.pprint(client.get_database(args[0],))
+
+elif cmd == 'get_database_req':
+  if len(args) != 1:
+    print('get_database_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.get_database_req(eval(args[0]),))
 
 elif cmd == 'drop_database':
   if len(args) != 3:
@@ -444,6 +480,12 @@ elif cmd == 'create_table_with_constraints':
     sys.exit(1)
   pp.pprint(client.create_table_with_constraints(eval(args[0]),eval(args[1]),eval(args[2]),eval(args[3]),eval(args[4]),eval(args[5]),eval(args[6]),))
 
+elif cmd == 'create_table_req':
+  if len(args) != 1:
+    print('create_table_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.create_table_req(eval(args[0]),))
+
 elif cmd == 'drop_constraint':
   if len(args) != 1:
     print('drop_constraint requires 1 args')
@@ -504,6 +546,12 @@ elif cmd == 'truncate_table':
     sys.exit(1)
   pp.pprint(client.truncate_table(args[0],args[1],eval(args[2]),))
 
+elif cmd == 'truncate_table_req':
+  if len(args) != 1:
+    print('truncate_table_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.truncate_table_req(eval(args[0]),))
+
 elif cmd == 'get_tables':
   if len(args) != 2:
     print('get_tables requires 2 args')
@@ -515,6 +563,12 @@ elif cmd == 'get_tables_by_type':
     print('get_tables_by_type requires 3 args')
     sys.exit(1)
   pp.pprint(client.get_tables_by_type(args[0],args[1],args[2],))
+
+elif cmd == 'get_all_materialized_view_objects_for_rewriting':
+  if len(args) != 0:
+    print('get_all_materialized_view_objects_for_rewriting requires 0 args')
+    sys.exit(1)
+  pp.pprint(client.get_all_materialized_view_objects_for_rewriting())
 
 elif cmd == 'get_materialized_views_for_rewriting':
   if len(args) != 1:
@@ -545,6 +599,12 @@ elif cmd == 'get_table_objects_by_name':
     print('get_table_objects_by_name requires 2 args')
     sys.exit(1)
   pp.pprint(client.get_table_objects_by_name(args[0],eval(args[1]),))
+
+elif cmd == 'get_tables_ext':
+  if len(args) != 1:
+    print('get_tables_ext requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.get_tables_ext(eval(args[0]),))
 
 elif cmd == 'get_table_req':
   if len(args) != 1:
@@ -593,6 +653,12 @@ elif cmd == 'alter_table_with_cascade':
     print('alter_table_with_cascade requires 4 args')
     sys.exit(1)
   pp.pprint(client.alter_table_with_cascade(args[0],args[1],eval(args[2]),eval(args[3]),))
+
+elif cmd == 'alter_table_req':
+  if len(args) != 1:
+    print('alter_table_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.alter_table_req(eval(args[0]),))
 
 elif cmd == 'add_partition':
   if len(args) != 1:
@@ -786,6 +852,12 @@ elif cmd == 'get_partitions_by_names':
     sys.exit(1)
   pp.pprint(client.get_partitions_by_names(args[0],args[1],eval(args[2]),))
 
+elif cmd == 'get_partitions_by_names_req':
+  if len(args) != 1:
+    print('get_partitions_by_names_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.get_partitions_by_names_req(eval(args[0]),))
+
 elif cmd == 'alter_partition':
   if len(args) != 3:
     print('alter_partition requires 3 args')
@@ -804,6 +876,12 @@ elif cmd == 'alter_partitions_with_environment_context':
     sys.exit(1)
   pp.pprint(client.alter_partitions_with_environment_context(args[0],args[1],eval(args[2]),eval(args[3]),))
 
+elif cmd == 'alter_partitions_req':
+  if len(args) != 1:
+    print('alter_partitions_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.alter_partitions_req(eval(args[0]),))
+
 elif cmd == 'alter_partition_with_environment_context':
   if len(args) != 4:
     print('alter_partition_with_environment_context requires 4 args')
@@ -815,6 +893,12 @@ elif cmd == 'rename_partition':
     print('rename_partition requires 4 args')
     sys.exit(1)
   pp.pprint(client.rename_partition(args[0],args[1],eval(args[2]),eval(args[3]),))
+
+elif cmd == 'rename_partition_req':
+  if len(args) != 1:
+    print('rename_partition_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.rename_partition_req(eval(args[0]),))
 
 elif cmd == 'partition_name_has_valid_characters':
   if len(args) != 2:
@@ -900,6 +984,18 @@ elif cmd == 'update_partition_column_statistics':
     sys.exit(1)
   pp.pprint(client.update_partition_column_statistics(eval(args[0]),))
 
+elif cmd == 'update_table_column_statistics_req':
+  if len(args) != 1:
+    print('update_table_column_statistics_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.update_table_column_statistics_req(eval(args[0]),))
+
+elif cmd == 'update_partition_column_statistics_req':
+  if len(args) != 1:
+    print('update_partition_column_statistics_req requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.update_partition_column_statistics_req(eval(args[0]),))
+
 elif cmd == 'get_table_column_statistics':
   if len(args) != 3:
     print('get_table_column_statistics requires 3 args')
@@ -937,16 +1033,16 @@ elif cmd == 'set_aggr_stats_for':
   pp.pprint(client.set_aggr_stats_for(eval(args[0]),))
 
 elif cmd == 'delete_partition_column_statistics':
-  if len(args) != 4:
-    print('delete_partition_column_statistics requires 4 args')
+  if len(args) != 5:
+    print('delete_partition_column_statistics requires 5 args')
     sys.exit(1)
-  pp.pprint(client.delete_partition_column_statistics(args[0],args[1],args[2],args[3],))
+  pp.pprint(client.delete_partition_column_statistics(args[0],args[1],args[2],args[3],args[4],))
 
 elif cmd == 'delete_table_column_statistics':
-  if len(args) != 3:
-    print('delete_table_column_statistics requires 3 args')
+  if len(args) != 4:
+    print('delete_table_column_statistics requires 4 args')
     sys.exit(1)
-  pp.pprint(client.delete_table_column_statistics(args[0],args[1],args[2],))
+  pp.pprint(client.delete_table_column_statistics(args[0],args[1],args[2],args[3],))
 
 elif cmd == 'create_function':
   if len(args) != 1:
@@ -1260,6 +1356,48 @@ elif cmd == 'add_dynamic_partitions':
     sys.exit(1)
   pp.pprint(client.add_dynamic_partitions(eval(args[0]),))
 
+elif cmd == 'find_next_compact':
+  if len(args) != 1:
+    print('find_next_compact requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.find_next_compact(args[0],))
+
+elif cmd == 'update_compactor_state':
+  if len(args) != 2:
+    print('update_compactor_state requires 2 args')
+    sys.exit(1)
+  pp.pprint(client.update_compactor_state(eval(args[0]),eval(args[1]),))
+
+elif cmd == 'find_columns_with_stats':
+  if len(args) != 1:
+    print('find_columns_with_stats requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.find_columns_with_stats(eval(args[0]),))
+
+elif cmd == 'mark_cleaned':
+  if len(args) != 1:
+    print('mark_cleaned requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.mark_cleaned(eval(args[0]),))
+
+elif cmd == 'mark_compacted':
+  if len(args) != 1:
+    print('mark_compacted requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.mark_compacted(eval(args[0]),))
+
+elif cmd == 'mark_failed':
+  if len(args) != 1:
+    print('mark_failed requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.mark_failed(eval(args[0]),))
+
+elif cmd == 'set_hadoop_jobid':
+  if len(args) != 2:
+    print('set_hadoop_jobid requires 2 args')
+    sys.exit(1)
+  pp.pprint(client.set_hadoop_jobid(args[0],eval(args[1]),))
+
 elif cmd == 'get_next_notification':
   if len(args) != 1:
     print('get_next_notification requires 1 args')
@@ -1289,6 +1427,12 @@ elif cmd == 'flushCache':
     print('flushCache requires 0 args')
     sys.exit(1)
   pp.pprint(client.flushCache())
+
+elif cmd == 'add_write_notification_log':
+  if len(args) != 1:
+    print('add_write_notification_log requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.add_write_notification_log(eval(args[0]),))
 
 elif cmd == 'cm_recycle':
   if len(args) != 1:
@@ -1541,6 +1685,30 @@ elif cmd == 'get_runtime_stats':
     print('get_runtime_stats requires 1 args')
     sys.exit(1)
   pp.pprint(client.get_runtime_stats(eval(args[0]),))
+
+elif cmd == 'scheduled_query_poll':
+  if len(args) != 1:
+    print('scheduled_query_poll requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.scheduled_query_poll(eval(args[0]),))
+
+elif cmd == 'scheduled_query_maintenance':
+  if len(args) != 1:
+    print('scheduled_query_maintenance requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.scheduled_query_maintenance(eval(args[0]),))
+
+elif cmd == 'scheduled_query_progress':
+  if len(args) != 1:
+    print('scheduled_query_progress requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.scheduled_query_progress(eval(args[0]),))
+
+elif cmd == 'get_scheduled_query':
+  if len(args) != 1:
+    print('get_scheduled_query requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.get_scheduled_query(eval(args[0]),))
 
 elif cmd == 'getName':
   if len(args) != 0:

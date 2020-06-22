@@ -755,14 +755,14 @@ import org.slf4j.LoggerFactory;
           case 2: // POOLS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list840 = iprot.readListBegin();
-                struct.pools = new ArrayList<WMPool>(_list840.size);
-                WMPool _elem841;
-                for (int _i842 = 0; _i842 < _list840.size; ++_i842)
+                org.apache.thrift.protocol.TList _list1000 = iprot.readListBegin();
+                struct.pools = new ArrayList<WMPool>(_list1000.size);
+                WMPool _elem1001;
+                for (int _i1002 = 0; _i1002 < _list1000.size; ++_i1002)
                 {
-                  _elem841 = new WMPool();
-                  _elem841.read(iprot);
-                  struct.pools.add(_elem841);
+                  _elem1001 = new WMPool();
+                  _elem1001.read(iprot);
+                  struct.pools.add(_elem1001);
                 }
                 iprot.readListEnd();
               }
@@ -774,14 +774,14 @@ import org.slf4j.LoggerFactory;
           case 3: // MAPPINGS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list843 = iprot.readListBegin();
-                struct.mappings = new ArrayList<WMMapping>(_list843.size);
-                WMMapping _elem844;
-                for (int _i845 = 0; _i845 < _list843.size; ++_i845)
+                org.apache.thrift.protocol.TList _list1003 = iprot.readListBegin();
+                struct.mappings = new ArrayList<WMMapping>(_list1003.size);
+                WMMapping _elem1004;
+                for (int _i1005 = 0; _i1005 < _list1003.size; ++_i1005)
                 {
-                  _elem844 = new WMMapping();
-                  _elem844.read(iprot);
-                  struct.mappings.add(_elem844);
+                  _elem1004 = new WMMapping();
+                  _elem1004.read(iprot);
+                  struct.mappings.add(_elem1004);
                 }
                 iprot.readListEnd();
               }
@@ -793,14 +793,14 @@ import org.slf4j.LoggerFactory;
           case 4: // TRIGGERS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list846 = iprot.readListBegin();
-                struct.triggers = new ArrayList<WMTrigger>(_list846.size);
-                WMTrigger _elem847;
-                for (int _i848 = 0; _i848 < _list846.size; ++_i848)
+                org.apache.thrift.protocol.TList _list1006 = iprot.readListBegin();
+                struct.triggers = new ArrayList<WMTrigger>(_list1006.size);
+                WMTrigger _elem1007;
+                for (int _i1008 = 0; _i1008 < _list1006.size; ++_i1008)
                 {
-                  _elem847 = new WMTrigger();
-                  _elem847.read(iprot);
-                  struct.triggers.add(_elem847);
+                  _elem1007 = new WMTrigger();
+                  _elem1007.read(iprot);
+                  struct.triggers.add(_elem1007);
                 }
                 iprot.readListEnd();
               }
@@ -812,14 +812,14 @@ import org.slf4j.LoggerFactory;
           case 5: // POOL_TRIGGERS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list849 = iprot.readListBegin();
-                struct.poolTriggers = new ArrayList<WMPoolTrigger>(_list849.size);
-                WMPoolTrigger _elem850;
-                for (int _i851 = 0; _i851 < _list849.size; ++_i851)
+                org.apache.thrift.protocol.TList _list1009 = iprot.readListBegin();
+                struct.poolTriggers = new ArrayList<WMPoolTrigger>(_list1009.size);
+                WMPoolTrigger _elem1010;
+                for (int _i1011 = 0; _i1011 < _list1009.size; ++_i1011)
                 {
-                  _elem850 = new WMPoolTrigger();
-                  _elem850.read(iprot);
-                  struct.poolTriggers.add(_elem850);
+                  _elem1010 = new WMPoolTrigger();
+                  _elem1010.read(iprot);
+                  struct.poolTriggers.add(_elem1010);
                 }
                 iprot.readListEnd();
               }
@@ -850,9 +850,9 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(POOLS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.pools.size()));
-          for (WMPool _iter852 : struct.pools)
+          for (WMPool _iter1012 : struct.pools)
           {
-            _iter852.write(oprot);
+            _iter1012.write(oprot);
           }
           oprot.writeListEnd();
         }
@@ -863,9 +863,9 @@ import org.slf4j.LoggerFactory;
           oprot.writeFieldBegin(MAPPINGS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.mappings.size()));
-            for (WMMapping _iter853 : struct.mappings)
+            for (WMMapping _iter1013 : struct.mappings)
             {
-              _iter853.write(oprot);
+              _iter1013.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -877,9 +877,9 @@ import org.slf4j.LoggerFactory;
           oprot.writeFieldBegin(TRIGGERS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.triggers.size()));
-            for (WMTrigger _iter854 : struct.triggers)
+            for (WMTrigger _iter1014 : struct.triggers)
             {
-              _iter854.write(oprot);
+              _iter1014.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -891,9 +891,9 @@ import org.slf4j.LoggerFactory;
           oprot.writeFieldBegin(POOL_TRIGGERS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.poolTriggers.size()));
-            for (WMPoolTrigger _iter855 : struct.poolTriggers)
+            for (WMPoolTrigger _iter1015 : struct.poolTriggers)
             {
-              _iter855.write(oprot);
+              _iter1015.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -920,9 +920,9 @@ import org.slf4j.LoggerFactory;
       struct.plan.write(oprot);
       {
         oprot.writeI32(struct.pools.size());
-        for (WMPool _iter856 : struct.pools)
+        for (WMPool _iter1016 : struct.pools)
         {
-          _iter856.write(oprot);
+          _iter1016.write(oprot);
         }
       }
       BitSet optionals = new BitSet();
@@ -939,27 +939,27 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetMappings()) {
         {
           oprot.writeI32(struct.mappings.size());
-          for (WMMapping _iter857 : struct.mappings)
+          for (WMMapping _iter1017 : struct.mappings)
           {
-            _iter857.write(oprot);
+            _iter1017.write(oprot);
           }
         }
       }
       if (struct.isSetTriggers()) {
         {
           oprot.writeI32(struct.triggers.size());
-          for (WMTrigger _iter858 : struct.triggers)
+          for (WMTrigger _iter1018 : struct.triggers)
           {
-            _iter858.write(oprot);
+            _iter1018.write(oprot);
           }
         }
       }
       if (struct.isSetPoolTriggers()) {
         {
           oprot.writeI32(struct.poolTriggers.size());
-          for (WMPoolTrigger _iter859 : struct.poolTriggers)
+          for (WMPoolTrigger _iter1019 : struct.poolTriggers)
           {
-            _iter859.write(oprot);
+            _iter1019.write(oprot);
           }
         }
       }
@@ -972,56 +972,56 @@ import org.slf4j.LoggerFactory;
       struct.plan.read(iprot);
       struct.setPlanIsSet(true);
       {
-        org.apache.thrift.protocol.TList _list860 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-        struct.pools = new ArrayList<WMPool>(_list860.size);
-        WMPool _elem861;
-        for (int _i862 = 0; _i862 < _list860.size; ++_i862)
+        org.apache.thrift.protocol.TList _list1020 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+        struct.pools = new ArrayList<WMPool>(_list1020.size);
+        WMPool _elem1021;
+        for (int _i1022 = 0; _i1022 < _list1020.size; ++_i1022)
         {
-          _elem861 = new WMPool();
-          _elem861.read(iprot);
-          struct.pools.add(_elem861);
+          _elem1021 = new WMPool();
+          _elem1021.read(iprot);
+          struct.pools.add(_elem1021);
         }
       }
       struct.setPoolsIsSet(true);
       BitSet incoming = iprot.readBitSet(3);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TList _list863 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.mappings = new ArrayList<WMMapping>(_list863.size);
-          WMMapping _elem864;
-          for (int _i865 = 0; _i865 < _list863.size; ++_i865)
+          org.apache.thrift.protocol.TList _list1023 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.mappings = new ArrayList<WMMapping>(_list1023.size);
+          WMMapping _elem1024;
+          for (int _i1025 = 0; _i1025 < _list1023.size; ++_i1025)
           {
-            _elem864 = new WMMapping();
-            _elem864.read(iprot);
-            struct.mappings.add(_elem864);
+            _elem1024 = new WMMapping();
+            _elem1024.read(iprot);
+            struct.mappings.add(_elem1024);
           }
         }
         struct.setMappingsIsSet(true);
       }
       if (incoming.get(1)) {
         {
-          org.apache.thrift.protocol.TList _list866 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.triggers = new ArrayList<WMTrigger>(_list866.size);
-          WMTrigger _elem867;
-          for (int _i868 = 0; _i868 < _list866.size; ++_i868)
+          org.apache.thrift.protocol.TList _list1026 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.triggers = new ArrayList<WMTrigger>(_list1026.size);
+          WMTrigger _elem1027;
+          for (int _i1028 = 0; _i1028 < _list1026.size; ++_i1028)
           {
-            _elem867 = new WMTrigger();
-            _elem867.read(iprot);
-            struct.triggers.add(_elem867);
+            _elem1027 = new WMTrigger();
+            _elem1027.read(iprot);
+            struct.triggers.add(_elem1027);
           }
         }
         struct.setTriggersIsSet(true);
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TList _list869 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.poolTriggers = new ArrayList<WMPoolTrigger>(_list869.size);
-          WMPoolTrigger _elem870;
-          for (int _i871 = 0; _i871 < _list869.size; ++_i871)
+          org.apache.thrift.protocol.TList _list1029 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.poolTriggers = new ArrayList<WMPoolTrigger>(_list1029.size);
+          WMPoolTrigger _elem1030;
+          for (int _i1031 = 0; _i1031 < _list1029.size; ++_i1031)
           {
-            _elem870 = new WMPoolTrigger();
-            _elem870.read(iprot);
-            struct.poolTriggers.add(_elem870);
+            _elem1030 = new WMPoolTrigger();
+            _elem1030.read(iprot);
+            struct.poolTriggers.add(_elem1030);
           }
         }
         struct.setPoolTriggersIsSet(true);

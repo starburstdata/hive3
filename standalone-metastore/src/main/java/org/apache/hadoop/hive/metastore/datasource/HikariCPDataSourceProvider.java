@@ -28,6 +28,9 @@ import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Properties;
 
+import static org.apache.hadoop.hive.metastore.DatabaseProduct.MYSQL;
+import static org.apache.hadoop.hive.metastore.DatabaseProduct.determineDatabaseProduct;
+
 /**
  * DataSourceProvider for the HikariCP connection pool.
  */
@@ -35,8 +38,8 @@ public class HikariCPDataSourceProvider implements DataSourceProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(HikariCPDataSourceProvider.class);
 
-  public static final String HIKARI = "hikari";
-  private static final String CONNECTION_TIMEOUT_PROPERTY= "hikari.connectionTimeout";
+  public static final String HIKARI = "hikaricp";
+  private static final String CONNECTION_TIMEOUT_PROPERTY= HIKARI + ".connectionTimeout";
 
   @Override
   public DataSource create(Configuration hdpConfig) throws SQLException {
@@ -62,6 +65,10 @@ public class HikariCPDataSourceProvider implements DataSourceProvider {
     config.setJdbcUrl(driverUrl);
     config.setUsername(user);
     config.setPassword(passwd);
+
+    if (determineDatabaseProduct(driverUrl) == MYSQL) {
+      config.setConnectionInitSql("SET @@session.sql_mode=ANSI_QUOTES");
+    }
     //https://github.com/brettwooldridge/HikariCP
     config.setConnectionTimeout(connectionTimeout);
     return new HikariDataSource(config);
@@ -76,14 +83,8 @@ public class HikariCPDataSourceProvider implements DataSourceProvider {
   @Override
   public boolean supports(Configuration configuration) {
     String poolingType = MetastoreConf.getVar(configuration,
-            MetastoreConf.ConfVars.CONNECTION_POOLING_TYPE).toLowerCase();
-    if (HIKARI.equals(poolingType)) {
-      int hikariPropsNr = DataSourceProvider.getPrefixedProperties(configuration, HIKARI).size();
-      LOG.debug("Found " + hikariPropsNr + " nr. of hikari specific configurations");
-      return hikariPropsNr > 0;
-    }
-    LOG.debug("Configuration requested " + poolingType + " pooling, HikariCpDSProvider exiting");
-    return false;
+            MetastoreConf.ConfVars.CONNECTION_POOLING_TYPE);
+    return HIKARI.equalsIgnoreCase(poolingType);
   }
 
   private Properties replacePrefix(Properties props) {

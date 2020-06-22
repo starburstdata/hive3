@@ -1,0 +1,82 @@
+***************
+*** 1742,1747 ****
+   `NUM_TRUES` bigint,
+   `NUM_FALSES` bigint,
+   `LAST_ANALYZED` bigint,
+    CONSTRAINT `SYS_PK_TAB_COL_STATS` PRIMARY KEY (`CS_ID`) DISABLE
+  )
+  STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+--- 1744,1750 ----
+   `NUM_TRUES` bigint,
+   `NUM_FALSES` bigint,
+   `LAST_ANALYZED` bigint,
++  `ENGINE` string,
+    CONSTRAINT `SYS_PK_TAB_COL_STATS` PRIMARY KEY (`CS_ID`) DISABLE
+  )
+  STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+***************
+*** 1851,1856 ****
+   `NUM_TRUES` bigint,
+   `NUM_FALSES` bigint,
+   `LAST_ANALYZED` bigint,
+    CONSTRAINT `SYS_PK_PART_COL_STATS` PRIMARY KEY (`CS_ID`) DISABLE
+  )
+  STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+--- 1857,1863 ----
+   `NUM_TRUES` bigint,
+   `NUM_FALSES` bigint,
+   `LAST_ANALYZED` bigint,
++  `ENGINE` string,
+    CONSTRAINT `SYS_PK_PART_COL_STATS` PRIMARY KEY (`CS_ID`) DISABLE
+  )
+  STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+***************
+*** 1877,1883 ****
+   \"MAX_COL_LEN\",
+   \"NUM_TRUES\",
+   \"NUM_FALSES\",
+-  \"LAST_ANALYZED\"
+  FROM
+    \"PART_COL_STATS\""
+  )
+--- 1884,1891 ----
+   \"MAX_COL_LEN\",
+   \"NUM_TRUES\",
+   \"NUM_FALSES\",
++  \"LAST_ANALYZED\",
++  \"ENGINE\"
+  FROM
+    \"PART_COL_STATS\""
+  )
+***************
+*** 3905,3910 ****
+  part_col_stats	db_name
+  part_col_stats	double_high_value
+  part_col_stats	double_low_value
+  part_col_stats	last_analyzed
+  part_col_stats	long_high_value
+  part_col_stats	long_low_value
+--- 3913,3919 ----
+  part_col_stats	db_name
+  part_col_stats	double_high_value
+  part_col_stats	double_low_value
++ part_col_stats	engine
+  part_col_stats	last_analyzed
+  part_col_stats	long_high_value
+  part_col_stats	long_low_value
+***************
+*** 4047,4052 ****
+  tab_col_stats	db_name
+  tab_col_stats	double_high_value
+  tab_col_stats	double_low_value
+  tab_col_stats	last_analyzed
+  tab_col_stats	long_high_value
+  tab_col_stats	long_low_value
+--- 4056,4062 ----
+  tab_col_stats	db_name
+  tab_col_stats	double_high_value
+  tab_col_stats	double_low_value
++ tab_col_stats	engine
+  tab_col_stats	last_analyzed
+  tab_col_stats	long_high_value
+  tab_col_stats	long_low_value

@@ -13,6 +13,16 @@ const hive_metastoreConstants g_hive_metastore_constants;
 hive_metastoreConstants::hive_metastoreConstants() {
   DDL_TIME = "transient_lastDdlTime";
 
+  HMS_API = "1.1.0";
+
+  ACCESSTYPE_NONE = 1;
+
+  ACCESSTYPE_READONLY = 2;
+
+  ACCESSTYPE_WRITEONLY = 4;
+
+  ACCESSTYPE_READWRITE = 8;
+
   HIVE_FILTER_FIELD_OWNER = "hive_filter_field_owner__";
 
   HIVE_FILTER_FIELD_PARAMS = "hive_filter_field_params__";
@@ -60,6 +70,10 @@ hive_metastoreConstants::hive_metastoreConstants() {
   TABLE_TRANSACTIONAL_PROPERTIES = "transactional_properties";
 
   TABLE_BUCKETING_VERSION = "bucketing_version";
+
+  DRUID_CONFIG_PREFIX = "druid.";
+
+  JDBC_CONFIG_PREFIX = "hive.sql.";
 
 }
 

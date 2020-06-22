@@ -1,0 +1,17 @@
+***************
+*** 462,468 ****
+      List<ColumnStatisticsObj> stats;
+      validWriteIds = msClient.getValidWriteIds("default." + tableName).toString();
+      stats = msClient.getTableColumnStatistics(
+-         "default", tableName, Lists.newArrayList("a"), validWriteIds);
+      return stats;
+    }
+  
+--- 463,469 ----
+      List<ColumnStatisticsObj> stats;
+      validWriteIds = msClient.getValidWriteIds("default." + tableName).toString();
+      stats = msClient.getTableColumnStatistics(
++         "default", tableName, Lists.newArrayList("a"), Constants.HIVE_ENGINE, validWriteIds);
+      return stats;
+    }
+  

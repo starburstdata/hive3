@@ -35,8 +35,11 @@ import org.apache.hadoop.hive.metastore.api.DateColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.columnstats.cache.DateColumnStatsDataInspector;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.ColStatsObjWithSourceInfo;
+import org.apache.hadoop.hive.metastore.columnstats.merge.DateColumnStatsMerger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hive.metastore.columnstats.ColumnsStatsUtils.dateInspectorFromStats;
 
 public class DateColumnStatsAggregator extends ColumnStatsAggregator implements
     IExtrapolatePartStatus {
@@ -62,8 +65,8 @@ public class DateColumnStatsAggregator extends ColumnStatsAggregator implements
             cso.getStatsData().getSetField());
         LOG.trace("doAllPartitionContainStats for column: {} is: {}", colName, doAllPartitionContainStats);
       }
-      DateColumnStatsDataInspector dateColumnStats =
-          (DateColumnStatsDataInspector) cso.getStatsData().getDateStats();
+      DateColumnStatsDataInspector dateColumnStats = dateInspectorFromStats(cso);
+
       if (dateColumnStats.getNdvEstimator() == null) {
         ndvEstimator = null;
         break;
@@ -95,21 +98,21 @@ public class DateColumnStatsAggregator extends ColumnStatsAggregator implements
       double densityAvgSum = 0.0;
       for (ColStatsObjWithSourceInfo csp : colStatsWithSourceInfo) {
         ColumnStatisticsObj cso = csp.getColStatsObj();
-        DateColumnStatsDataInspector newData =
-            (DateColumnStatsDataInspector) cso.getStatsData().getDateStats();
-        lowerBound = Math.max(lowerBound, newData.getNumDVs());
+        DateColumnStatsDataInspector newData = dateInspectorFromStats(cso);
         higherBound += newData.getNumDVs();
-        densityAvgSum += (diff(newData.getHighValue(), newData.getLowValue()))
-            / newData.getNumDVs();
+        if (newData.isSetLowValue() && newData.isSetHighValue()) {
+          densityAvgSum += (diff(newData.getHighValue(), newData.getLowValue())) / newData.getNumDVs();
+        }
         if (ndvEstimator != null) {
           ndvEstimator.mergeEstimators(newData.getNdvEstimator());
         }
         if (aggregateData == null) {
           aggregateData = newData.deepCopy();
         } else {
-          aggregateData.setLowValue(min(aggregateData.getLowValue(), newData.getLowValue()));
-          aggregateData
-              .setHighValue(max(aggregateData.getHighValue(), newData.getHighValue()));
+          DateColumnStatsMerger merger = new DateColumnStatsMerger();
+          merger.setLowValue(aggregateData, newData);
+          merger.setHighValue(aggregateData, newData);
+
           aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
           aggregateData.setNumDVs(Math.max(aggregateData.getNumDVs(), newData.getNumDVs()));
         }
@@ -174,8 +177,7 @@ public class DateColumnStatsAggregator extends ColumnStatsAggregator implements
         for (ColStatsObjWithSourceInfo csp : colStatsWithSourceInfo) {
           ColumnStatisticsObj cso = csp.getColStatsObj();
           String partName = csp.getPartName();
-          DateColumnStatsDataInspector newData =
-              (DateColumnStatsDataInspector) cso.getStatsData().getDateStats();
+          DateColumnStatsDataInspector newData = dateInspectorFromStats(cso);
           // newData.isSetBitVectors() should be true for sure because we
           // already checked it before.
           if (indexMap.get(partName) != curIndex) {

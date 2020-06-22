@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hive.metastore.columnstats.merge;
 
+import static org.apache.hadoop.hive.metastore.columnstats.ColumnsStatsUtils.dateInspectorFromStats;
+
 import org.apache.hadoop.hive.common.ndv.NumDistinctValueEstimator;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Date;
@@ -27,16 +29,12 @@ import org.apache.hadoop.hive.metastore.columnstats.cache.DateColumnStatsDataIns
 public class DateColumnStatsMerger extends ColumnStatsMerger {
   @Override
   public void merge(ColumnStatisticsObj aggregateColStats, ColumnStatisticsObj newColStats) {
-    DateColumnStatsDataInspector aggregateData =
-        (DateColumnStatsDataInspector) aggregateColStats.getStatsData().getDateStats();
-    DateColumnStatsDataInspector newData =
-        (DateColumnStatsDataInspector) newColStats.getStatsData().getDateStats();
-    Date lowValue = aggregateData.getLowValue().compareTo(newData.getLowValue()) < 0 ? aggregateData
-        .getLowValue() : newData.getLowValue();
-    aggregateData.setLowValue(lowValue);
-    Date highValue = aggregateData.getHighValue().compareTo(newData.getHighValue()) >= 0 ? aggregateData
-        .getHighValue() : newData.getHighValue();
-    aggregateData.setHighValue(highValue);
+    DateColumnStatsDataInspector aggregateData = dateInspectorFromStats(aggregateColStats);
+    DateColumnStatsDataInspector newData = dateInspectorFromStats(newColStats);
+
+    setLowValue(aggregateData, newData);
+    setHighValue(aggregateData, newData);
+
     aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
     if (aggregateData.getNdvEstimator() == null || newData.getNdvEstimator() == null) {
       aggregateData.setNumDVs(Math.max(aggregateData.getNumDVs(), newData.getNumDVs()));
@@ -55,5 +53,43 @@ public class DateColumnStatsMerger extends ColumnStatsMerger {
           + aggregateData.getNumDVs() + " and " + newData.getNumDVs() + " to be " + ndv);
       aggregateData.setNumDVs(ndv);
     }
+
+    aggregateColStats.getStatsData().setDateStats(aggregateData);
+  }
+
+  public void setLowValue(DateColumnStatsDataInspector aggregateData, DateColumnStatsDataInspector newData) {
+    if (!aggregateData.isSetLowValue() && !newData.isSetLowValue()) {
+      return;
+    }
+
+    Date aggregateLowValue = aggregateData.getLowValue();
+    Date newLowValue = newData.getLowValue();
+
+    Date mergedLowValue = null;
+    if (aggregateData.isSetLowValue() && newData.isSetLowValue()) {
+      mergedLowValue = aggregateLowValue.compareTo(newLowValue) > 0 ? newLowValue : aggregateLowValue;
+    } else {
+      mergedLowValue = aggregateLowValue == null ? newLowValue : aggregateLowValue;
+    }
+
+    aggregateData.setLowValue(mergedLowValue);
+  }
+
+  public void setHighValue(DateColumnStatsDataInspector aggregateData, DateColumnStatsDataInspector newData) {
+    if (!aggregateData.isSetHighValue() && !newData.isSetHighValue()) {
+      return;
+    }
+
+    Date aggregateHighValue = aggregateData.getHighValue();
+    Date newHighValue = newData.getHighValue();
+
+    Date mergedHighValue = null;
+    if (aggregateData.isSetHighValue() && newData.isSetHighValue()) {
+      mergedHighValue = aggregateHighValue.compareTo(newHighValue) > 0 ? aggregateHighValue : newHighValue;
+    } else {
+      mergedHighValue = aggregateHighValue == null ? newHighValue : aggregateHighValue;
+    }
+
+    aggregateData.setHighValue(mergedHighValue);
   }
 }

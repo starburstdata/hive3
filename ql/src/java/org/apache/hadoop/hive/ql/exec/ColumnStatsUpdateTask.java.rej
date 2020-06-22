@@ -1,0 +1,33 @@
+***************
+*** 29,34 ****
+  import org.apache.hadoop.hive.common.TableName;
+  import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
+  import org.apache.hadoop.hive.common.ValidWriteIdList;
+  import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
+  import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
+  import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+--- 29,35 ----
+  import org.apache.hadoop.hive.common.TableName;
+  import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
+  import org.apache.hadoop.hive.common.ValidWriteIdList;
++ import org.apache.hadoop.hive.conf.Constants;
+  import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
+  import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
+  import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+***************
+*** 289,295 ****
+    private int persistColumnStats(Hive db) throws HiveException, MetaException, IOException {
+      ColumnStatistics colStats = constructColumnStatsFromInput();
+      SetPartitionsStatsRequest request =
+-             new SetPartitionsStatsRequest(Collections.singletonList(colStats));
+  
+      // Set writeId and validWriteId list for replicated statistics. getColStats() will return
+      // non-null value only during replication.
+--- 291,297 ----
+    private int persistColumnStats(Hive db) throws HiveException, MetaException, IOException {
+      ColumnStatistics colStats = constructColumnStatsFromInput();
+      SetPartitionsStatsRequest request =
++             new SetPartitionsStatsRequest(Collections.singletonList(colStats), Constants.HIVE_ENGINE);
+  
+      // Set writeId and validWriteId list for replicated statistics. getColStats() will return
+      // non-null value only during replication.

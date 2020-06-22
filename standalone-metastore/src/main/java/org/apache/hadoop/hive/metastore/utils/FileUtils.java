@@ -17,27 +17,29 @@
  */
 package org.apache.hadoop.hive.metastore.utils;
 
-import org.apache.curator.shaded.com.google.common.collect.Lists;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.Trash;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FileUtils {
   private static final PathFilter SNAPSHOT_DIR_PATH_FILTER = new PathFilter() {
@@ -307,41 +309,31 @@ public class FileUtils {
   /**
    * Get all file status from a root path and recursively go deep into certain levels.
    *
-   * @param path
+   * @param base
    *          the root path
-   * @param level
-   *          the depth of directory to explore
    * @param fs
    *          the file system
    * @return array of FileStatus
    * @throws IOException
    */
-  public static List<FileStatus> getFileStatusRecurse(Path path, int level, FileSystem fs)
-      throws IOException {
-
-    // if level is <0, the return all files/directories under the specified path
-    if (level < 0) {
-      List<FileStatus> result = new ArrayList<>();
-      try {
-        FileStatus fileStatus = fs.getFileStatus(path);
-        FileUtils.listStatusRecursively(fs, fileStatus, result);
-      } catch (IOException e) {
-        // globStatus() API returns empty FileStatus[] when the specified path
-        // does not exist. But getFileStatus() throw IOException. To mimic the
-        // similar behavior we will return empty array on exception. For external
-        // tables, the path of the table will not exists during table creation
-        return new ArrayList<>(0);
+  public static List<FileStatus> getFileStatusRecurse(Path base, FileSystem fs) {
+    try {
+      List<FileStatus> results = new ArrayList<>();
+      if (isS3a(fs)) {
+        // S3A file system has an optimized recursive directory listing implementation however it doesn't support filtering.
+        // Therefore we filter the result set afterwards. This might be not so optimal in HDFS case (which does a tree walking) where a filter could have been used.
+        listS3FilesRecursive(base, fs, results);
+      } else {
+        listStatusRecursively(fs, fs.getFileStatus(base), results);
       }
-      return result;
+      return results;
+    } catch (IOException e) {
+      // globStatus() API returns empty FileStatus[] when the specified path
+      // does not exist. But getFileStatus() throw IOException. To mimic the
+      // similar behavior we will return empty array on exception. For external
+      // tables, the path of the table will not exists during table creation
+      return new ArrayList<>(0);
     }
-
-    // construct a path pattern (e.g., /*/*) to find all dynamically generated paths
-    StringBuilder sb = new StringBuilder(path.toUri().getPath());
-    for (int i = 0; i < level; i++) {
-      sb.append(Path.SEPARATOR).append("*");
-    }
-    Path pathPattern = new Path(path, sb.toString());
-    return Lists.newArrayList(fs.globStatus(pathPattern, FileUtils.HIDDEN_FILES_PATH_FILTER));
   }
 
   /**
@@ -357,7 +349,7 @@ public class FileUtils {
    * @param results
    *          receives enumeration of all files found
    */
-  public static void listStatusRecursively(FileSystem fs, FileStatus fileStatus,
+  private static void listStatusRecursively(FileSystem fs, FileStatus fileStatus,
                                            List<FileStatus> results) throws IOException {
 
     if (fileStatus.isDir()) {
@@ -366,6 +358,25 @@ public class FileUtils {
       }
     } else {
       results.add(fileStatus);
+    }
+  }
+
+  private static void listS3FilesRecursive(Path base, FileSystem fs, List<FileStatus> results) throws IOException {
+    RemoteIterator<LocatedFileStatus> remoteIterator = fs.listFiles(base, true);
+    while (remoteIterator.hasNext()) {
+      LocatedFileStatus each = remoteIterator.next();
+      Path relativePath = new Path(each.getPath().toString().replace(base.toString(), ""));
+      if (RemoteIteratorWithFilter.HIDDEN_FILES_FULL_PATH_FILTER.accept(relativePath)) {
+        results.add(each);
+      }
+    }
+  }
+
+  public static boolean isS3a(FileSystem fs) {
+    try {
+      return "s3a".equalsIgnoreCase(fs.getScheme());
+    } catch (UnsupportedOperationException ex) {
+      return false;
     }
   }
 
@@ -509,5 +520,86 @@ public class FileUtils {
     }
 
     return new Path(scheme, authority, pathUri.getPath());
+  }
+
+  /**
+   * Returns a BEST GUESS as to whether or not other is a subdirectory of parent. It does not
+   * take into account any intricacies of the underlying file system, which is assumed to be
+   * HDFS. This should not return any false positives, but may return false negatives.
+   *
+   * @param parent
+   * @param other Directory to check if it is a subdirectory of parent
+   * @return True, if other is subdirectory of parent
+   */
+  public static boolean isSubdirectory(String parent, String other) {
+    return other.startsWith(parent.endsWith(Path.SEPARATOR) ? parent : parent + Path.SEPARATOR);
+  }
+
+  public static Path getTransformedPath(String name, String subDir, String root) {
+    if (root != null) {
+      Path newPath = new Path(root);
+      if (subDir != null) {
+        newPath = new Path(newPath, subDir);
+      }
+      return new Path(newPath, name);
+    }
+    return null;
+  }
+  public static class RemoteIteratorWithFilter implements RemoteIterator<LocatedFileStatus> {
+    /**
+     * This works with {@link RemoteIterator} which (potentially) produces all files recursively
+     * so looking for hidden folders must look at whole path, not just the the last part of it as
+     * would be appropriate w/o recursive listing.
+     */
+    public static final PathFilter HIDDEN_FILES_FULL_PATH_FILTER = new PathFilter() {
+      @Override
+      public boolean accept(Path p) {
+        do {
+          String name = p.getName();
+          if (name.startsWith("_") || name.startsWith(".")) {
+            return false;
+          }
+        } while ((p = p.getParent()) != null);
+        return true;
+      }
+    };
+    private final RemoteIterator<LocatedFileStatus> iter;
+    private final PathFilter filter;
+    private LocatedFileStatus nextFile;
+
+    public RemoteIteratorWithFilter(RemoteIterator<LocatedFileStatus> iter, PathFilter filter)
+        throws IOException {
+      this.iter = iter;
+      this.filter = filter;
+      findNext();
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      return nextFile != null;
+    }
+
+    @Override
+    public LocatedFileStatus next() throws IOException {
+      if (!hasNext()) {
+        throw new NoSuchElementException();
+      }
+      LocatedFileStatus result = nextFile;
+      findNext();
+      return result;
+    }
+
+    void findNext() throws IOException {
+      while (iter.hasNext()) {
+        LocatedFileStatus status = iter.next();
+        if (filter.accept(status.getPath())) {
+          nextFile = status;
+          return;
+        }
+      }
+
+      // No more matching files in the iterator
+      nextFile = null;
+    }
   }
 }

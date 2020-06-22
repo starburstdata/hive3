@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
   private static final org.apache.thrift.protocol.TField OWNER_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("ownerName", org.apache.thrift.protocol.TType.STRING, (short)6);
   private static final org.apache.thrift.protocol.TField OWNER_TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("ownerType", org.apache.thrift.protocol.TType.I32, (short)7);
   private static final org.apache.thrift.protocol.TField CATALOG_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("catalogName", org.apache.thrift.protocol.TType.STRING, (short)8);
+  private static final org.apache.thrift.protocol.TField CREATE_TIME_FIELD_DESC = new org.apache.thrift.protocol.TField("createTime", org.apache.thrift.protocol.TType.I32, (short)9);
+  private static final org.apache.thrift.protocol.TField MANAGED_LOCATION_URI_FIELD_DESC = new org.apache.thrift.protocol.TField("managedLocationUri", org.apache.thrift.protocol.TType.STRING, (short)10);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -61,6 +63,8 @@ import org.slf4j.LoggerFactory;
   private String ownerName; // optional
   private PrincipalType ownerType; // optional
   private String catalogName; // optional
+  private int createTime; // optional
+  private String managedLocationUri; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -75,7 +79,9 @@ import org.slf4j.LoggerFactory;
      * @see PrincipalType
      */
     OWNER_TYPE((short)7, "ownerType"),
-    CATALOG_NAME((short)8, "catalogName");
+    CATALOG_NAME((short)8, "catalogName"),
+    CREATE_TIME((short)9, "createTime"),
+    MANAGED_LOCATION_URI((short)10, "managedLocationUri");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -106,6 +112,10 @@ import org.slf4j.LoggerFactory;
           return OWNER_TYPE;
         case 8: // CATALOG_NAME
           return CATALOG_NAME;
+        case 9: // CREATE_TIME
+          return CREATE_TIME;
+        case 10: // MANAGED_LOCATION_URI
+          return MANAGED_LOCATION_URI;
         default:
           return null;
       }
@@ -146,7 +156,9 @@ import org.slf4j.LoggerFactory;
   }
 
   // isset id assignments
-  private static final _Fields optionals[] = {_Fields.PRIVILEGES,_Fields.OWNER_NAME,_Fields.OWNER_TYPE,_Fields.CATALOG_NAME};
+  private static final int __CREATETIME_ISSET_ID = 0;
+  private byte __isset_bitfield = 0;
+  private static final _Fields optionals[] = {_Fields.PRIVILEGES,_Fields.OWNER_NAME,_Fields.OWNER_TYPE,_Fields.CATALOG_NAME,_Fields.CREATE_TIME,_Fields.MANAGED_LOCATION_URI};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -167,6 +179,10 @@ import org.slf4j.LoggerFactory;
     tmpMap.put(_Fields.OWNER_TYPE, new org.apache.thrift.meta_data.FieldMetaData("ownerType", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, PrincipalType.class)));
     tmpMap.put(_Fields.CATALOG_NAME, new org.apache.thrift.meta_data.FieldMetaData("catalogName", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.CREATE_TIME, new org.apache.thrift.meta_data.FieldMetaData("createTime", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+    tmpMap.put(_Fields.MANAGED_LOCATION_URI, new org.apache.thrift.meta_data.FieldMetaData("managedLocationUri", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(Database.class, metaDataMap);
@@ -192,6 +208,7 @@ import org.slf4j.LoggerFactory;
    * Performs a deep copy on <i>other</i>.
    */
   public Database(Database other) {
+    __isset_bitfield = other.__isset_bitfield;
     if (other.isSetName()) {
       this.name = other.name;
     }
@@ -217,6 +234,10 @@ import org.slf4j.LoggerFactory;
     if (other.isSetCatalogName()) {
       this.catalogName = other.catalogName;
     }
+    this.createTime = other.createTime;
+    if (other.isSetManagedLocationUri()) {
+      this.managedLocationUri = other.managedLocationUri;
+    }
   }
 
   public Database deepCopy() {
@@ -233,6 +254,9 @@ import org.slf4j.LoggerFactory;
     this.ownerName = null;
     this.ownerType = null;
     this.catalogName = null;
+    setCreateTimeIsSet(false);
+    this.createTime = 0;
+    this.managedLocationUri = null;
   }
 
   public String getName() {
@@ -438,6 +462,51 @@ import org.slf4j.LoggerFactory;
     }
   }
 
+  public int getCreateTime() {
+    return this.createTime;
+  }
+
+  public void setCreateTime(int createTime) {
+    this.createTime = createTime;
+    setCreateTimeIsSet(true);
+  }
+
+  public void unsetCreateTime() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __CREATETIME_ISSET_ID);
+  }
+
+  /** Returns true if field createTime is set (has been assigned a value) and false otherwise */
+  public boolean isSetCreateTime() {
+    return EncodingUtils.testBit(__isset_bitfield, __CREATETIME_ISSET_ID);
+  }
+
+  public void setCreateTimeIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __CREATETIME_ISSET_ID, value);
+  }
+
+  public String getManagedLocationUri() {
+    return this.managedLocationUri;
+  }
+
+  public void setManagedLocationUri(String managedLocationUri) {
+    this.managedLocationUri = managedLocationUri;
+  }
+
+  public void unsetManagedLocationUri() {
+    this.managedLocationUri = null;
+  }
+
+  /** Returns true if field managedLocationUri is set (has been assigned a value) and false otherwise */
+  public boolean isSetManagedLocationUri() {
+    return this.managedLocationUri != null;
+  }
+
+  public void setManagedLocationUriIsSet(boolean value) {
+    if (!value) {
+      this.managedLocationUri = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case NAME:
@@ -504,6 +573,22 @@ import org.slf4j.LoggerFactory;
       }
       break;
 
+    case CREATE_TIME:
+      if (value == null) {
+        unsetCreateTime();
+      } else {
+        setCreateTime((Integer)value);
+      }
+      break;
+
+    case MANAGED_LOCATION_URI:
+      if (value == null) {
+        unsetManagedLocationUri();
+      } else {
+        setManagedLocationUri((String)value);
+      }
+      break;
+
     }
   }
 
@@ -533,6 +618,12 @@ import org.slf4j.LoggerFactory;
     case CATALOG_NAME:
       return getCatalogName();
 
+    case CREATE_TIME:
+      return getCreateTime();
+
+    case MANAGED_LOCATION_URI:
+      return getManagedLocationUri();
+
     }
     throw new IllegalStateException();
   }
@@ -560,6 +651,10 @@ import org.slf4j.LoggerFactory;
       return isSetOwnerType();
     case CATALOG_NAME:
       return isSetCatalogName();
+    case CREATE_TIME:
+      return isSetCreateTime();
+    case MANAGED_LOCATION_URI:
+      return isSetManagedLocationUri();
     }
     throw new IllegalStateException();
   }
@@ -649,6 +744,24 @@ import org.slf4j.LoggerFactory;
         return false;
     }
 
+    boolean this_present_createTime = true && this.isSetCreateTime();
+    boolean that_present_createTime = true && that.isSetCreateTime();
+    if (this_present_createTime || that_present_createTime) {
+      if (!(this_present_createTime && that_present_createTime))
+        return false;
+      if (this.createTime != that.createTime)
+        return false;
+    }
+
+    boolean this_present_managedLocationUri = true && this.isSetManagedLocationUri();
+    boolean that_present_managedLocationUri = true && that.isSetManagedLocationUri();
+    if (this_present_managedLocationUri || that_present_managedLocationUri) {
+      if (!(this_present_managedLocationUri && that_present_managedLocationUri))
+        return false;
+      if (!this.managedLocationUri.equals(that.managedLocationUri))
+        return false;
+    }
+
     return true;
   }
 
@@ -695,6 +808,16 @@ import org.slf4j.LoggerFactory;
     list.add(present_catalogName);
     if (present_catalogName)
       list.add(catalogName);
+
+    boolean present_createTime = true && (isSetCreateTime());
+    list.add(present_createTime);
+    if (present_createTime)
+      list.add(createTime);
+
+    boolean present_managedLocationUri = true && (isSetManagedLocationUri());
+    list.add(present_managedLocationUri);
+    if (present_managedLocationUri)
+      list.add(managedLocationUri);
 
     return list.hashCode();
   }
@@ -783,6 +906,26 @@ import org.slf4j.LoggerFactory;
     }
     if (isSetCatalogName()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.catalogName, other.catalogName);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetCreateTime()).compareTo(other.isSetCreateTime());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetCreateTime()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.createTime, other.createTime);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetManagedLocationUri()).compareTo(other.isSetManagedLocationUri());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetManagedLocationUri()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.managedLocationUri, other.managedLocationUri);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -878,6 +1021,22 @@ import org.slf4j.LoggerFactory;
       }
       first = false;
     }
+    if (isSetCreateTime()) {
+      if (!first) sb.append(", ");
+      sb.append("createTime:");
+      sb.append(this.createTime);
+      first = false;
+    }
+    if (isSetManagedLocationUri()) {
+      if (!first) sb.append(", ");
+      sb.append("managedLocationUri:");
+      if (this.managedLocationUri == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.managedLocationUri);
+      }
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -900,6 +1059,8 @@ import org.slf4j.LoggerFactory;
 
   private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
     try {
+      // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
+      __isset_bitfield = 0;
       read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
     } catch (org.apache.thrift.TException te) {
       throw new java.io.IOException(te);
@@ -951,15 +1112,15 @@ import org.slf4j.LoggerFactory;
           case 4: // PARAMETERS
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
-                org.apache.thrift.protocol.TMap _map102 = iprot.readMapBegin();
-                struct.parameters = new HashMap<String,String>(2*_map102.size);
-                String _key103;
-                String _val104;
-                for (int _i105 = 0; _i105 < _map102.size; ++_i105)
+                org.apache.thrift.protocol.TMap _map110 = iprot.readMapBegin();
+                struct.parameters = new HashMap<String,String>(2*_map110.size);
+                String _key111;
+                String _val112;
+                for (int _i113 = 0; _i113 < _map110.size; ++_i113)
                 {
-                  _key103 = iprot.readString();
-                  _val104 = iprot.readString();
-                  struct.parameters.put(_key103, _val104);
+                  _key111 = iprot.readString();
+                  _val112 = iprot.readString();
+                  struct.parameters.put(_key111, _val112);
                 }
                 iprot.readMapEnd();
               }
@@ -1001,6 +1162,22 @@ import org.slf4j.LoggerFactory;
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 9: // CREATE_TIME
+            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+              struct.createTime = iprot.readI32();
+              struct.setCreateTimeIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 10: // MANAGED_LOCATION_URI
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.managedLocationUri = iprot.readString();
+              struct.setManagedLocationUriIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1033,10 +1210,10 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(PARAMETERS_FIELD_DESC);
         {
           oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.parameters.size()));
-          for (Map.Entry<String, String> _iter106 : struct.parameters.entrySet())
+          for (Map.Entry<String, String> _iter114 : struct.parameters.entrySet())
           {
-            oprot.writeString(_iter106.getKey());
-            oprot.writeString(_iter106.getValue());
+            oprot.writeString(_iter114.getKey());
+            oprot.writeString(_iter114.getValue());
           }
           oprot.writeMapEnd();
         }
@@ -1067,6 +1244,18 @@ import org.slf4j.LoggerFactory;
         if (struct.isSetCatalogName()) {
           oprot.writeFieldBegin(CATALOG_NAME_FIELD_DESC);
           oprot.writeString(struct.catalogName);
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.isSetCreateTime()) {
+        oprot.writeFieldBegin(CREATE_TIME_FIELD_DESC);
+        oprot.writeI32(struct.createTime);
+        oprot.writeFieldEnd();
+      }
+      if (struct.managedLocationUri != null) {
+        if (struct.isSetManagedLocationUri()) {
+          oprot.writeFieldBegin(MANAGED_LOCATION_URI_FIELD_DESC);
+          oprot.writeString(struct.managedLocationUri);
           oprot.writeFieldEnd();
         }
       }
@@ -1112,7 +1301,13 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetCatalogName()) {
         optionals.set(7);
       }
-      oprot.writeBitSet(optionals, 8);
+      if (struct.isSetCreateTime()) {
+        optionals.set(8);
+      }
+      if (struct.isSetManagedLocationUri()) {
+        optionals.set(9);
+      }
+      oprot.writeBitSet(optionals, 10);
       if (struct.isSetName()) {
         oprot.writeString(struct.name);
       }
@@ -1125,10 +1320,10 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetParameters()) {
         {
           oprot.writeI32(struct.parameters.size());
-          for (Map.Entry<String, String> _iter107 : struct.parameters.entrySet())
+          for (Map.Entry<String, String> _iter115 : struct.parameters.entrySet())
           {
-            oprot.writeString(_iter107.getKey());
-            oprot.writeString(_iter107.getValue());
+            oprot.writeString(_iter115.getKey());
+            oprot.writeString(_iter115.getValue());
           }
         }
       }
@@ -1144,12 +1339,18 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetCatalogName()) {
         oprot.writeString(struct.catalogName);
       }
+      if (struct.isSetCreateTime()) {
+        oprot.writeI32(struct.createTime);
+      }
+      if (struct.isSetManagedLocationUri()) {
+        oprot.writeString(struct.managedLocationUri);
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, Database struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(8);
+      BitSet incoming = iprot.readBitSet(10);
       if (incoming.get(0)) {
         struct.name = iprot.readString();
         struct.setNameIsSet(true);
@@ -1164,15 +1365,15 @@ import org.slf4j.LoggerFactory;
       }
       if (incoming.get(3)) {
         {
-          org.apache.thrift.protocol.TMap _map108 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.parameters = new HashMap<String,String>(2*_map108.size);
-          String _key109;
-          String _val110;
-          for (int _i111 = 0; _i111 < _map108.size; ++_i111)
+          org.apache.thrift.protocol.TMap _map116 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.parameters = new HashMap<String,String>(2*_map116.size);
+          String _key117;
+          String _val118;
+          for (int _i119 = 0; _i119 < _map116.size; ++_i119)
           {
-            _key109 = iprot.readString();
-            _val110 = iprot.readString();
-            struct.parameters.put(_key109, _val110);
+            _key117 = iprot.readString();
+            _val118 = iprot.readString();
+            struct.parameters.put(_key117, _val118);
           }
         }
         struct.setParametersIsSet(true);
@@ -1193,6 +1394,14 @@ import org.slf4j.LoggerFactory;
       if (incoming.get(7)) {
         struct.catalogName = iprot.readString();
         struct.setCatalogNameIsSet(true);
+      }
+      if (incoming.get(8)) {
+        struct.createTime = iprot.readI32();
+        struct.setCreateTimeIsSet(true);
+      }
+      if (incoming.get(9)) {
+        struct.managedLocationUri = iprot.readString();
+        struct.setManagedLocationUriIsSet(true);
       }
     }
   }

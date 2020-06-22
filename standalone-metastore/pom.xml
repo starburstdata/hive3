@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -12,25 +11,23 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>18</version>
-    <relativePath></relativePath>
+    <relativePath />
   </parent>
 
   <groupId>org.apache.hive</groupId>
   <artifactId>hive-standalone-metastore</artifactId>
-  <version>3.1.2</version>
+  <version>3.1.3000.7.1.1.0-565</version>
   <packaging>jar</packaging>
   <name>Hive Standalone Metastore</name>
 
   <properties>
-    <hive.version.shortname>3.1.0</hive.version.shortname>
+    <hive.version.shortname>3.1.3000</hive.version.shortname>
 
     <!-- Build properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -45,6 +42,7 @@
     <log4j.conf.dir>${project.basedir}/src/test/resources</log4j.conf.dir>
     <test.tmp.dir>${project.build.directory}/tmp</test.tmp.dir>
     <test.warehouse.dir>${project.build.directory}/warehouse</test.warehouse.dir>
+    <test.warehouse.external.dir>${project.build.directory}/external</test.warehouse.external.dir>
     <test.warehouse.scheme>file://</test.warehouse.scheme>
     <test.forkcount>1</test.forkcount>
     <skipITests>true</skipITests>
@@ -61,8 +59,9 @@
     <!-- Dependency versions -->
     <antlr.version>3.5.2</antlr.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
+    <apache-directory-server.version>1.5.7</apache-directory-server.version>
     <commons-dbcp.version>1.4</commons-dbcp.version>
-    <commons-lang3.version>3.2</commons-lang3.version>
+    <commons-lang3.version>3.9</commons-lang3.version>
     <datanucleus-api-jdo.version>4.2.4</datanucleus-api-jdo.version>
     <datanucleus-core.version>4.1.17</datanucleus-core.version>
     <datanucleus-jdo.version>3.2.0-m3</datanucleus-jdo.version>
@@ -70,20 +69,24 @@
     <derby.version>10.10.2.0</derby.version>
     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
     <dropwizard.version>3.1.0</dropwizard.version>
-    <guava.version>19.0</guava.version>
-    <hadoop.version>3.1.0</hadoop.version>
+    <guava.version>28.1-jre</guava.version>
+    <hadoop.version>3.1.1.7.1.1.0-565</hadoop.version>
     <hikaricp.version>2.6.1</hikaricp.version>
-    <jackson.version>2.9.5</jackson.version>
+    <jackson.version>2.9.9</jackson.version>
     <javolution.version>5.5.1</javolution.version>
     <junit.version>4.11</junit.version>
     <libfb303.version>0.9.3</libfb303.version>
-    <libthrift.version>0.9.3</libthrift.version>
+    <libthrift.version>0.9.3-1</libthrift.version>
     <log4j2.version>2.8.2</log4j2.version>
     <mockito-all.version>1.10.19</mockito-all.version>
-    <orc.version>1.5.1</orc.version>
+    <orc.version>1.5.1.7.1.1.0-565</orc.version>
     <protobuf.version>2.5.0</protobuf.version>
     <sqlline.version>1.3.0</sqlline.version>
-    <storage-api.version>2.7.0</storage-api.version>
+    <storage-api.version>3.1.3000.7.1.1.0-565</storage-api.version>
+    <ST4.version>4.0.4</ST4.version>
+    <zookeeper.version>3.5.5.7.1.1.0-565</zookeeper.version>
+    <curator.version>4.2.0</curator.version>
+    <cron-utils.version>8.1.1</cron-utils.version>
 
     <!-- Thrift properties -->
     <thrift.home>you-must-set-this-to-run-thrift</thrift.home>
@@ -169,6 +172,11 @@
       <version>${antlr.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.antlr</groupId>
+      <artifactId>ST4</artifactId>
+      <version>${ST4.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
       <version>${commons-lang3.version}</version>
@@ -192,6 +200,26 @@
           <groupId>commmons-logging</groupId>
           <artifactId>commons-logging</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.zookeeper</groupId>
+          <artifactId>zookeeper</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-test</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-framework</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-recipes</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -213,6 +241,10 @@
         <exclusion>
           <groupId>commmons-logging</groupId>
           <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-framework</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -305,6 +337,48 @@
       <artifactId>sqlline</artifactId>
       <version>${sqlline.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>${zookeeper.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.jboss.netty</groupId>
+          <artifactId>netty</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-recipes</artifactId>
+      <version>${curator.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-framework</artifactId>
+      <version>${curator.version}</version>
+    </dependency>
+      <dependency>
+        <groupId>com.cronutils</groupId>
+        <artifactId>cron-utils</artifactId>
+        <version>${cron-utils.version}</version>
+      </dependency>
 
     <!-- test scope dependencies -->
 
@@ -321,23 +395,34 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.directory.server</groupId>
+      <artifactId>apacheds-server-integ</artifactId>
+      <version>${apache-directory-server.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.directory.server</groupId>
+      <artifactId>apacheds-test-framework</artifactId>
+      <version>${apache-directory-server.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <version>${mockito-all.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-        <!-- Note, this is LGPL.  But we're only using it in a test and not changing it, so I
-        believe we are fine. -->
-      <groupId>org.mariadb.jdbc</groupId>
-      <artifactId>mariadb-java-client</artifactId>
-      <version>2.2.0</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>9.3-1102-jdbc41</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-test</artifactId>
+      <version>${curator.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -356,19 +441,18 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <target>
-                    <taskdef name="for" classname="net.sf.antcontrib.logic.ForTask"
-                             classpathref="maven.plugin.classpath" />
-                    <property name="thrift.args" value="${thrift.args}"/>
-                    <property name="thrift.gen.dir" value="${thrift.gen.dir}"/>
-                    <delete dir="${thrift.gen.dir}"/>
-                    <mkdir dir="${thrift.gen.dir}"/>
+                    <taskdef classname="net.sf.antcontrib.logic.ForTask" classpathref="maven.plugin.classpath" name="for" />
+                    <property name="thrift.args" value="${thrift.args}" />
+                    <property name="thrift.gen.dir" value="${thrift.gen.dir}" />
+                    <delete dir="${thrift.gen.dir}" />
+                    <mkdir dir="${thrift.gen.dir}" />
                     <for param="thrift.file">
                       <path>
                         <fileset dir="." includes="src/main/thrift/*.thrift" />
                       </path>
                       <sequential>
-                        <echo message="Generating Thrift code for @{thrift.file}"/>
-                        <exec executable="${thrift.home}/bin/thrift"  failonerror="true" dir=".">
+                        <echo message="Generating Thrift code for @{thrift.file}" />
+                        <exec dir="." executable="${thrift.home}/bin/thrift" failonerror="true">
                           <arg line="${thrift.args} -I ${basedir}/include -I ${basedir}/.. -o ${thrift.gen.dir} @{thrift.file} " />
                         </exec>
                       </sequential>
@@ -399,6 +483,8 @@
                     <include>Partition.java</include>
                     <include>SerDeInfo.java</include>
                     <include>StorageDescriptor.java</include>
+                    <include>ColumnStatisticsDesc.java</include>
+                    <include>ColumnStatisticsObj.java</include>
                   </includes>
                   <tokenValueMap>${basedir}/src/main/resources/thrift-replacements.txt</tokenValueMap>
                   <regex>true</regex>
@@ -540,8 +626,10 @@
               <target>
                 <delete dir="${test.tmp.dir}" />
                 <delete dir="${test.warehouse.dir}" />
+                <delete dir="${test.warehouse.external.dir}" />
                 <mkdir dir="${test.tmp.dir}" />
                 <mkdir dir="${test.warehouse.dir}" />
+                <mkdir dir="${test.warehouse.external.dir}" />
               </target>
             </configuration>
           </execution>
@@ -551,10 +639,10 @@
             <configuration>
               <target>
                 <exec executable="bash" failonerror="true">
-                  <arg value="${basedir}/src/main/resources/saveVersion.sh"/>
-                  <arg value="${project.version}"/>
-                  <arg value="${hive.version.shortname}"/>
-                  <arg value="${basedir}/src"/>
+                  <arg value="${basedir}/src/main/resources/saveVersion.sh" />
+                  <arg value="${project.version}" />
+                  <arg value="${hive.version.shortname}" />
+                  <arg value="${basedir}/src" />
                 </exec>
               </target>
             </configuration>
@@ -572,7 +660,7 @@
               <target>
                 <mkdir dir="${test.tmp.dir}/scripts/metastore/upgrade" />
                 <copy todir="${test.tmp.dir}/scripts/metastore/upgrade">
-                  <fileset dir="${basedir}/src/main/sql/"/>
+                  <fileset dir="${basedir}/src/main/sql/" />
                 </copy>
               </target>
             </configuration>
@@ -683,6 +771,7 @@
             <metastore.schema.verification>false</metastore.schema.verification>
             <test.tmp.dir>${test.tmp.dir}</test.tmp.dir>
             <metastore.warehouse.dir>${test.warehouse.scheme}${test.warehouse.dir}</metastore.warehouse.dir>
+            <hive.metastore.warehouse.external.dir>${test.warehouse.scheme}${test.warehouse.external.dir}</hive.metastore.warehouse.external.dir>
           </systemPropertyVariables>
           <additionalClasspathElements>
             <additionalClasspathElement>${log4j.conf.dir}</additionalClasspathElement>
@@ -762,7 +851,7 @@
           <executable>java</executable>
           <arguments>
             <argument>-classpath</argument>
-            <classpath/>
+            <classpath />
             <argument>org.apache.hadoop.hive.metastore.conf.ConfTemplatePrinter</argument>
             <argument>${project.build.directory}/generated-sources/conf/metastore-site.xml.template</argument>
           </arguments>

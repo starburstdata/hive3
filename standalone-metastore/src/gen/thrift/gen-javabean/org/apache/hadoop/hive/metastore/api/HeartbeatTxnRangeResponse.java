@@ -453,13 +453,13 @@ import org.slf4j.LoggerFactory;
           case 1: // ABORTED
             if (schemeField.type == org.apache.thrift.protocol.TType.SET) {
               {
-                org.apache.thrift.protocol.TSet _set666 = iprot.readSetBegin();
-                struct.aborted = new HashSet<Long>(2*_set666.size);
-                long _elem667;
-                for (int _i668 = 0; _i668 < _set666.size; ++_i668)
+                org.apache.thrift.protocol.TSet _set738 = iprot.readSetBegin();
+                struct.aborted = new HashSet<Long>(2*_set738.size);
+                long _elem739;
+                for (int _i740 = 0; _i740 < _set738.size; ++_i740)
                 {
-                  _elem667 = iprot.readI64();
-                  struct.aborted.add(_elem667);
+                  _elem739 = iprot.readI64();
+                  struct.aborted.add(_elem739);
                 }
                 iprot.readSetEnd();
               }
@@ -471,13 +471,13 @@ import org.slf4j.LoggerFactory;
           case 2: // NOSUCH
             if (schemeField.type == org.apache.thrift.protocol.TType.SET) {
               {
-                org.apache.thrift.protocol.TSet _set669 = iprot.readSetBegin();
-                struct.nosuch = new HashSet<Long>(2*_set669.size);
-                long _elem670;
-                for (int _i671 = 0; _i671 < _set669.size; ++_i671)
+                org.apache.thrift.protocol.TSet _set741 = iprot.readSetBegin();
+                struct.nosuch = new HashSet<Long>(2*_set741.size);
+                long _elem742;
+                for (int _i743 = 0; _i743 < _set741.size; ++_i743)
                 {
-                  _elem670 = iprot.readI64();
-                  struct.nosuch.add(_elem670);
+                  _elem742 = iprot.readI64();
+                  struct.nosuch.add(_elem742);
                 }
                 iprot.readSetEnd();
               }
@@ -503,9 +503,9 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(ABORTED_FIELD_DESC);
         {
           oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, struct.aborted.size()));
-          for (long _iter672 : struct.aborted)
+          for (long _iter744 : struct.aborted)
           {
-            oprot.writeI64(_iter672);
+            oprot.writeI64(_iter744);
           }
           oprot.writeSetEnd();
         }
@@ -515,9 +515,9 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(NOSUCH_FIELD_DESC);
         {
           oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, struct.nosuch.size()));
-          for (long _iter673 : struct.nosuch)
+          for (long _iter745 : struct.nosuch)
           {
-            oprot.writeI64(_iter673);
+            oprot.writeI64(_iter745);
           }
           oprot.writeSetEnd();
         }
@@ -542,16 +542,16 @@ import org.slf4j.LoggerFactory;
       TTupleProtocol oprot = (TTupleProtocol) prot;
       {
         oprot.writeI32(struct.aborted.size());
-        for (long _iter674 : struct.aborted)
+        for (long _iter746 : struct.aborted)
         {
-          oprot.writeI64(_iter674);
+          oprot.writeI64(_iter746);
         }
       }
       {
         oprot.writeI32(struct.nosuch.size());
-        for (long _iter675 : struct.nosuch)
+        for (long _iter747 : struct.nosuch)
         {
-          oprot.writeI64(_iter675);
+          oprot.writeI64(_iter747);
         }
       }
     }
@@ -560,24 +560,24 @@ import org.slf4j.LoggerFactory;
     public void read(org.apache.thrift.protocol.TProtocol prot, HeartbeatTxnRangeResponse struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       {
-        org.apache.thrift.protocol.TSet _set676 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
-        struct.aborted = new HashSet<Long>(2*_set676.size);
-        long _elem677;
-        for (int _i678 = 0; _i678 < _set676.size; ++_i678)
+        org.apache.thrift.protocol.TSet _set748 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+        struct.aborted = new HashSet<Long>(2*_set748.size);
+        long _elem749;
+        for (int _i750 = 0; _i750 < _set748.size; ++_i750)
         {
-          _elem677 = iprot.readI64();
-          struct.aborted.add(_elem677);
+          _elem749 = iprot.readI64();
+          struct.aborted.add(_elem749);
         }
       }
       struct.setAbortedIsSet(true);
       {
-        org.apache.thrift.protocol.TSet _set679 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
-        struct.nosuch = new HashSet<Long>(2*_set679.size);
-        long _elem680;
-        for (int _i681 = 0; _i681 < _set679.size; ++_i681)
+        org.apache.thrift.protocol.TSet _set751 = new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, iprot.readI32());
+        struct.nosuch = new HashSet<Long>(2*_set751.size);
+        long _elem752;
+        for (int _i753 = 0; _i753 < _set751.size; ++_i753)
         {
-          _elem680 = iprot.readI64();
-          struct.nosuch.add(_elem680);
+          _elem752 = iprot.readI64();
+          struct.nosuch.add(_elem752);
         }
       }
       struct.setNosuchIsSet(true);

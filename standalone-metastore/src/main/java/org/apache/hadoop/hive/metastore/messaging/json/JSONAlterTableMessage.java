@@ -20,8 +20,10 @@ package org.apache.hadoop.hive.metastore.messaging.json;
 
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.MessageBuilder;
 import org.apache.thrift.TException;
-import org.codehaus.jackson.annotate.JsonProperty;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * JSON alter table message
@@ -35,7 +37,7 @@ public class JSONAlterTableMessage extends AlterTableMessage {
   String isTruncateOp;
 
   @JsonProperty
-  Long timestamp;
+  Long timestamp, writeId;
 
   /**
    * Default constructor, needed for Jackson.
@@ -44,7 +46,7 @@ public class JSONAlterTableMessage extends AlterTableMessage {
   }
 
   public JSONAlterTableMessage(String server, String servicePrincipal, Table tableObjBefore, Table tableObjAfter,
-      boolean isTruncateOp, Long timestamp) {
+      boolean isTruncateOp, Long writeId, Long timestamp) {
     this.server = server;
     this.servicePrincipal = servicePrincipal;
     this.db = tableObjBefore.getDbName();
@@ -52,9 +54,10 @@ public class JSONAlterTableMessage extends AlterTableMessage {
     this.tableType = tableObjBefore.getTableType();
     this.isTruncateOp = Boolean.toString(isTruncateOp);
     this.timestamp = timestamp;
+    this.writeId = writeId;
     try {
-      this.tableObjBeforeJson = JSONMessageFactory.createTableObjJson(tableObjBefore);
-      this.tableObjAfterJson = JSONMessageFactory.createTableObjJson(tableObjAfter);
+      this.tableObjBeforeJson = MessageBuilder.createTableObjJson(tableObjBefore);
+      this.tableObjAfterJson = MessageBuilder.createTableObjJson(tableObjAfter);
     } catch (TException e) {
       throw new IllegalArgumentException("Could not serialize: ", e);
     }
@@ -88,7 +91,11 @@ public class JSONAlterTableMessage extends AlterTableMessage {
 
   @Override
   public String getTableType() {
-    if (tableType != null) return tableType; else return "";
+    if (tableType != null) {
+      return tableType;
+    } else {
+      return "";
+    }
   }
 
   @Override
@@ -96,12 +103,12 @@ public class JSONAlterTableMessage extends AlterTableMessage {
 
   @Override
   public Table getTableObjBefore() throws Exception {
-    return (Table) JSONMessageFactory.getTObj(tableObjBeforeJson,Table.class);
+    return (Table) MessageBuilder.getTObj(tableObjBeforeJson,Table.class);
   }
 
   @Override
   public Table getTableObjAfter() throws Exception {
-    return (Table) JSONMessageFactory.getTObj(tableObjAfterJson,Table.class);
+    return (Table) MessageBuilder.getTObj(tableObjAfterJson,Table.class);
   }
 
   public String getTableObjBeforeJson() {
@@ -110,6 +117,11 @@ public class JSONAlterTableMessage extends AlterTableMessage {
 
   public String getTableObjAfterJson() {
     return tableObjAfterJson ;
+  }
+
+  @Override
+  public Long getWriteId() {
+    return writeId == null ? 0 : writeId;
   }
 
   @Override

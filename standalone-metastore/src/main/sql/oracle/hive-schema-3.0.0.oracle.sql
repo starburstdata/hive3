@@ -82,9 +82,6 @@ CREATE TABLE CTLGS (
     UNIQUE ("NAME")
 );
 
--- Insert a default value.  The location is TBD.  Hive will fix this when it starts
-INSERT INTO CTLGS VALUES (1, 'hive', 'Default catalog for Hive', 'TBD');
-
 -- Table DBS for classes [org.apache.hadoop.hive.metastore.model.MDatabase]
 CREATE TABLE DBS
 (
@@ -94,7 +91,7 @@ CREATE TABLE DBS
     "NAME" VARCHAR2(128) NULL,
     OWNER_NAME VARCHAR2(128) NULL,
     OWNER_TYPE VARCHAR2(10) NULL,
-    CTLG_NAME VARCHAR2(256) DEFAULT 'hive'
+    CTLG_NAME VARCHAR2(256)
 );
 
 ALTER TABLE DBS ADD CONSTRAINT DBS_PK PRIMARY KEY (DB_ID);
@@ -1136,7 +1133,6 @@ CREATE TABLE RUNTIME_STATS (
 );
 
 CREATE INDEX IDX_RUNTIME_STATS_CREATE_TIME ON RUNTIME_STATS(CREATE_TIME);
-
 
 -- -----------------------------------------------------------------
 -- Record schema version. Should be the last step in the init script

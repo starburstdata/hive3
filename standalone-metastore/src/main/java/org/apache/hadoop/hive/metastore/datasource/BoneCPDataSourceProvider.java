@@ -24,6 +24,9 @@ import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hive.metastore.DatabaseProduct.MYSQL;
+import static org.apache.hadoop.hive.metastore.DatabaseProduct.determineDatabaseProduct;
+
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -36,8 +39,8 @@ public class BoneCPDataSourceProvider implements DataSourceProvider {
   private static final Logger LOG = LoggerFactory.getLogger(BoneCPDataSourceProvider.class);
 
   public static final String BONECP = "bonecp";
-  private static final String CONNECTION_TIMEOUT_PROPERTY= "bonecp.connectionTimeoutInMs";
-  private static final String PARTITION_COUNT_PROPERTY= "bonecp.partitionCount";
+  private static final String CONNECTION_TIMEOUT_PROPERTY= BONECP + ".connectionTimeoutInMs";
+  private static final String PARTITION_COUNT_PROPERTY= BONECP + ".partitionCount";
 
   @Override
   public DataSource create(Configuration hdpConfig) throws SQLException {
@@ -61,14 +64,19 @@ public class BoneCPDataSourceProvider implements DataSourceProvider {
       throw new SQLException("Cannot create BoneCP configuration: ", e);
     }
     config.setJdbcUrl(driverUrl);
-    //if we are waiting for connection for a long time, something is really wrong
-    //better raise an error than hang forever
-    //see DefaultConnectionStrategy.getConnectionInternal()
+    // if we are waiting for connection for a long time, something is really wrong
+    // better raise an error than hang forever
+    // see DefaultConnectionStrategy.getConnectionInternal()
     config.setConnectionTimeoutInMs(connectionTimeout);
     config.setMaxConnectionsPerPartition(maxPoolSize);
     config.setPartitionCount(Integer.parseInt(partitionCount));
     config.setUser(user);
     config.setPassword(passwd);
+
+    if (determineDatabaseProduct(driverUrl) == MYSQL) {
+      config.setInitSQL("SET @@session.sql_mode=ANSI_QUOTES");
+    }
+
     return new BoneCPDataSource(config);
   }
 
@@ -81,13 +89,7 @@ public class BoneCPDataSourceProvider implements DataSourceProvider {
   @Override
   public boolean supports(Configuration configuration) {
     String poolingType = MetastoreConf.getVar(configuration,
-            MetastoreConf.ConfVars.CONNECTION_POOLING_TYPE).toLowerCase();
-    if (BONECP.equals(poolingType)) {
-      int boneCpPropsNr = DataSourceProvider.getPrefixedProperties(configuration, BONECP).size();
-      LOG.debug("Found " + boneCpPropsNr + " nr. of bonecp specific configurations");
-      return boneCpPropsNr > 0;
-    }
-    LOG.debug("Configuration requested " + poolingType + " pooling, BoneCpDSProvider exiting");
-    return false;
+            MetastoreConf.ConfVars.CONNECTION_POOLING_TYPE);
+    return BONECP.equalsIgnoreCase(poolingType);
   }
 }

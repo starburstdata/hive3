@@ -63,11 +63,9 @@ CREATE TABLE "CTLGS" (
     "CTLG_ID" BIGINT PRIMARY KEY,
     "NAME" VARCHAR(256) UNIQUE,
     "DESC" VARCHAR(4000),
-    "LOCATION_URI" VARCHAR(4000) NOT NULL
+    "LOCATION_URI" VARCHAR(4000) NOT NULL,
+    "CREATE_TIME" BIGINT
 );
-
--- Insert a default value.  The location is TBD.  Hive will fix this when it starts
-INSERT INTO "CTLGS" VALUES (1, 'hive', 'Default catalog for Hive', 'TBD');
 
 --
 -- Name: DBS; Type: TABLE; Schema: public; Owner: hiveuser; Tablespace:
@@ -80,7 +78,8 @@ CREATE TABLE "DBS" (
     "NAME" character varying(128) DEFAULT NULL::character varying,
     "OWNER_NAME" character varying(128) DEFAULT NULL::character varying,
     "OWNER_TYPE" character varying(10) DEFAULT NULL::character varying,
-    "CTLG_NAME" varchar(256) DEFAULT 'hive'
+    "CTLG_NAME" varchar(256),
+    "CREATE_TIME" BIGINT
 );
 
 
@@ -171,7 +170,8 @@ CREATE TABLE "PARTITIONS" (
     "LAST_ACCESS_TIME" bigint NOT NULL,
     "PART_NAME" character varying(767) DEFAULT NULL::character varying,
     "SD_ID" bigint,
-    "TBL_ID" bigint
+    "TBL_ID" bigint,
+    "WRITE_ID" bigint DEFAULT 0
 );
 
 
@@ -395,7 +395,8 @@ CREATE TABLE "TBLS" (
     "TBL_TYPE" character varying(128) DEFAULT NULL::character varying,
     "VIEW_EXPANDED_TEXT" text,
     "VIEW_ORIGINAL_TEXT" text,
-    "IS_REWRITE_ENABLED" boolean NOT NULL DEFAULT false
+    "IS_REWRITE_ENABLED" boolean NOT NULL DEFAULT false,
+    "WRITE_ID" bigint DEFAULT 0
 );
 
 --
@@ -629,6 +630,8 @@ CREATE TABLE "NOTIFICATION_LOG"
     "MESSAGE_FORMAT" VARCHAR(16),
     PRIMARY KEY ("NL_ID")
 );
+
+CREATE UNIQUE INDEX "NOTIFICATION_LOG_EVENT_ID" ON "NOTIFICATION_LOG" USING btree ("EVENT_ID");
 
 CREATE TABLE "NOTIFICATION_SEQUENCE"
 (
@@ -1847,6 +1850,20 @@ CREATE TABLE RUNTIME_STATS (
 
 CREATE INDEX IDX_RUNTIME_STATS_CREATE_TIME ON RUNTIME_STATS(CREATE_TIME);
 
+CREATE TABLE "TXN_WRITE_NOTIFICATION_LOG" (
+  "WNL_ID" bigint NOT NULL,
+  "WNL_TXNID" bigint NOT NULL,
+  "WNL_WRITEID" bigint NOT NULL,
+  "WNL_DATABASE" varchar(128) NOT NULL,
+  "WNL_TABLE" varchar(128) NOT NULL,
+  "WNL_PARTITION" varchar(767) NOT NULL,
+  "WNL_TABLE_OBJ" text NOT NULL,
+  "WNL_PARTITION_OBJ" text,
+  "WNL_FILES" text,
+  "WNL_EVENT_TIME" integer NOT NULL,
+  PRIMARY KEY ("WNL_TXNID", "WNL_DATABASE", "WNL_TABLE", "WNL_PARTITION")
+);
+INSERT INTO "SEQUENCE_TABLE" ("SEQUENCE_NAME", "NEXT_VAL") VALUES ('org.apache.hadoop.hive.metastore.model.MTxnWriteNotificationLog', 1);
 
 -- -----------------------------------------------------------------
 -- Record schema version. Should be the last step in the init script

@@ -16,6 +16,11 @@ class hive_metastoreConstants {
   hive_metastoreConstants();
 
   std::string DDL_TIME;
+  std::string HMS_API;
+  int8_t ACCESSTYPE_NONE;
+  int8_t ACCESSTYPE_READONLY;
+  int8_t ACCESSTYPE_WRITEONLY;
+  int8_t ACCESSTYPE_READWRITE;
   std::string HIVE_FILTER_FIELD_OWNER;
   std::string HIVE_FILTER_FIELD_PARAMS;
   std::string HIVE_FILTER_FIELD_LAST_ACCESS;
@@ -40,6 +45,8 @@ class hive_metastoreConstants {
   std::string TABLE_NO_AUTO_COMPACT;
   std::string TABLE_TRANSACTIONAL_PROPERTIES;
   std::string TABLE_BUCKETING_VERSION;
+  std::string DRUID_CONFIG_PREFIX;
+  std::string JDBC_CONFIG_PREFIX;
 };
 
 extern const hive_metastoreConstants g_hive_metastore_constants;

@@ -59,6 +59,7 @@ import org.apache.hadoop.hive.metastore.client.builder.SQLPrimaryKeyBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.SQLUniqueConstraintBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.thrift.TException;
 import org.junit.After;
@@ -92,10 +93,12 @@ public abstract class NonCatCallsWithCatalog {
   protected abstract IMetaStoreClient getClient() throws Exception;
   protected abstract String expectedCatalog();
   protected abstract String expectedBaseDir() throws MetaException;
+  protected abstract String expectedExtBaseDir() throws MetaException;
 
   @Before
   public void setUp() throws Exception {
     conf = MetastoreConf.newMetastoreConf();
+    MetastoreConf.setBoolVar(this.conf, ConfVars.HIVE_IN_TEST, true);
     MetaStoreTestUtils.setConfForStandloneMode(conf);
 
     // Get new client
@@ -216,7 +219,7 @@ public abstract class NonCatCallsWithCatalog {
     }
 
     Database fetched = client.getDatabase(dbNames[0]);
-    String expectedLocation = new File(expectedBaseDir(), dbNames[0] + ".db").toURI().toString();
+    String expectedLocation = new File(expectedExtBaseDir(), dbNames[0] + ".db").toURI().toString();
     Assert.assertEquals(expectedCatalog(), fetched.getCatalogName());
     Assert.assertEquals(expectedLocation, fetched.getLocationUri() + "/");
     String db0Location = new URI(fetched.getLocationUri()).getPath();
@@ -482,7 +485,9 @@ public abstract class NonCatCallsWithCatalog {
           .build(conf);
       table.unsetCatName();
       client.createTable(table);
-      expected.add(new TableMeta(dbName, tableNames[i], TableType.MANAGED_TABLE.name()));
+      TableMeta tableMeta = new TableMeta(dbName, tableNames[i], TableType.MANAGED_TABLE.name());
+      tableMeta.setCatName(expectedCatalog());
+      expected.add(tableMeta);
     }
 
     List<String> types = Collections.singletonList(TableType.MANAGED_TABLE.name());

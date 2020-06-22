@@ -1,3 +1,4 @@
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,11 +19,15 @@
 
 package org.apache.hadoop.hive.metastore.model;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.metastore.model.MTable.PK;
+
 public class MTable {
-  
+
+  private long id;
   private String tableName;
   private MDatabase database;
   private MStorageDescriptor sd;
@@ -37,6 +42,35 @@ public class MTable {
   private String viewExpandedText;
   private boolean rewriteEnabled;
   private String tableType;
+  private long writeId;
+
+  @SuppressWarnings("serial")
+  public static class PK implements Serializable {
+    public long id;
+
+    public PK() {}
+
+    public PK(long id) {
+      this.id = id;
+    }
+
+    public String toString() {
+      return String.format("%d", id);
+    }
+
+    public int hashCode() {
+      return toString().hashCode();
+    }
+
+    public boolean equals(Object other) {
+      if (other != null && (other instanceof PK)) {
+        PK otherPK = (PK) other;
+        return
+            otherPK.id == id;
+      }
+      return false;
+    }
+  }
 
   public MTable() {}
 
@@ -269,5 +303,20 @@ public class MTable {
    */
   public String getTableType() {
     return tableType;
+  }
+
+  public long getWriteId() {
+    return writeId;
+  }
+
+  public void setWriteId(long writeId) {
+    this.writeId = writeId;
+  }
+
+  /**
+   * @return the id.
+   */
+  public long getId() {
+    return id;
   }
 }

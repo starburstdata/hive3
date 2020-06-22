@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.metastore.api.CreationMetadata;
 import org.apache.hadoop.hive.metastore.api.ISchemaName;
 import org.apache.hadoop.hive.metastore.api.SchemaVersionDescriptor;
@@ -72,6 +73,12 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
+import org.apache.hadoop.hive.metastore.api.ScheduledQuery;
+import org.apache.hadoop.hive.metastore.api.ScheduledQueryKey;
+import org.apache.hadoop.hive.metastore.api.ScheduledQueryMaintenanceRequest;
+import org.apache.hadoop.hive.metastore.api.ScheduledQueryPollRequest;
+import org.apache.hadoop.hive.metastore.api.ScheduledQueryPollResponse;
+import org.apache.hadoop.hive.metastore.api.ScheduledQueryProgressInfo;
 import org.apache.hadoop.hive.metastore.api.SchemaVersion;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -82,10 +89,10 @@ import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.metastore.api.WMMapping;
 import org.apache.hadoop.hive.metastore.api.WMPool;
+import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.FullTableName;
 import org.apache.thrift.TException;
 import org.junit.Assert;
 
@@ -243,6 +250,12 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public Table getTable(String catalogName, String dbName, String tableName,
+                        String  writeIdList) throws MetaException {
+    return null;
+  }
+
+  @Override
   public boolean addPartition(Partition part) throws InvalidObjectException, MetaException {
 
     return false;
@@ -252,6 +265,13 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   public Partition getPartition(String catName, String dbName, String tableName, List<String> part_vals)
       throws MetaException, NoSuchObjectException {
 
+    return null;
+  }
+
+  @Override
+  public Partition getPartition(String catName, String dbName, String tableName, List<String> part_vals,
+                                String  writeIdList)
+      throws MetaException, NoSuchObjectException {
     return null;
   }
 
@@ -270,8 +290,15 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public void alterTable(String catName, String dbname, String name, Table newTable)
+  public Map<String, String> getPartitionLocations(String catName, String dbName, String tblName,
+                                                   String baseLocationToNotShow, int max) {
+    return Collections.emptyMap();
+  }
+
+  @Override
+  public Table alterTable(String catName, String dbname, String name, Table newTable, String queryValidWriteIds)
       throws InvalidObjectException, MetaException {
+    return newTable;
   }
 
   @Override
@@ -285,7 +312,12 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public List<String> getTables(String catName, String dbName, String pattern, TableType tableType) throws MetaException {
+  public List<String> getTables(String catName, String dbName, String pattern, TableType tableType, int limit) throws MetaException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<Table> getAllMaterializedViewObjectsForRewriting(String catName) throws MetaException {
     return Collections.emptyList();
   }
 
@@ -338,16 +370,16 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public void alterPartition(String catName, String db_name, String tbl_name, List<String> part_vals,
-      Partition new_part) throws InvalidObjectException, MetaException {
+  public Partition alterPartition(String catName, String db_name, String tbl_name, List<String> part_vals,
+      Partition new_part, String queryValidWriteIds) throws InvalidObjectException, MetaException {
+    return new_part;
   }
 
   @Override
-  public void alterPartitions(String catName, String db_name, String tbl_name,
-                              List<List<String>> part_vals_list, List<Partition> new_parts)
-      throws InvalidObjectException, MetaException {
-
-
+  public List<Partition> alterPartitions(String catName, String db_name, String tbl_name,
+      List<List<String>> part_vals_list, List<Partition> new_parts,
+      long writeId, String queryValidWriteIds) throws InvalidObjectException, MetaException {
+    return new_parts;
   }
 
   @Override
@@ -694,14 +726,28 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public  ColumnStatistics getTableColumnStatistics(String catName, String dbName, String tableName,
+  public List<ColumnStatistics> getTableColumnStatistics(String catName, String dbName, String tableName,
       List<String> colName) throws MetaException, NoSuchObjectException {
     return null;
   }
 
   @Override
+  public  ColumnStatistics getTableColumnStatistics(String catName, String dbName, String tableName,
+      List<String> colName, String engine) throws MetaException, NoSuchObjectException {
+    return null;
+  }
+
+  @Override
+  public ColumnStatistics getTableColumnStatistics(
+      String catName, String dbName, String tableName, List<String> colName,
+      String engine, String  writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return null;
+  }
+
+  @Override
   public boolean deleteTableColumnStatistics(String catName, String dbName, String tableName,
-                                             String colName)
+      String colName, String engine)
       throws NoSuchObjectException, MetaException, InvalidObjectException {
     return false;
   }
@@ -709,7 +755,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
 
   @Override
   public boolean deletePartitionColumnStatistics(String catName, String dbName, String tableName,
-    String partName, List<String> partVals, String colName)
+    String partName, List<String> partVals, String colName, String engine)
     throws NoSuchObjectException, MetaException, InvalidObjectException,
     InvalidInputException {
     return false;
@@ -717,15 +763,25 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public boolean updateTableColumnStatistics(ColumnStatistics statsObj)
+  public Map<String, String> updateTableColumnStatistics(ColumnStatistics statsObj,
+      String  validWriteIds, long writeId)
       throws NoSuchObjectException, MetaException, InvalidObjectException {
-    return false;
+    return null;
   }
 
   @Override
-  public boolean updatePartitionColumnStatistics(ColumnStatistics statsObj,List<String> partVals)
+  public Map<String, String> updatePartitionColumnStatistics(ColumnStatistics statsObj,List<String> partVals,
+      String  validWriteIds, long writeId)
     throws NoSuchObjectException, MetaException, InvalidObjectException {
-    return false;
+    return null;
+  }
+
+  @Override
+  public List<ColumnStatistics> getPartitionColumnStatistics(
+      String catName, String dbName, String tblName, List<String> partNames,
+      List<String> colNames, String  writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return Collections.emptyList();
   }
 
   @Override
@@ -742,15 +798,24 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public List<ColumnStatistics> getPartitionColumnStatistics(String catName, String dbName,
+  public List<List<ColumnStatistics>> getPartitionColumnStatistics(String catName, String dbName,
       String tblName, List<String> colNames, List<String> partNames)
       throws MetaException, NoSuchObjectException {
     return Collections.emptyList();
   }
 
   @Override
+  public List<ColumnStatistics> getPartitionColumnStatistics(
+      String catName, String dbName, String tblName, List<String> partNames,
+      List<String> colNames, String engine, String  writeIdList)
+      throws MetaException, NoSuchObjectException {
+    return Collections.emptyList();
+  }
+
+  @Override
   public boolean doesPartitionExist(String catName, String dbName, String tableName,
-      List<String> partVals) throws MetaException, NoSuchObjectException {
+      List<FieldSchema> partKeys, List<String> partVals)
+      throws MetaException, NoSuchObjectException {
     return false;
   }
 
@@ -805,8 +870,17 @@ public class DummyRawStoreForJdoConnection implements RawStore {
 
   @Override
   public AggrStats get_aggr_stats_for(String catName, String dbName,
-      String tblName, List<String> partNames, List<String> colNames)
+      String tblName, List<String> partNames, List<String> colNames,
+      String engine)
       throws MetaException {
+    return null;
+  }
+
+  @Override
+  public AggrStats get_aggr_stats_for(
+      String catName, String dbName, String tblName, List<String> partNames,
+      List<String> colNames, String engine, String  writeIdList)
+      throws MetaException, NoSuchObjectException {
     return null;
   }
 
@@ -816,7 +890,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public void addNotificationEvent(NotificationEvent event) {
+  public void addNotificationEvent(NotificationEvent event) throws MetaException {
 
   }
 
@@ -1175,13 +1249,13 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public List<FullTableName> getTableNamesWithStats() throws MetaException,
+  public List<TableName> getTableNamesWithStats() throws MetaException,
       NoSuchObjectException {
     return null;
   }
 
   @Override
-  public List<FullTableName> getAllTableNamesForStats() throws MetaException,
+  public List<TableName> getAllTableNamesForStats() throws MetaException,
       NoSuchObjectException {
     return null;
   }
@@ -1191,5 +1265,42 @@ public class DummyRawStoreForJdoConnection implements RawStore {
       String dbName, String tableName) throws MetaException,
       NoSuchObjectException {
     return null;
+  }
+
+  @Override
+  public void cleanWriteNotificationEvents(int olderThan) {
+  }
+
+  @Override
+  public List<WriteEventInfo> getAllWriteEventInfo(long txnId, String dbName, String tableName) throws MetaException {
+    return null;
+  }
+
+  @Override
+  public ScheduledQueryPollResponse scheduledQueryPoll(ScheduledQueryPollRequest request) {
+    throw new RuntimeException("unimplemented");
+  }
+
+  @Override
+  public void scheduledQueryMaintenance(ScheduledQueryMaintenanceRequest request) {
+  }
+
+  @Override
+  public void scheduledQueryProgress(ScheduledQueryProgressInfo info) {
+  }
+
+  @Override
+  public ScheduledQuery getScheduledQuery(ScheduledQueryKey scheduleKey) {
+    throw new RuntimeException("unimplemented");
+  }
+
+  @Override
+  public int deleteScheduledExecutions(int maxRetainSecs) {
+    throw new RuntimeException("unimplemented");
+  }
+
+  @Override
+  public int markScheduledExecutionsTimedOut(int timeoutSecs) throws InvalidOperationException{
+    throw new RuntimeException("unimplemented");
   }
 }

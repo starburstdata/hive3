@@ -122,9 +122,12 @@ public class TestDatabases extends MetaStoreClientTest {
     Database createdDatabase = client.getDatabase(database.getName());
 
     // The createTime will be set on the server side, so the comparison should skip it
+    database.setCreateTime(createdDatabase.getCreateTime());
     Assert.assertEquals("Comparing databases", database, createdDatabase);
     Assert.assertTrue("The directory should be created", metaStore.isPathExists(
         new Path(database.getLocationUri())));
+    Assert.assertTrue("The managed directory should be created", metaStore.isPathExists(
+        new Path(database.getManagedLocationUri())));
     client.dropDatabase(database.getName());
     Assert.assertFalse("The directory should be removed",
         metaStore.isPathExists(new Path(database.getLocationUri())));
@@ -145,7 +148,7 @@ public class TestDatabases extends MetaStoreClientTest {
     Database createdDatabase = client.getDatabase(database.getName());
 
     Assert.assertNull("Comparing description", createdDatabase.getDescription());
-    Assert.assertEquals("Comparing location", metaStore.getWarehouseRoot() + "/" +
+    Assert.assertEquals("Comparing location", metaStore.getExternalWarehouseRoot() + "/" +
                                                   createdDatabase.getName() + ".db", createdDatabase.getLocationUri());
     Assert.assertEquals("Comparing parameters", new HashMap<String, String>(),
         createdDatabase.getParameters());
@@ -153,6 +156,17 @@ public class TestDatabases extends MetaStoreClientTest {
     Assert.assertEquals("Comparing owner name", SecurityUtils.getUser(),
         createdDatabase.getOwnerName());
     Assert.assertEquals("Comparing owner type", PrincipalType.USER, createdDatabase.getOwnerType());
+  }
+
+  @Test
+  public void testCreateDatabaseOwnerName() throws Exception{
+    DatabaseBuilder databaseBuilder = new DatabaseBuilder()
+        .setCatalogName("hive")
+        .setName("dummy")
+        .setOwnerName(null);
+
+    Database db = databaseBuilder.create(client, metaStore.getConf());
+    Assert.assertNotNull("Owner name should be filled", db.getOwnerName());
   }
 
   @Test(expected = MetaException.class)
@@ -199,13 +213,40 @@ public class TestDatabases extends MetaStoreClientTest {
     Assert.assertEquals("Default database name", "default", database.getName());
     Assert.assertEquals("Default database description", "Default Hive database",
         database.getDescription());
-    Assert.assertEquals("Default database location", metaStore.getWarehouseRoot(),
+    Assert.assertEquals("Default database location", metaStore.getExternalWarehouseRoot(),
         new Path(database.getLocationUri()));
     Assert.assertEquals("Default database parameters", new HashMap<String, String>(),
         database.getParameters());
     Assert.assertEquals("Default database owner", "public", database.getOwnerName());
     Assert.assertEquals("Default database owner type", PrincipalType.ROLE, database.getOwnerType());
     Assert.assertNull("Default database privileges", database.getPrivileges());
+    Assert.assertTrue("database create time should be set", database.isSetCreateTime());
+    Assert.assertTrue("Database create time should be non-zero", database.getCreateTime() > 0);
+  }
+
+  @Test
+  public void testDatabaseCreateTime() throws Exception {
+    // create db without specifying createtime
+    Database testDb =
+        new DatabaseBuilder().setName("test_create_time").create(client, metaStore.getConf());
+    Database database = client.getDatabase("test_create_time");
+    Assert.assertTrue("Database create time should have been set",
+        database.getCreateTime() > 0);
+  }
+
+  @Test
+  public void testDbCreateTimeOverride() throws Exception {
+    // create db by providing a create time. Should be overridden, create time should
+    // always be set by metastore
+    Database testDb =
+        new DatabaseBuilder().setName("test_create_time")
+            .setCreateTime(1)
+            .create(client, metaStore.getConf());
+    Database database = client.getDatabase("test_create_time");
+    Assert.assertTrue("Database create time should have been set",
+        database.getCreateTime() > 0);
+    Assert.assertTrue("Database create time should have been reset by metastore",
+        database.getCreateTime() != 1);
   }
 
   @Test
@@ -429,6 +470,7 @@ public class TestDatabases extends MetaStoreClientTest {
             .setDescription("dummy description 2")
             .addParam("param_key_1", "param_value_1_2")
             .addParam("param_key_2_3", "param_value_2_3")
+            .setCreateTime(originalDatabase.getCreateTime())
             .build(metaStore.getConf());
 
     client.alterDatabase(originalDatabase.getName(), newDatabase);
@@ -454,6 +496,8 @@ public class TestDatabases extends MetaStoreClientTest {
         alteredDatabase.getDescription());
     Assert.assertEquals("Database location should not change", originalDatabase.getLocationUri(),
         alteredDatabase.getLocationUri());
+    Assert.assertEquals("Database managed location should not change", originalDatabase.getManagedLocationUri(),
+        alteredDatabase.getManagedLocationUri());
     Assert.assertEquals("Database parameters should be empty", new HashMap<String, String>(),
         alteredDatabase.getParameters());
     Assert.assertNull("Database owner should be empty", alteredDatabase.getOwnerName());
@@ -621,7 +665,8 @@ public class TestDatabases extends MetaStoreClientTest {
                .setName("dummy")
                .setOwnerType(PrincipalType.ROLE)
                .setOwnerName("owner")
-               .setLocation(metaStore.getWarehouseRoot() + "/database_location")
+               .setLocation(metaStore.getExternalWarehouseRoot() + "/database_location")
+               .setManagedLocation(metaStore.getWarehouseRoot() + "/database_location")
                .setDescription("dummy description")
                .addParam("param_key_1", "param_value_1")
                .addParam("param_key_2", "param_value_2")
